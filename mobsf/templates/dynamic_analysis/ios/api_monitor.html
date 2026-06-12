@@ -1,0 +1,101 @@
+{% extends "base/legacy_app.html" %}
+{% load static %}
+
+{% block page_title %}iOS API Monitor — {{ bundle_id }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'adminlte/plugins/datatables-bs4/dataTables.bootstrap4.min.css' %}">
+<style>
+  table.dataTable thead th { background: rgb(var(--surface-2) / 0.5); border-color: rgb(var(--border-subtle)) !important; }
+  table.dataTable tbody td  { border-color: rgb(var(--border-subtle)) !important; }
+  table.dataTable tbody tr:hover td { background: rgb(var(--surface-2) / 0.4); }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="flex items-center justify-between gap-4 mb-6">
+  <div>
+    <p class="text-tiny uppercase text-text-tertiary">Dynamic · iOS</p>
+    <h1 class="text-h2 mt-1">iOS API monitor</h1>
+    <p class="text-small text-text-secondary mt-1 font-mono">{{ bundle_id }}</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <label class="text-small text-text-secondary">Snip:</label>
+    <input id="snip" type="number" min="100" max="20000" value="5000"
+           oninput="change_snip(this.value)" class="input h-8 w-28 text-right" />
+  </div>
+</header>
+
+<div class="card">
+  <div class="card-header">
+    <span class="text-small text-text-secondary">Calls</span>
+    <span class="text-tiny text-text-tertiary">refreshes every 10s</span>
+  </div>
+  <div class="card-body">
+    <div id="messages" class="text-tiny text-text-tertiary mb-3"></div>
+    <div class="table-responsive">
+      <table id="autotbl" class="table table-hover table-striped" style="width:100%">
+        <thead><tr><th>API</th><th>DATA</th></tr></thead>
+        <tfoot><tr><th>API</th><th>DATA</th></tr></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'adminlte/plugins/datatables/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'adminlte/plugins/datatables-bs4/dataTables.bootstrap4.min.js' %}"></script>
+<script type="text/javascript">
+var snip = document.getElementById('snip').value;
+var tbl;
+
+function change_snip(val) { snip = parseInt(val); tbl.ajax.reload(); }
+
+function escapeHtml(text) {
+  var map = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' };
+  return text.replace(/[&<>"']/g, function (m) { return map[m]; });
+}
+
+function formatFlattenedData(data) {
+  if (!data || typeof data !== 'object') return escapeHtml(JSON.stringify(data));
+  var formatted = [];
+  function walk(obj) {
+    for (var k in obj) {
+      if (!obj.hasOwnProperty(k)) continue;
+      var v = obj[k];
+      if (v !== null && typeof v === 'object' && !Array.isArray(v)) walk(v);
+      else if (Array.isArray(v)) {
+        if (v.length > 0 && typeof v[0] === 'object') {
+          v.forEach(function (it) {
+            if (typeof it === 'object' && it !== null) walk(it);
+            else formatted.push('<strong>' + escapeHtml(k) + '</strong>: ' + escapeHtml(String(it)));
+          });
+        } else formatted.push('<strong>' + escapeHtml(k) + '</strong>: ' + escapeHtml(JSON.stringify(v)));
+      } else formatted.push('<strong>' + escapeHtml(k) + '</strong>: ' + escapeHtml(String(v)));
+    }
+  }
+  walk(data);
+  return formatted.join('<br>');
+}
+
+$(document).ready(function () {
+  $.fn.dataTable.ext.errMode = 'none';
+  tbl = $('#autotbl').DataTable({
+    ajax: '{% url "ios_api_monitor" %}?checksum={{ checksum }}&stream=1',
+    deferRender: true, scroller: true, scrollX: true,
+    searching: true, paging: false, info: true,
+    processing: true, serverSide: false,
+    columns: [{ data: 'api' }, { data: 'data' }],
+    columnDefs: [{
+      targets: [1],
+      render: function (data) {
+        var s = formatFlattenedData(data);
+        return s.length > snip ? s.slice(0, snip) + '...' : s;
+      },
+    }],
+  });
+  setInterval(function () { tbl.ajax.reload(null, false); }, 10000);
+});
+</script>
+{% endblock %}

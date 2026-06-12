@@ -1,0 +1,19 @@
+{% extends "base/auth.html" %}
+{% load mi_icons %}
+{% block page_title %}Not found{% endblock %}
+
+{% block content %}
+<div class="text-center" data-reveal>
+  <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-surface-2 text-text-tertiary mb-4">
+    {% icon "help-circle" size=28 %}
+  </div>
+  <h1 class="text-display">404</h1>
+  <p class="text-h3 mt-2">Page not found</p>
+  <p class="text-text-secondary mt-2 max-w-sm mx-auto">
+    The URL you tried doesn't exist, or it was moved.
+  </p>
+  <div class="mt-6">
+    <a href="/" class="btn btn-primary btn-md">{% icon "chevron-left" size=14 %} Back to home</a>
+  </div>
+</div>
+{% endblock %}

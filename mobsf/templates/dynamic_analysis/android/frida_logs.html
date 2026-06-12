@@ -1,0 +1,40 @@
+{% extends "base/legacy_app.html" %}
+
+{% block page_title %}Frida Logs — {{ package }}{% endblock %}
+
+{% block content %}
+<header class="mb-6">
+  <p class="text-tiny uppercase text-text-tertiary">Dynamic · Frida</p>
+  <h1 class="text-h2 mt-1">Frida logs</h1>
+  <p class="text-small text-text-secondary mt-1 font-mono">{{ package }}</p>
+</header>
+
+<div class="card">
+  <div class="card-header">
+    <span class="text-small text-text-secondary">Live tail</span>
+    <span class="text-tiny text-text-tertiary">refreshes every 10s</span>
+  </div>
+  <div class="card-body p-0">
+    <div id="messages" class="px-5 py-2 text-tiny text-text-tertiary"></div>
+    <pre id="logs" class="px-5 py-4 m-0 max-h-[70vh] overflow-auto font-mono text-mono bg-surface-2/40 border-t border-border-subtle whitespace-pre-wrap"></pre>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script type="text/javascript">
+$(document).ready(function () {
+  function get_logs() {
+    $.ajax({
+      url: '/frida_logs/?hash={{ hash }}&stream=1',
+      type: 'GET',
+      dataType: 'json',
+      success: function (json) { $('#logs').text(json.message); },
+      error: function (xhr) { console.log(xhr.responseText); },
+    });
+  }
+  get_logs();
+  setInterval(get_logs, 10000);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,963 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}Static · iOS — {{ app_name|default:file_name }}{% endblock %}
+
+{% block extra_head %}
+  <!-- DataTables CSS (used by charts, datatables_init.js) -->
+  <link href="{% static "datatables/css/datatables.combined.min.css" %}" rel="stylesheet">
+  <link href="{% static 'adminlte/plugins/sweetalert2/sweetalert2.min.css' %}" rel="stylesheet">
+  <style type="text/css" media="print">
+    @page { size: landscape; }
+    @media print {
+      aside, header.h-topbar, footer, .no-print { display: none !important; }
+      body { -webkit-print-color-adjust: exact; }
+    }
+  </style>
+  <style>
+    #app_icon { width: 64px; height: 64px; }
+    .pre-finding {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    #chartdiv { width: 100%; height: 500px; overflow: hidden; }
+    /* keep amCharts map readable on dark surfaces */
+    #chartdiv text { fill: currentColor; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div x-data="{ open: '', plistOpen: false, supOpen: false, logsOpen: false }" class="space-y-8">
+
+{# ─────────── Header ─────────── #}
+<a id="information" class="anchor"></a>
+<header class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+  <div class="flex items-center gap-4 min-w-0">
+    <img id="app_icon"
+      src="{% if not appstore_details.error %}{{appstore_details.icon}}{% elif icon_path %}/download/{{ icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+      class="rounded-lg bg-surface-2 object-contain flex-shrink-0"
+      alt=""/>
+    <div class="min-w-0">
+      <p class="text-tiny uppercase text-text-tertiary">Static · iOS</p>
+      <h1 class="text-h2 truncate">
+        {{ app_name }}
+        {% if app_version %}<span class="text-text-tertiary">v{{ app_version }}</span>{% endif %}
+      </h1>
+      {% if bundle_id %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ bundle_id }}</p>{% endif %}
+      <p class="text-tiny text-text-tertiary mt-0.5 font-mono truncate">{{ md5 }}</p>
+    </div>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 no-print" id="scan_options">
+    <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-primary btn-md" role="button">
+      {% icon "shield-check" size=14 %} Scorecard
+    </a>
+    <a href="{% url 'static_analyzer_ios' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md" role="button">
+      {% icon "activity" size=14 %} Rescan
+    </a>
+    <button onclick="window.print()" class="btn btn-secondary btn-md">
+      {% icon "file-text" size=14 %} Print / PDF
+    </button>
+    <a id="supbtn" onclick="list_suppressions()" role="button" class="btn btn-secondary btn-md" @click="supOpen = true" href="#">
+      {% icon "sliders" size=14 %} Suppressions
+    </a>
+    <button type="button" class="btn btn-secondary btn-md" @click="plistOpen = true">
+      {% icon "eye" size=14 %} Info.plist
+    </button>
+    <button type="button" class="btn btn-secondary btn-md" @click="logsOpen = true">
+      {% icon "file-text" size=14 %} Scan logs
+    </button>
+    <a href="{% url "download_binary" checksum=md5 %}" class="btn btn-ghost btn-md">
+      {% icon "download" size=14 %} Download ZIP
+    </a>
+  </div>
+</header>
+
+{# ─────────── Score + File + App info ─────────── #}
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+  {# App scores #}
+  <div class="card lg:col-span-3" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "shield-check" size=16 %} App scores</h2></div>
+    <div class="card-body space-y-3 text-small">
+      {% if average_cvss %}
+      <div class="flex items-center justify-between">
+        <span class="text-text-tertiary">Average CVSS</span>
+        <span class="font-semibold tabular text-text-primary">{{ average_cvss }}</span>
+      </div>
+      {% endif %}
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-text-tertiary">Security score</span>
+        <span class="badge {% if appsec.security_score < 40 %}badge-critical{% elif appsec.security_score == 100 %}badge-passed{% else %}badge-medium{% endif %}">{{ appsec.security_score }}/100</span>
+      </div>
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-text-tertiary">Trackers</span>
+        {% if trackers.detected_trackers > 0 %}
+          <span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
+        {% else %}
+          <span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# File information #}
+  <div class="card lg:col-span-4" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
+    <div class="card-body space-y-2 text-small">
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">File name</span><span class="font-mono text-mono text-text-primary truncate">{{ file_name }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">MD5</span><span class="font-mono text-mono text-text-secondary truncate">{{ md5 }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">SHA1</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha1 }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">SHA256</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha256 }}</span></div>
+    </div>
+  </div>
+
+  {# App information #}
+  <div class="card lg:col-span-5" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "info" size=16 %} App information</h2></div>
+    <div class="card-body space-y-2 text-small">
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App type</span><span class="text-text-primary">{{ app_type }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Identifier</span><span class="font-mono text-mono text-text-primary truncate">{{ bundle_id }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">SDK name</span><span class="text-text-primary">{{ sdk_name }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Version</span><span class="text-text-primary">{{ app_version }} <span class="text-text-tertiary">(build {{ build }})</span></span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Platform version</span><span class="text-text-primary">{{ platform }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Min OS version</span><span class="text-text-primary">{{ min_os_version }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Supported platforms</span><span class="text-text-secondary">{% for pl in bundle_supported_platforms %}{{pl}}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+    </div>
+  </div>
+
+</section>
+
+{# ─────────── App Store information ─────────── #}
+{% if not appstore_details.error %}
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "smartphone" size=16 %} App Store information</h2></div>
+    <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-small">
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Title</span><span class="text-text-primary">{{ appstore_details.title }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Score</span><span class="text-text-primary">{{ appstore_details.score }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Features</span><span class="text-text-secondary">{% for fea in appstore_details.features %}{{ fea }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Price</span><span class="text-text-primary">{{ appstore_details.price }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Category</span><span class="text-text-secondary">{% for cat in appstore_details.category %}{{ cat }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App Store URL</span><a target="_blank" href="{{ appstore_details.itunes_url }}" rel="noopener noreferrer" class="text-text-brand hover:underline truncate">{{ appstore_details.app_id }}</a></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Developer</span><span class="text-text-primary">{{ appstore_details.developer }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Developer ID</span><span class="text-text-secondary">{{ appstore_details.developer_id }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Developer website</span><span class="text-text-secondary truncate">{{ appstore_details.developer_website }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Developer URL</span><span class="text-text-secondary truncate">{{ appstore_details.developer_url }}</span></div>
+      <div class="flex items-baseline gap-2 md:col-span-2"><span class="text-text-tertiary w-32 flex-shrink-0">Supported devices</span><span class="text-text-secondary">{% for dev in appstore_details.supported_devices %}{{ dev }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+      <div class="md:col-span-2 mt-2">
+        <p class="text-text-tertiary mb-1">Description</p>
+        <pre class="pre-finding text-text-secondary">{{ appstore_details.description }}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ─────────── Custom URL schemes ─────────── #}
+<a id="url_schemes" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "external-link" size=18 %} Custom URL schemes</h2></div>
+    {% if bundle_url_types|length > 0 %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">URL name</th>
+            <th class="text-left px-5 py-2.5 font-medium">Schemes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for scheme in bundle_url_types %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+            <td class="px-5 py-3 text-text-primary">
+              {{scheme | key:"CFBundleURLName" }}
+              {% if scheme|key:"CFBundleTypeRole" %}
+                <br><span class="text-text-tertiary">{{scheme | key:"CFBundleTypeRole" }}</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary font-mono text-mono">
+              {% if scheme|key:"CFBundleURLSchemes" %}
+              {% for ul in scheme.CFBundleURLSchemes %}
+                {{ul}} <br/>
+              {% endfor %}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body"><p class="text-small text-text-secondary">No URL Schemes found.</p></div>
+    {% endif %}
+  </div>
+</section>
+
+{# ─────────── Application permissions ─────────── #}
+<a id="permissions" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield" size=18 %} Application permissions</h2></div>
+    {% if permissions %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Permissions</th>
+            <th class="text-left px-5 py-2.5 font-medium">Status</th>
+            <th class="text-left px-5 py-2.5 font-medium">Info</th>
+            <th class="text-left px-5 py-2.5 font-medium">Reason in manifest</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for  perm, desc in permissions.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-primary font-mono text-mono">{{ perm }}</td>
+            <td class="px-5 py-3">
+              {% if desc.status == 'dangerous' %}
+                <span class="badge badge-critical">dangerous</span>
+              {% else %}
+                <span class="badge badge-low">normal</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary">{{ desc.info}}</td>
+            <td class="px-5 py-3 text-text-secondary">{{ desc.description }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body"><p class="text-small text-text-secondary">No Permissions required.</p></div>
+    {% endif %}
+  </div>
+</section>
+
+{# ─────────── iOS API ─────────── #}
+<a id="ios_api" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} iOS API</h2></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">API</th>
+            <th class="text-left px-5 py-2.5 font-medium">Files</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rule, details in  ios_api.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-primary">{{ details.metadata.description }}</td>
+            <td class="px-5 py-3">
+              <details class="group">
+                <summary class="cursor-pointer text-text-brand hover:underline select-none inline-flex items-center gap-1">
+                  {% icon "chevron-right" size=14 %} Show files
+                </summary>
+                <div class="mt-2 space-y-1">
+                  {% for file_path, lines in details.files.items %}
+                    <a class="block text-mono font-mono text-text-secondary hover:text-text-brand hover:underline" href="{% url 'view_file_ios' %}?file={{ file_path }}&amp;md5={{ md5 }}&amp;type=ios&amp;lines={{ lines }}">{{ file_path }}</a>
+                  {% endfor %}
+                </div>
+              </details>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────── App Transport Security (ATS) ─────────── #}
+<a id="transport_security" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "lock" size=18 %} App Transport Security (ATS)</h2></div>
+    {% if ats_analysis and 'ats_summary' in ats_analysis and ats_analysis.ats_summary|length > 0 %}
+    <div class="card-body grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 rounded-md bg-severity-high/10 text-severity-high dark:bg-severity-high-dark/15 dark:text-severity-high-dark flex items-center justify-center">{% icon "alert-triangle" size=18 %}</span>
+        <div><p class="text-tiny uppercase text-text-tertiary">High</p><p class="text-h3 tabular">{{ ats_analysis.ats_summary.high }}</p></div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 rounded-md bg-severity-medium/10 text-severity-medium dark:bg-severity-medium-dark/15 dark:text-severity-medium-dark flex items-center justify-center">{% icon "alert-triangle" size=18 %}</span>
+        <div><p class="text-tiny uppercase text-text-tertiary">Warning</p><p class="text-h3 tabular">{{ ats_analysis.ats_summary.warning }}</p></div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 rounded-md bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark flex items-center justify-center">{% icon "info" size=18 %}</span>
+        <div><p class="text-tiny uppercase text-text-tertiary">Info</p><p class="text-h3 tabular">{{ ats_analysis.ats_summary.info }}</p></div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 rounded-md bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex items-center justify-center">{% icon "check" size=18 %}</span>
+        <div><p class="text-tiny uppercase text-text-tertiary">Secure</p><p class="text-h3 tabular">{{ ats_analysis.ats_summary.secure }}</p></div>
+      </div>
+    </div>
+    {% endif %}
+    <div class="overflow-x-auto border-t border-border-subtle">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">No</th>
+            <th class="text-left px-5 py-2.5 font-medium">Issue</th>
+            <th class="text-left px-5 py-2.5 font-medium">Severity</th>
+            <th class="text-left px-5 py-2.5 font-medium">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if ats_analysis and 'ats_findings' in ats_analysis %}
+            {% for findings in ats_analysis.ats_findings %}
+            <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+              <td class="px-5 py-3 tabular text-text-tertiary">{{ forloop.counter }}</td>
+              <td class="px-5 py-3 text-text-primary">{{findings.issue}}</td>
+              <td class="px-5 py-3">
+                {% if findings.severity == "high" %}
+                <span class="badge badge-high">high</span>
+                {% elif findings.severity == "secure" %}
+                <span class="badge badge-passed">secure</span>
+                {% elif findings.severity == "warning" %}
+                <span class="badge badge-medium">warning</span>
+                {% elif findings.severity == "info" %}
+                <span class="badge badge-low">info</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3 text-text-secondary">{{findings.description}}</td>
+            </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────── Code analysis ─────────── #}
+<a id="code_analysis" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Code analysis</h2></div>
+    {% if code_analysis and 'summary' in code_analysis and code_analysis.summary|length > 0 %}
+    <div class="card-body grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 rounded-md bg-severity-high/10 text-severity-high dark:bg-severity-high-dark/15 dark:text-severity-high-dark flex items-center justify-center">{% icon "alert-triangle" size=18 %}</span>
+        <div><p class="text-tiny uppercase text-text-tertiary">High</p><p class="text-h3 tabular">{{ code_analysis.summary.high }}</p></div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 rounded-md bg-severity-medium/10 text-severity-medium dark:bg-severity-medium-dark/15 dark:text-severity-medium-dark flex items-center justify-center">{% icon "alert-triangle" size=18 %}</span>
+        <div><p class="text-tiny uppercase text-text-tertiary">Warning</p><p class="text-h3 tabular">{{ code_analysis.summary.warning }}</p></div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 rounded-md bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark flex items-center justify-center">{% icon "info" size=18 %}</span>
+        <div><p class="text-tiny uppercase text-text-tertiary">Info</p><p class="text-h3 tabular">{{ code_analysis.summary.info }}</p></div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 rounded-md bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex items-center justify-center">{% icon "check" size=18 %}</span>
+        <div><p class="text-tiny uppercase text-text-tertiary">Secure</p><p class="text-h3 tabular">{{ code_analysis.summary.secure }}</p></div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="w-9 h-9 rounded-md bg-severity-unknown/15 text-severity-unknown dark:bg-severity-unknown-dark/15 dark:text-severity-unknown-dark flex items-center justify-center">{% icon "eye-off" size=18 %}</span>
+        <div><p class="text-tiny uppercase text-text-tertiary">Suppressed</p><p class="text-h3 tabular">{{ code_analysis.summary.suppressed }}</p></div>
+      </div>
+    </div>
+    {% endif %}
+    <div class="overflow-x-auto border-t border-border-subtle">
+      <table id="table_code" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">No</th>
+            <th class="text-left px-5 py-2.5 font-medium">Issue</th>
+            <th class="text-left px-5 py-2.5 font-medium">Severity</th>
+            <th class="text-left px-5 py-2.5 font-medium">Standards</th>
+            <th class="text-left px-5 py-2.5 font-medium">Files</th>
+            <th class="text-left px-5 py-2.5 font-medium">Options</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if code_analysis and 'findings' in code_analysis %}
+          {% for rule, details in code_analysis.findings.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 tabular text-text-tertiary">{{ forloop.counter }}</td>
+            <td class="px-5 py-3 text-text-primary">
+              {% if details.metadata|key:"ref" %}
+              <a href="{{details.metadata.ref}}" target="_blank" rel="noopener" class="text-text-brand hover:underline">{{ details.metadata.description }}</a>
+              {% else %}
+                {{ details.metadata.description }}
+              {% endif %}
+            </td>
+            <td class="px-5 py-3">
+              {% if details.metadata.severity == "high" %}
+                <span class="badge badge-high">high</span>
+                {% elif details.metadata.severity == "good" %}
+                <span class="badge badge-passed">secure</span>
+                {% elif details.metadata.severity == "warning" %}
+                <span class="badge badge-medium">warning</span>
+                {% elif details.metadata.severity == "info" %}
+                <span class="badge badge-low">info</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary text-tiny">
+              {% if average_cvss %}
+                <strong class="text-text-primary">CVSS V2:</strong>
+                {{ details.metadata.cvss }}
+                {% if details.metadata.cvss > 6 %}
+                  (high)
+                {% elif details.metadata.cvss == 0 %}
+                  (info)
+                {% elif details.metadata.cvss >= 4 %}
+                  (medium)
+                {% elif details.metadata.cvss < 4 %}
+                  (low)
+                {% endif %}
+                </br>
+              {% endif %}
+              {% if details.metadata.cwe %} <strong class="text-text-primary">CWE: </strong>{{details.metadata.cwe }}{% endif %}
+              {% if details.metadata|key:"owasp-mobile" %}</br> <strong class="text-text-primary">OWASP Top 10: </strong>{{ details.metadata|key:"owasp-mobile" }}{% endif %}
+              {% if details.metadata.masvs %}</br> <strong class="text-text-primary">OWASP MASVS: </strong>{{ details.metadata.masvs  }}{% endif %}
+            </td>
+            <td class="px-5 py-3">
+              {% if details.files|length < 4 %}
+                {% for file_path, lines in details.files.items %}
+                  <a class="block text-mono font-mono text-text-secondary hover:text-text-brand hover:underline" href="{% url 'view_file_ios' %}?file={{ file_path }}&amp;md5={{ md5 }}&amp;type=ios&amp;lines={{ lines }}">{{ file_path }}</a>
+                {% endfor %}
+              {% else %}
+                <details class="group">
+                  <summary class="cursor-pointer text-text-brand hover:underline select-none inline-flex items-center gap-1">
+                    {% icon "chevron-right" size=14 %} Show files
+                  </summary>
+                  <div class="mt-2 space-y-1">
+                    {% for file_path, lines in details.files.items %}
+                      <a class="block text-mono font-mono text-text-secondary hover:text-text-brand hover:underline" href="{% url 'view_file_ios' %}?file={{ file_path }}&amp;md5={{ md5 }}&amp;type=ios&amp;lines={{ lines }}">{{ file_path }}</a>
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3">
+              <div class="relative" x-data="{ menu: false }">
+                <button type="button" class="btn btn-ghost btn-sm" @click="menu = !menu" @click.outside="menu = false" aria-haspopup="true" :aria-expanded="menu">
+                  {% icon "eye-off" size=14 %}
+                </button>
+                <div x-show="menu" x-cloak x-transition class="absolute right-0 z-30 mt-1 w-72 rounded-lg border border-border-subtle bg-surface-1 shadow-elevation-3 py-1">
+                  <a style="cursor:pointer;" class="block px-4 py-2 text-small text-text-secondary hover:bg-surface-2/60" onclick="suppress('{{rule | escapejs }}', false, $(this.closest('tr')))">Suppress the rule <b class="text-text-primary">{{ rule }}</b> in <b class="text-text-primary">{{bundle_id}}</b></a>
+                  <a style="cursor:pointer;" class="block px-4 py-2 text-small text-text-secondary hover:bg-surface-2/60" onclick="suppress('{{rule | escapejs }}', true, $(this.closest('tr')))">Suppress the rule <b class="text-text-primary">{{ rule }}</b> in <b class="text-text-primary">{{bundle_id}}</b> only from these files</a>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────── File analysis ─────────── #}
+<a id="file_analysis" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} File analysis</h2></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">No</th>
+            <th class="text-left px-5 py-2.5 font-medium">Issue</th>
+            <th class="text-left px-5 py-2.5 font-medium">Files</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in file_analysis %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 tabular text-text-tertiary">{{ forloop.counter }}</td>
+            <td class="px-5 py-3 text-text-primary">{{ item.issue }}</td>
+            <td class="px-5 py-3">
+              {% for file in item.files %}
+                {% if file.type %}
+                <a href="{% url 'view_file_ios' %}?file={{file.file_path}}&amp;type={{file.type}}&amp;md5={{file.hash}}" class="block text-mono font-mono text-text-secondary hover:text-text-brand hover:underline">{{ file.file_path }}</a>
+                {% else %}
+                <span class="block text-mono font-mono text-text-secondary">{{ file.file_path }}</span>
+                {% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────── Firebase database analysis ─────────── #}
+<a id="firebase" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Firebase database analysis</h2></div>
+    <div class="overflow-x-auto">
+      <table id="table_firebase" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Title</th>
+            <th class="text-left px-5 py-2.5 font-medium">Severity</th>
+            <th class="text-left px-5 py-2.5 font-medium">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for find in firebase_urls %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-primary">{{ find.title }}</td>
+            <td class="px-5 py-3">
+              {% if find.severity == 'high' %}
+                <span class="badge badge-high">high</span>
+              {% elif find.severity  == 'secure' %}
+                <span class="badge badge-passed">secure</span>
+              {% elif find.severity  == 'warning' %}
+                <span class="badge badge-medium">warning</span>
+              {% elif find.severity  == 'info' %}
+                <span class="badge badge-low">info</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary">{{ find.description }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────── Server locations ─────────── #}
+<a id="serverlocations" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "activity" size=18 %} Server locations</h2></div>
+    <div class="card-body">
+      <div id="chartdiv"></div>
+    </div>
+    {% if domains %}
+    <div class="px-5 pb-3">
+      <p class="text-small text-text-secondary">This app may communicate with the following OFAC sanctioned list of countries.</p>
+    </div>
+    <div class="overflow-x-auto border-t border-border-subtle">
+      <table id="table_ofac" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Domain</th>
+            <th class="text-left px-5 py-2.5 font-medium">Country/Region</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for domain, details in domains.items %}
+          {% if details|key:"ofac" == True %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-primary font-mono text-mono">{{domain}}</td>
+            <td class="px-5 py-3 text-text-secondary">
+              <strong class="text-text-primary">IP: </strong>{{details|key:"geolocation"|key:"ip"}}  <br/>
+              <strong class="text-text-primary">Country: </strong>{{details|key:"geolocation"|key:"country_long"}} <br/>
+              <strong class="text-text-primary">Region: </strong>{{details|key:"geolocation"|key:"region"}} <br/>
+              <strong class="text-text-primary">City: </strong>{{details|key:"geolocation"|key:"city"}} <br/>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{# ─────────── Domain malware check ─────────── #}
+<a id="malware_check" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "search" size=18 %} Domain malware check</h2></div>
+    {% if domains %}
+    <div class="overflow-x-auto">
+      <table id="table_malware" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Domain</th>
+            <th class="text-left px-5 py-2.5 font-medium">Status</th>
+            <th class="text-left px-5 py-2.5 font-medium">Geolocation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for domain, details in domains.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-primary font-mono text-mono">{{domain}}</td>
+            <td class="px-5 py-3">
+              {% if details|key:"bad" == "yes" %}
+                <span class="badge badge-critical">malware</span>
+                <pre class="pre-finding text-text-secondary mt-2"><strong class="text-text-primary">URL: </strong>{{details|key:"domain_or_url"}}
+<strong class="text-text-primary">IP: </strong><span class="badge badge-critical">{{details|key:"ip"}}</span>
+<strong class="text-text-primary">Description: </strong>{{details|key:"desc"}}</pre>
+              {% else %}
+                <span class="badge badge-passed">ok</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary">
+              {% if details|key:"geolocation" %}
+                <strong class="text-text-primary">IP: </strong>{{details|key:"geolocation"|key:"ip"}}  <br/>
+                <strong class="text-text-primary">Country: </strong>{{details|key:"geolocation"|key:"country_long"}} <br/>
+                <strong class="text-text-primary">Region: </strong>{{details|key:"geolocation"|key:"region"}} <br/>
+                <strong class="text-text-primary">City: </strong>{{details|key:"geolocation"|key:"city"}} <br/>
+                <strong class="text-text-primary">Latitude: </strong>{{details|key:"geolocation"|key:"latitude"}} <br/>
+                <strong class="text-text-primary">Longitude: </strong>{{details|key:"geolocation"|key:"longitude"}} <br/>
+                <strong class="text-text-primary">View: </strong><a target="_blank" class="text-text-brand hover:underline" href="http://maps.google.com/maps?q={{details|key:"geolocation"|key:"latitude"}},{{details|key:"geolocation"|key:"longitude"}}">Google Map</a>
+              {% else %}
+                No Geolocation information available.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{# ─────────── URLs ─────────── #}
+<a id="urls" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "external-link" size=18 %} URLs</h2></div>
+    {% if urls %}
+    <div class="overflow-x-auto">
+      <table id="table_urls" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">URL</th>
+            <th class="text-left px-5 py-2.5 font-medium">File</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for urldict in urls %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-secondary font-mono text-mono break-all">
+              {% for u in urldict|key:"urls" %}
+                {{ u }} <br/>
+              {% endfor %}
+            </td>
+            <td class="px-5 py-3">
+              <a href="{% url 'view_file_ios' %}?file={{urldict|key:"path"}}&amp;md5={{ md5}}&amp;type=ios" class="text-mono font-mono text-text-brand hover:underline">{{urldict|key:"path"}}</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{# ─────────── Emails ─────────── #}
+<a id="emails" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Emails</h2></div>
+    {% if emails %}
+    <div class="overflow-x-auto">
+      <table id="table_emails" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Email</th>
+            <th class="text-left px-5 py-2.5 font-medium">File</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for email_dict in emails %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-secondary font-mono text-mono break-all">
+              {% for e in email_dict|key:"emails" %}
+                {{ e }} <br/>
+              {% endfor %}
+            </td>
+            <td class="px-5 py-3">
+              <a href="{% url 'view_file_ios' %}?file={{email_dict|key:"path"}}&amp;md5={{ md5}}&amp;type=ios" class="text-mono font-mono text-text-brand hover:underline">{{email_dict|key:"path"}}</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{# ─────────── Trackers ─────────── #}
+<a id="trackers" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "eye" size=18 %} Trackers</h2></div>
+    {% if trackers %}
+    <div class="overflow-x-auto">
+      <table id="table_trackers" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Tracker name</th>
+            <th class="text-left px-5 py-2.5 font-medium">Categories</th>
+            <th class="text-left px-5 py-2.5 font-medium">URL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for trk in trackers|key:"trackers" %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-primary">{{trk.name}}</td>
+            <td class="px-5 py-3 text-text-secondary">{{trk.categories}}</td>
+            <td class="px-5 py-3"><a target="_blank" href="{{trk.url}}" rel="noopener noreferrer" class="text-mono font-mono text-text-brand hover:underline break-all">{{trk.url}}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{# ─────────── Possible hardcoded secrets ─────────── #}
+<a id="secrets" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "key" size=18 %} Possible hardcoded secrets</h2></div>
+    <div class="card-body">
+      <div class="space-y-1 font-mono text-mono text-text-secondary break-all">
+        {% for val in secrets %}
+          {{ val }}<br/>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─────────── Strings ─────────── #}
+<a id="strings" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Strings</h2></div>
+    <div class="card-body">
+      {% include 'base/list.html' with list=strings type="strings"  limit=100 %}
+    </div>
+  </div>
+</section>
+
+{# ─────────── Files ─────────── #}
+<a id="files" class="anchor"></a>
+<section>
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "copy" size=18 %} Files</h2></div>
+    <div class="card-body">
+      {% include 'base/list.html' with list=files type="files"  limit=200 %}
+    </div>
+  </div>
+</section>
+
+{# ─────────── Info.plist modal ─────────── #}
+<div x-show="plistOpen" x-cloak @keydown.escape.window="plistOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/50" @click="plistOpen = false"></div>
+  <div class="relative card w-full max-w-4xl max-h-[85vh] flex flex-col" @click.outside="plistOpen = false">
+    <div class="card-header flex items-center justify-between">
+      <h2 class="text-h3">Info.plist</h2>
+      <button type="button" class="btn btn-ghost btn-sm" @click="plistOpen = false" aria-label="Close">{% icon "x" size=16 %}</button>
+    </div>
+    <div class="card-body overflow-auto">
+      <pre class="pre-finding text-text-secondary"><code>{{ info_plist }}</code></pre>
+    </div>
+  </div>
+</div>
+
+{# ─────────── Suppression rules modal ─────────── #}
+<div x-show="supOpen" x-cloak @keydown.escape.window="supOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/50" @click="supOpen = false"></div>
+  <div class="relative card w-full max-w-4xl max-h-[85vh] flex flex-col" @click.outside="supOpen = false">
+    <div class="card-header flex items-center justify-between">
+      <h2 class="text-h3">Suppression rules</h2>
+      <button type="button" class="btn btn-ghost btn-sm" @click="supOpen = false" aria-label="Close">{% icon "x" size=16 %}</button>
+    </div>
+    <div class="overflow-auto">
+      <table id="sup_table" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Suppression type</th>
+            <th class="text-left px-5 py-2.5 font-medium">By rule ID</th>
+            <th class="text-left px-5 py-2.5 font-medium">By files</th>
+          </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ─────────── Scan logs modal ─────────── #}
+<div x-show="logsOpen" x-cloak @keydown.escape.window="logsOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/50" @click="logsOpen = false"></div>
+  <div class="relative card w-full max-w-4xl max-h-[85vh] flex flex-col" @click.outside="logsOpen = false">
+    <div class="card-header flex items-center justify-between">
+      <h2 class="text-h3">Scan logs</h2>
+      <button type="button" class="btn btn-ghost btn-sm" @click="logsOpen = false" aria-label="Close">{% icon "x" size=16 %}</button>
+    </div>
+    <div class="overflow-auto">
+      <table id="scan_logs" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Timestamp</th>
+            <th class="text-left px-5 py-2.5 font-medium">Event</th>
+            <th class="text-left px-5 py-2.5 font-medium">Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-secondary tabular">{{log.timestamp}}</td>
+            <td class="px-5 py-3 text-text-primary">{{log.status}}</td>
+            <td class="px-5 py-3">
+              {% if not log.exception %}
+              <span class="text-severity-passed dark:text-severity-passed-dark">OK</span>
+              {% else %}
+              <span class="text-severity-critical dark:text-severity-critical-dark">{{log.exception}}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Legacy JS — jQuery + DataTables + amCharts + SweetAlert + suppression.js -->
+<script src="{% static 'adminlte/plugins/jquery.min.js' %}"></script>
+<script>
+  // Filter datatables warnings out of the alert() stream the way upstream did.
+  window.alert = (function () {
+    var nativeAlert = window.alert;
+    return function (m) {
+      window.alert = nativeAlert;
+      return ('' + m).indexOf('DataTables warning') === 0 ? console.warn(m) : nativeAlert(m);
+    };
+  })();
+</script>
+<script src="{% static "datatables/js/pdfmake.min.js" %}"></script>
+<script src="{% static "datatables/js/vfs_fonts.js" %}"></script>
+<script src="{% static "datatables/js/datatables.combined.min.js" %}"></script>
+<script src="{% static "others/js/datatables_init.js" %}"></script>
+<script src="{% static "amcharts/core.js" %}"></script>
+<script src="{% static "amcharts/maps.js" %}"></script>
+<script src="{% static "amcharts/worldIndiaLow.js" %}"></script>
+<script src="{% static "amcharts/animated.js" %}"></script>
+<script>
+  var list_suppressions_url = '{% url 'list_suppressions' %}';
+  var suppress_by_files_url = '{% url 'suppress_by_files' %}';
+  var suppress_by_rule_url = '{% url 'suppress_by_rule' %}';
+  var delete_suppression_url = '{% url 'delete_suppression' %}';
+</script>
+<!-- SweetAlert2 — live dependency of suppression.js (Swal.fire) -->
+<script src="{% static 'adminlte/plugins/sweetalert2/sweetalert2.min.js' %}"></script>
+<script src="{% static "others/js/suppression.js" %}"></script>
+<script>
+
+  // Remove rescan parameter
+  window.history.replaceState({}, '', window.location.pathname);
+
+  // Globals
+  const csrf = '{{ csrf_token }}'
+  const pkg = '{{ bundle_id }}'
+  const hash = '{{ md5 }}'
+
+
+  // Navbar Active
+    $(".nav-link").on("click", function() {
+    $(".nav-link").removeClass("active");
+    $(this).addClass("active");
+  });
+</script>
+<script>
+  // Themes begin
+  am4core.useTheme(am4themes_animated);
+  // Themes end
+
+  // Create map instance
+  var chart = am4core.create("chartdiv", am4maps.MapChart);
+
+  // Set map definition
+  chart.geodata = am4geodata_worldIndiaLow;
+
+  // Set projection
+  chart.projection = new am4maps.projections.Miller();
+
+  // Create map polygon series
+  var polygonSeries = chart.series.push(new am4maps.MapPolygonSeries());
+
+  // Exclude Antartica
+  polygonSeries.exclude = ["AQ"];
+
+  // Make map load polygon (like country names) data from GeoJSON
+  polygonSeries.useGeodata = true;
+
+  // Configure series
+  var polygonTemplate = polygonSeries.mapPolygons.template;
+  polygonTemplate.tooltipText = "{name}";
+  polygonTemplate.polygon.fillOpacity = 0.6;
+
+  // Create hover state and set alternative fill color
+  var hs = polygonTemplate.states.create("hover");
+  hs.properties.fill = chart.colors.getIndex(0);
+
+  // Add image series
+  var imageSeries = chart.series.push(new am4maps.MapImageSeries());
+  imageSeries.mapImages.template.propertyFields.longitude = "longitude";
+  imageSeries.mapImages.template.propertyFields.latitude = "latitude";
+  imageSeries.mapImages.template.tooltipText = "{title}";
+  imageSeries.mapImages.template.propertyFields.url = "url";
+
+  var circle = imageSeries.mapImages.template.createChild(am4core.Circle);
+  circle.radius = 3;
+  circle.propertyFields.fill = "color";
+
+  var circle2 = imageSeries.mapImages.template.createChild(am4core.Circle);
+  circle2.radius = 3;
+  circle2.propertyFields.fill = "color";
+
+
+  circle2.events.on("inited", function(event){
+    animateBullet(event.target);
+  })
+
+  function animateBullet(circle) {
+      var animation = circle.animate([{ property: "scale", from: 1, to: 5 }, { property: "opacity", from: 1, to: 0 }], 1000, am4core.ease.circleOut);
+      animation.events.on("animationended", function(event){
+        animateBullet(event.target.object);
+      })
+  }
+
+  var colorSet = new am4core.ColorSet();
+  imageSeries.data = [
+  {% if domains %}
+    {% for domain, details in domains.items %}
+      {% if details|key:"geolocation" %}
+      {
+        'title': '{{details|key:"geolocation"|key:"country_long"}}/{{details|key:"geolocation"|key:"region"}}',
+        'latitude': {{details|key:"geolocation"|key:"latitude"}},
+        'longitude': {{details|key:"geolocation"|key:"longitude"}},
+        'color':colorSet.next()
+      },
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  ];
+  </script>
+{% endblock %}

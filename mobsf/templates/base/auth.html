@@ -1,0 +1,54 @@
+{% load static %}{% load mi_icons %}{% load mi_theme %}<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  {% theme_bootstrap %}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>{% block page_title %}{{ title }}{% endblock %} · MobInspect</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'mobinspect/img/favicon.svg' %}" />
+  <link rel="alternate icon" href="{% static 'img/favicon.ico' %}" />
+  <link rel="stylesheet" href="{% static 'mobinspect/css/dist/app.css' %}" />
+</head>
+<body class="h-full antialiased bg-surface-0 text-text-primary">
+  <div class="min-h-full flex flex-col">
+
+    {# Top bar — minimal: brand left, theme toggle right #}
+    <header class="h-topbar flex items-center px-4 lg:px-6 border-b border-border-subtle">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500 text-white shadow-elevation-1">
+          {% icon "shield-check" size=18 %}
+        </span>
+        <span class="font-semibold tracking-tight text-text-primary">MobInspect</span>
+      </div>
+      <button
+        type="button"
+        class="ml-auto p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
+        aria-label="Toggle theme"
+        x-data="{ pref: (window.MI && window.MI.theme) ? window.MI.theme.get() : 'system' }"
+        @click="pref = window.MI.theme.cycle()"
+      >
+        <span x-show="pref === 'light'">{% icon "sun" size=18 %}</span>
+        <span x-show="pref === 'dark'" x-cloak>{% icon "moon" size=18 %}</span>
+        <span x-show="pref === 'system'" x-cloak>{% icon "monitor" size=18 %}</span>
+      </button>
+    </header>
+
+    <main class="flex-1 flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      {# Subtle bg accent — single radial gradient, no images #}
+      <div class="absolute inset-0 bg-gradient-to-br from-mobinspect-500/5 via-transparent to-transparent pointer-events-none" aria-hidden="true"></div>
+
+      <div class="relative w-full max-w-md">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <footer class="px-6 py-3 border-t border-border-subtle text-tiny text-text-tertiary text-center">
+      © {% now "Y" %} Appdirs · MobInspect · GPL-3.0
+    </footer>
+  </div>
+
+  <script defer src="{% static 'mobinspect/vendor/alpine.min.js' %}"></script>
+  <script defer src="{% static 'mobinspect/js/theme.js' %}"></script>
+</body>
+</html>

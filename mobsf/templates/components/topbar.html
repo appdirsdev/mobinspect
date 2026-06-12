@@ -1,0 +1,103 @@
+{% load mi_icons %}
+{# Topbar — search · notifications · theme toggle · user menu #}
+<div class="flex items-center gap-3 w-full px-4 lg:px-6">
+
+  {# Mobile sidebar toggle #}
+  <button
+    type="button"
+    class="md:hidden p-2 rounded-md text-text-secondary hover:bg-surface-2"
+    aria-label="Open menu"
+  >
+    {% icon "menu" size=20 %}
+  </button>
+
+  {# Search (global) #}
+  <div class="flex-1 max-w-md">
+    <div class="relative">
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+        {% icon "search" size=16 %}
+      </span>
+      <input
+        type="search"
+        placeholder="Search apps, hashes, findings…"
+        class="input pl-9 pr-12 h-9 bg-surface-2 border-transparent focus:bg-surface-1 focus:border-border"
+      />
+      <span class="absolute right-3 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-1 text-text-tertiary pointer-events-none">
+        <kbd class="kbd">⌘K</kbd>
+      </span>
+    </div>
+  </div>
+
+  <div class="ml-auto flex items-center gap-1">
+
+    {# Theme toggle — cycles light → dark → system #}
+    <button
+      type="button"
+      class="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
+      aria-label="Toggle theme"
+      x-data="{
+        pref: (window.MI && window.MI.theme) ? window.MI.theme.get() : 'system'
+      }"
+      @click="pref = window.MI.theme.cycle()"
+      :title="'Theme: ' + pref"
+    >
+      <span x-show="pref === 'light'">{% icon "sun" size=18 %}</span>
+      <span x-show="pref === 'dark'" x-cloak>{% icon "moon" size=18 %}</span>
+      <span x-show="pref === 'system'" x-cloak>{% icon "monitor" size=18 %}</span>
+    </button>
+
+    {# Notifications #}
+    <button
+      type="button"
+      class="relative p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
+      aria-label="Notifications"
+    >
+      {% icon "bell" size=18 %}
+      <span class="sr-only">No new notifications</span>
+    </button>
+
+    {# User menu #}
+    {% if request.user.is_authenticated %}
+      <div x-data="{ open: false }" class="relative">
+        <button
+          type="button"
+          class="flex items-center gap-2 pl-1.5 pr-2 h-9 rounded-md hover:bg-surface-2 transition-colors duration-fast"
+          @click="open = !open"
+          @click.outside="open = false"
+        >
+          <span class="w-7 h-7 rounded-full bg-mobinspect-500/15 text-mobinspect-500 flex items-center justify-center font-medium text-small">
+            {{ request.user.username|slice:":1"|upper }}
+          </span>
+          <span class="hidden lg:inline text-small text-text-primary max-w-[120px] truncate">{{ request.user.username }}</span>
+          {% icon "chevron-down" size=14 %}
+        </button>
+
+        <div
+          x-show="open"
+          x-cloak
+          x-transition:enter="transition ease-out duration-base"
+          x-transition:enter-start="opacity-0 scale-95"
+          x-transition:enter-end="opacity-100 scale-100"
+          class="absolute right-0 mt-2 w-56 card shadow-elevation-3 origin-top-right py-1.5 z-30"
+          role="menu"
+        >
+          <div class="px-3 py-2 border-b border-border-subtle">
+            <p class="text-small font-medium truncate">{{ request.user.username }}</p>
+            <p class="text-tiny text-text-tertiary truncate">{{ request.user.email|default:"—" }}</p>
+          </div>
+          <a href="{% url 'change_password' %}" class="flex items-center gap-2 px-3 py-2 text-small text-text-primary hover:bg-surface-2" role="menuitem">
+            {% icon "key" size=14 %} Change password
+          </a>
+          <form method="post" action="{% url 'logout' %}" role="menuitem">
+            {% csrf_token %}
+            <button type="submit" class="flex w-full items-center gap-2 px-3 py-2 text-small text-text-primary hover:bg-surface-2">
+              {% icon "log-out" size=14 %} Sign out
+            </button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <a href="{% url 'login' %}" class="btn btn-secondary btn-sm">Sign in</a>
+    {% endif %}
+  </div>
+</div>

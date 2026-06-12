@@ -1,0 +1,98 @@
+{% load static %}{% load mi_icons %}{% load mi_theme %}<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  {# Theme bootstrap MUST run before any paint to avoid flash #}
+  {% theme_bootstrap %}
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="MobInspect — Mobile Application Security Inspector" />
+  <meta name="color-scheme" content="light dark" />
+
+  <title>{% block page_title %}{{ title|default:"" }}{% endblock %}{% if title %} · {% endif %}MobInspect</title>
+
+  <link rel="icon" type="image/svg+xml" href="{% static 'mobinspect/img/favicon.svg' %}" />
+  <link rel="alternate icon" href="{% static 'img/favicon.ico' %}" />
+
+  <link rel="stylesheet" href="{% static 'mobinspect/css/dist/app.css' %}" />
+
+  {% block extra_head %}{% endblock %}
+</head>
+
+<body
+  class="h-full antialiased bg-surface-0 text-text-primary"
+  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+  x-data="{ sidebarCollapsed: false }"
+>
+  <div class="flex h-full">
+
+    {# ─────────── Sidebar ─────────── #}
+    <aside
+      :class="sidebarCollapsed ? 'w-sidebar-collapsed' : 'w-sidebar'"
+      class="hidden md:flex flex-col border-r border-border-subtle bg-surface-1 transition-[width] duration-base ease-out"
+    >
+      {% include "components/sidebar.html" %}
+    </aside>
+
+    {# ─────────── Main column ─────────── #}
+    <div class="flex flex-col flex-1 min-w-0">
+
+      {# Topbar #}
+      <header class="flex items-center h-topbar border-b border-border-subtle bg-surface-1/80 backdrop-blur sticky top-0 z-20">
+        {% include "components/topbar.html" %}
+      </header>
+
+      {# Page content #}
+      <main class="flex-1 overflow-y-auto">
+        <div class="max-w-content mx-auto px-4 lg:px-6 py-6">
+          {% block breadcrumbs %}{% endblock %}
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+
+      {# Footer (intentionally tiny) #}
+      <footer class="px-6 py-3 border-t border-border-subtle text-tiny text-text-tertiary flex items-center justify-between">
+        <span>© {% now "Y" %} Appdirs · MobInspect · GPL-3.0 — see <a href="/about/" class="text-text-brand hover:underline">about</a></span>
+        <span>v{{ version|default:"" }}</span>
+      </footer>
+    </div>
+  </div>
+
+  {# ─────────── Toast region ─────────── #}
+  <div
+    id="mi-toasts"
+    class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"
+    aria-live="polite"
+    aria-atomic="true"
+  >
+    {% if messages %}
+      {% for m in messages %}
+        <div class="card pointer-events-auto px-4 py-3 max-w-sm animate-fade-up shadow-elevation-3">
+          <p class="text-small">{{ m }}</p>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  {# ─────────── Vendor JS (load order matters) ─────────── #}
+  <script defer src="{% static 'mobinspect/vendor/htmx.min.js' %}"></script>
+  <script defer src="{% static 'mobinspect/vendor/alpine.min.js' %}"></script>
+  <script defer src="{% static 'mobinspect/js/theme.js' %}"></script>
+  <script defer src="{% static 'mobinspect/js/motion.js' %}"></script>
+
+  {# Charts only when needed #}
+  {% block chart_js %}{% endblock %}
+
+  {# Page-specific JS #}
+  {% block extra_js %}{% endblock %}
+
+  {# Auto-reveal cards marked [data-reveal] on initial paint #}
+  <script defer>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.MI && window.MI.motion) {
+        window.MI.motion.reveal('[data-reveal]');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+{% extends "base/legacy_app.html" %}
+{% load static %}
+
+{% block page_title %}API Monitor — {{ package }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'adminlte/plugins/datatables-bs4/dataTables.bootstrap4.min.css' %}">
+<style>
+  /* Tame DataTables to fit the new design surface */
+  table.dataTable thead th { background: rgb(var(--surface-2) / 0.5); border-color: rgb(var(--border-subtle)) !important; }
+  table.dataTable tbody td  { border-color: rgb(var(--border-subtle)) !important; }
+  table.dataTable tbody tr:hover td { background: rgb(var(--surface-2) / 0.4); }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="flex items-center justify-between gap-4 mb-6">
+  <div>
+    <p class="text-tiny uppercase text-text-tertiary">Dynamic · Frida</p>
+    <h1 class="text-h2 mt-1">API monitor</h1>
+    <p class="text-small text-text-secondary mt-1 font-mono">{{ package }}</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <label class="text-small text-text-secondary">Snip:</label>
+    <input
+      type="number" min="20" max="1000" value="100" oninput="change_snip(this.value)"
+      class="input h-8 w-24 text-right"
+    />
+  </div>
+</header>
+
+<div class="card">
+  <div class="card-header">
+    <span class="text-small text-text-secondary">Recent calls</span>
+    <span class="text-tiny text-text-tertiary">refreshes every 10s</span>
+  </div>
+  <div class="card-body">
+    <div id="messages" class="text-tiny text-text-tertiary mb-3"></div>
+    <div class="table-responsive">
+      <table id="autotbl" class="table table-hover table-striped" style="width:100%">
+        <thead>
+          <tr>
+            <th>NAME</th><th>CLASS</th><th>METHOD</th><th>ARGUMENTS</th>
+            <th>RESULT</th><th>RETURN VALUE</th><th>CALLED FROM</th>
+          </tr>
+        </thead>
+        <tfoot>
+          <tr>
+            <th>NAME</th><th>CLASS</th><th>METHOD</th><th>ARGUMENTS</th>
+            <th>RESULT</th><th>RETURN VALUE</th><th>CALLED FROM</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'adminlte/plugins/datatables/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'adminlte/plugins/datatables-bs4/dataTables.bootstrap4.min.js' %}"></script>
+<script type="text/javascript">
+var snip = 100;
+var tbl;
+function change_snip(val) { snip = parseInt(val); tbl.ajax.reload(); }
+$(document).ready(function () {
+  $.fn.dataTable.ext.errMode = 'none';
+  tbl = $('#autotbl').DataTable({
+    ajax: '/live_api/?hash={{ hash }}&stream=1',
+    deferRender: true, scroller: true, scrollX: true,
+    searching: true, paging: false, info: true,
+    columns: [
+      { data: 'name' }, { data: 'class' }, { data: 'method' },
+      { data: 'arguments' }, { data: 'result' },
+      { data: 'returnValue' }, { data: 'calledFrom' },
+    ],
+    columnDefs: [{
+      targets: [3, 4, 5],
+      render: function (data) {
+        if (data && JSON.stringify(data).length > snip)
+          return JSON.stringify(data).slice(0, snip) + '...';
+        return JSON.stringify(data);
+      },
+    }],
+  });
+  setInterval(function () { tbl.ajax.reload(); }, 10000);
+});
+</script>
+{% endblock %}

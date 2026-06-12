@@ -1,0 +1,372 @@
+"""Initialize on first run."""
+import logging
+import os
+import random
+import secrets
+import subprocess
+import sys
+import shutil
+import threading
+import warnings
+from getpass import getpass
+from hashlib import sha256
+from pathlib import Path
+from importlib import (
+    machinery,
+    util,
+)
+
+from mobsf.MobSF.tools_download import install_jadx
+from mobsf.install.windows.setup import windows_config_local
+
+logger = logging.getLogger(__name__)
+
+
+def env(new_name, old_name=None, default=None):
+    """Read an environment variable with rebrand-deprecation support.
+
+    Prefers MOBINSPECT_* over MOBSF_* but accepts both during the
+    deprecation window. Emits a one-time DeprecationWarning *and* a
+    logger.warning when the legacy name is used — DeprecationWarnings
+    are silenced by default in production, so the logger call is what
+    operators actually see.
+
+    Returns the value or `default` if neither is set.
+    """
+    val = os.environ.get(new_name)
+    if val is not None:
+        return val
+    if old_name and os.environ.get(old_name) is not None:
+        if not hasattr(env, '_warned'):
+            env._warned = set()
+        if old_name not in env._warned:
+            warnings.warn(
+                f'{old_name} is deprecated; use {new_name}.',
+                DeprecationWarning, stacklevel=2,
+            )
+            logger.warning(
+                'Environment variable %s is deprecated; '
+                'use %s instead.', old_name, new_name,
+            )
+            env._warned.add(old_name)
+        return os.environ[old_name]
+    return default
+
+VERSION = '4.5.0'
+BANNER = r"""
+  __  __       _     ___                            _
+ |  \/  | ___ | |__ |_ _|_ __  ___ _ __   ___  ___| |_
+ | |\/| |/ _ \| '_ \ | || '_ \/ __| '_ \ / _ \/ __| __|
+ | |  | | (_) | |_) || || | | \__ \ |_) |  __/ (__| |_
+ |_|  |_|\___/|_.__/___|_| |_|___/ .__/ \___|\___|\__|
+                                 |_|
+"""  # noqa: W291
+# ASCII Font: Standard
+
+
+def first_run(secret_file, base_dir, mobsf_home):
+    # Based on https://gist.github.com/ndarville/3452907#file-secret-key-gen-py
+    base_dir = Path(base_dir)
+    mobsf_home = Path(mobsf_home)
+    secret_file = Path(secret_file)
+    secret_env = env('MOBINSPECT_SECRET_KEY', 'MOBSF_SECRET_KEY')
+    if secret_env:
+        secret_key = secret_env
+    elif secret_file.exists() and secret_file.is_file():
+        secret_key = secret_file.read_text().strip()
+    else:
+        try:
+            secret_key = get_random()
+            secret_file.write_text(secret_key)
+        except IOError:
+            raise Exception('Secret file generation failed' % secret_file)
+        # Run Once
+        make_migrations(base_dir)
+        migrate(base_dir)
+        # Install JADX
+        thread = threading.Thread(
+            target=install_jadx,
+            name='install_jadx',
+            args=(mobsf_home.as_posix(),))
+        thread.start()
+        # Windows Setup
+        windows_config_local(mobsf_home.as_posix())
+    return secret_key
+
+
+def create_user_conf(mobsf_home, base_dir):
+    try:
+        config_path = mobsf_home / 'config.py'
+        if not config_path.exists():
+            sample_conf = base_dir / 'MobSF' / 'settings.py'
+            dat = sample_conf.read_text().splitlines()
+            config = []
+            add = False
+            for line in dat:
+                if '^CONFIG-START^' in line:
+                    add = True
+                if '^CONFIG-END^' in line:
+                    break
+                if add:
+                    config.append(line.lstrip())
+            config.pop(0)
+            conf_str = '\n'.join(config)
+            config_path.write_text(conf_str)
+    except Exception:
+        logger.exception('Cannot create config file')
+
+
+def django_operation(cmds, base_dir):
+    """Generic Function for Djano operations."""
+    manage = base_dir.parent / 'manage.py'
+    if manage.exists() and manage.is_file():
+        # Bail out for package
+        return
+    print(manage)
+    args = [sys.executable, manage.as_posix()]
+    args.extend(cmds)
+    subprocess.call(args)
+
+
+def make_migrations(base_dir):
+    """Create Database Migrations."""
+    try:
+        django_operation(['makemigrations'], base_dir)
+        django_operation(['makemigrations', 'StaticAnalyzer'], base_dir)
+    except Exception:
+        logger.exception('Cannot Make Migrations')
+
+
+def migrate(base_dir):
+    """Migrate Database."""
+    try:
+        django_operation(['migrate'], base_dir)
+        django_operation(['migrate', '--run-syncdb'], base_dir)
+        django_operation(['create_roles'], base_dir)
+    except Exception:
+        logger.exception('Cannot Migrate')
+
+
+def bootstrap_admin():
+    """Idempotent first-boot admin bootstrap.
+
+    Replaces the legacy `createsuperuser --noinput` flow that seeded the
+    notorious ``mobsf/mobsf`` superuser. Refuses to run if any superuser
+    already exists (returning False) so it is safe to invoke on every boot
+    or from a management command.
+
+    Password resolution order:
+      1. ``MOBINSPECT_ADMIN_PASSWORD`` env var (required for non-interactive
+         deploys).
+      2. Interactive prompt if stdin is a TTY.
+      3. A 24-char ``secrets.token_urlsafe`` written to
+         ``<MOBSF_HOME>/initial-admin-password.txt`` (mode 0600), with the
+         path logged so the operator can retrieve it once.
+
+    Username comes from ``MOBINSPECT_ADMIN_USERNAME`` (default ``admin``).
+
+    Returns ``True`` when a new admin was created, ``False`` if one already
+    existed.
+    """
+    # Imported lazily because Django apps need to be ready before
+    # ``django.contrib.auth.models`` can be touched at import time.
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    if User.objects.filter(is_superuser=True).exists():
+        logger.info(
+            'bootstrap_admin: superuser already exists; '
+            'skipping initial admin creation.')
+        return False
+
+    username = os.environ.get('MOBINSPECT_ADMIN_USERNAME', 'admin').strip()
+    if not username:
+        username = 'admin'
+
+    password = os.environ.get('MOBINSPECT_ADMIN_PASSWORD')
+    password_source = 'env'
+    if not password and sys.stdin and sys.stdin.isatty():
+        try:
+            password = getpass(
+                f'Set initial password for admin user {username!r}: ')
+            confirm = getpass('Confirm password: ')
+            if password != confirm:
+                logger.error(
+                    'bootstrap_admin: passwords did not match; aborting.')
+                return False
+            password_source = 'prompt'
+        except (EOFError, KeyboardInterrupt):
+            password = None
+
+    written_path = None
+    if not password:
+        password = secrets.token_urlsafe(24)
+        password_source = 'generated'
+        try:
+            # Resolve home lazily so tests can monkey-patch ``Path.home``.
+            new_home = Path.home() / '.MobInspect'
+            legacy_home = Path.home() / '.MobSF'
+            if not new_home.exists() and legacy_home.exists():
+                home_dir = legacy_home
+            else:
+                home_dir = new_home
+            custom_home = env('MOBINSPECT_HOME_DIR', 'MOBSF_HOME_DIR')
+            if custom_home:
+                p = Path(custom_home)
+                if p.is_absolute() and p.is_dir():
+                    home_dir = p
+            home_dir.mkdir(parents=True, exist_ok=True)
+            written_path = home_dir / 'initial-admin-password.txt'
+            written_path.write_text(password + '\n')
+            try:
+                os.chmod(written_path, 0o600)
+            except OSError:
+                # chmod is best-effort (e.g. Windows / non-POSIX FS).
+                logger.warning(
+                    'bootstrap_admin: could not chmod 0600 %s',
+                    written_path)
+        except Exception:
+            logger.exception(
+                'bootstrap_admin: failed to persist generated password')
+            return False
+
+    user = User(username=username)
+    user.is_active = True
+    user.is_staff = True
+    user.is_superuser = True
+    user.set_password(password)
+    user.save()
+
+    if password_source == 'generated' and written_path is not None:
+        logger.info(
+            'Initial admin password saved to %s '
+            '(read it once, then delete the file). '
+            'Username: %s', written_path, username)
+    elif password_source == 'prompt':
+        logger.info(
+            'bootstrap_admin: created superuser %r from interactive prompt.',
+            username)
+    else:
+        logger.info(
+            'bootstrap_admin: created superuser %r from '
+            'MOBINSPECT_ADMIN_PASSWORD.', username)
+    return True
+
+
+def get_random():
+    choice = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
+    return ''.join([random.SystemRandom().choice(choice) for i in range(50)])
+
+
+def get_mobsf_home(use_home, base_dir):
+    try:
+        base_dir = Path(base_dir)
+        mobsf_home = ''
+        if use_home:
+            # Prefer ~/.MobInspect; fall back to ~/.MobSF if it exists
+            # (existing installs continue to work without manual migration).
+            new_home = Path.home() / '.MobInspect'
+            legacy_home = Path.home() / '.MobSF'
+            if not new_home.exists() and legacy_home.exists():
+                mobsf_home = legacy_home
+            else:
+                mobsf_home = new_home
+            custom_home = env('MOBINSPECT_HOME_DIR', 'MOBSF_HOME_DIR')
+            if custom_home:
+                p = Path(custom_home)
+                if p.exists() and p.is_absolute() and p.is_dir():
+                    mobsf_home = p
+            # MobSF Home Directory
+            if not mobsf_home.exists():
+                mobsf_home.mkdir(parents=True, exist_ok=True)
+            create_user_conf(mobsf_home, base_dir)
+        else:
+            mobsf_home = base_dir
+        # Download Directory
+        dwd_dir = mobsf_home / 'downloads'
+        dwd_dir.mkdir(parents=True, exist_ok=True)
+        # Screenshot Directory
+        screen_dir = mobsf_home / 'screen'
+        screen_dir.mkdir(parents=True, exist_ok=True)
+        # Upload Directory
+        upload_dir = mobsf_home / 'uploads'
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        # Downloaded tools
+        downloaded_tools_dir = mobsf_home / 'tools'
+        downloaded_tools_dir.mkdir(parents=True, exist_ok=True)
+        # Signatures Directory
+        sig_dir = mobsf_home / 'signatures'
+        sig_dir.mkdir(parents=True, exist_ok=True)
+        if use_home:
+            src = Path(base_dir) / 'signatures'
+            try:
+                shutil.copytree(src, sig_dir, dirs_exist_ok=True)
+            except Exception:
+                pass
+        return mobsf_home.as_posix()
+    except Exception:
+        logger.exception('Creating MobInspect Home Directory')
+
+
+def get_mobsf_version():
+    return BANNER, VERSION, f'v{VERSION}'
+
+
+def load_source(modname, filename):
+    loader = machinery.SourceFileLoader(modname, filename)
+    spec = util.spec_from_file_location(modname, filename, loader=loader)
+    module = util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+def get_docker_secret_by_file(secret_key):
+    try:
+        secret_path = os.environ.get(secret_key)
+        path = Path(secret_path)
+        if path.exists() and path.is_file():
+            return path.read_text().strip()
+    except Exception:
+        logger.exception('Cannot read secret from %s', secret_path)
+    raise Exception('Cannot read secret from file')
+
+
+def get_secret_from_file_or_env(env_secret_key):
+    docker_secret_key = f'{env_secret_key}_FILE'
+    if os.environ.get(docker_secret_key):
+        return get_docker_secret_by_file(docker_secret_key)
+    else:
+        return os.environ[env_secret_key]
+
+
+def api_key(home_dir):
+    """Print REST API Key."""
+    # Form Docker Secrets — prefer new env name, fall back to legacy.
+    new_key_file = env('MOBINSPECT_API_KEY_FILE', 'MOBSF_API_KEY_FILE')
+    if new_key_file:
+        logger.info('\nAPI Key read from docker secrets')
+        try:
+            # The shim returns the value of the *file path* env var; pass that
+            # through to the docker-secret reader (which expects an env var name).
+            secret_var = (
+                'MOBINSPECT_API_KEY_FILE'
+                if os.environ.get('MOBINSPECT_API_KEY_FILE')
+                else 'MOBSF_API_KEY_FILE'
+            )
+            return get_docker_secret_by_file(secret_var)
+        except Exception:
+            logger.exception('Cannot read API Key from docker secrets')
+    # From Environment Variable
+    new_key = env('MOBINSPECT_API_KEY', 'MOBSF_API_KEY')
+    if new_key:
+        logger.info('\nAPI Key read from environment variable')
+        return new_key
+    home_dir = Path(home_dir)
+    secret_file = home_dir / 'secret'
+    if secret_file.exists() and secret_file.is_file():
+        try:
+            _api_key = secret_file.read_bytes().strip()
+            return sha256(_api_key).hexdigest()
+        except Exception:
+            logger.exception('Cannot Read API Key')
+    return None

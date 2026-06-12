@@ -1,0 +1,94 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}View — {{ file }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'enlighterjs/enlighterjs.min.css' %}" />
+<style>
+  pre { white-space: pre-wrap; word-wrap: break-word; }
+  .enlighter-t-enlighter div.enlighter > div.enlighter-special {
+    background-color: rgb(254 240 138 / 0.4);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="mb-6">
+  <a href="javascript:history.back()" class="text-small text-text-secondary hover:text-text-primary inline-flex items-center gap-1">
+    {% icon "chevron-left" size=14 %} Back
+  </a>
+  <h1 class="text-h2 mt-2 font-mono break-all">{{ file }}</h1>
+</header>
+
+<div class="card">
+  <div class="card-body">
+    {% if sqlite %}
+      <div class="space-y-6">
+        {% for table, data in sqlite.items %}
+          <section>
+            <h2 class="text-h3 mb-2 font-mono">{{ table }}</h2>
+            <div class="overflow-x-auto rounded-md border border-border-subtle">
+              <table class="w-full text-small">
+                <thead>
+                  <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                    {% for head in data|key:"head" %}
+                      <th class="text-left px-4 py-2 font-medium">{{ head }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for dat in data|key:"data" %}
+                    <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+                      {% for item in dat %}
+                        <td class="px-4 py-2 text-text-secondary break-words" style="min-width:160px;max-width:160px;">{{ item }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        {% endfor %}
+      </div>
+    {% else %}
+      <pre id="code_block">{{ data }}</pre>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="text/javascript" src="{% static 'enlighterjs/enlighterjs.min.js' %}"></script>
+<script type="text/javascript">
+  const get_lines = function () {
+    const pat = new RegExp(/^[\d,]{1,1000}$/);
+    const urlParams = new URLSearchParams(window.location.search);
+    let i;
+    const lines = urlParams.get('lines');
+    if (!pat.test(lines)) return 0;
+    const parts = lines.split(',');
+    for (i = 0; i < parts.length; i++) {
+      if (parseInt(parts[i]) > 50000) return 0;
+    }
+    return lines;
+  };
+  const code_blk = document.getElementById('code_block');
+  if (code_blk) {
+    EnlighterJS.enlight(code_blk, {
+      theme: 'enlighter',
+      linehover: false,
+      textOverflow: 'scroll',
+      highlight: get_lines(),
+      language: '{{ type }}',
+    });
+  }
+  const toolbar = document.getElementsByClassName('enlighter-toolbar')[0];
+  if (toolbar) toolbar.style.display = 'none';
+  const hcls = document.getElementsByClassName('enlighter-special')[0];
+  if (hcls) {
+    if (hcls.scrollIntoViewIfNeeded) hcls.scrollIntoViewIfNeeded();
+    else hcls.scrollIntoView();
+  }
+</script>
+{% endblock %}

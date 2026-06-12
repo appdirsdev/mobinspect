@@ -1,0 +1,154 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}
+
+{% block page_title %}Create user{% endblock %}
+
+{% block content %}
+<header class="mb-6">
+  <a href="{% url 'users' %}" class="text-small text-text-secondary hover:text-text-primary inline-flex items-center gap-1">
+    {% icon "chevron-left" size=14 %} All users
+  </a>
+  <h1 class="text-h1 mt-2">Create user</h1>
+  <p class="text-text-secondary mt-1">
+    The new account starts with a single base role. Finer-grained role
+    assignment is available from the <a href="{% url 'users' %}" class="text-text-brand hover:underline">Users page</a> after creation.
+  </p>
+</header>
+
+<div class="max-w-xl">
+  <div class="card">
+    <form method="post" class="card-body space-y-4" autocomplete="off">
+      {% csrf_token %}
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="px-3 py-2 rounded-md text-small border
+                      {% if message.tags == 'error' %}bg-system-error/10 text-system-error border-system-error/30
+                      {% elif message.tags == 'success' %}bg-system-success/10 text-system-success border-system-success/30
+                      {% else %}bg-system-info/10 text-system-info border-system-info/30{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      {% if form.non_field_errors %}
+        <div class="px-3 py-2 rounded-md text-small bg-system-error/10 text-system-error border border-system-error/30">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <div>
+        <label class="label" for="id_username">Username</label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+            {% icon "user" size=16 %}
+          </span>
+          <input
+            id="id_username" type="text" name="username"
+            maxlength="150" required autofocus
+            class="input pl-9"
+            placeholder="analyst"
+            aria-describedby="id_username_helptext"
+          />
+        </div>
+        {% for err in form.username.errors %}
+          <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+        {% endfor %}
+      </div>
+
+      <div>
+        <label class="label" for="id_email">Email</label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+            {% icon "info" size=16 %}
+          </span>
+          <input
+            id="id_email" type="email" name="email"
+            maxlength="254" required
+            class="input pl-9"
+            placeholder="analyst@example.com"
+          />
+        </div>
+        {% for err in form.email.errors %}
+          <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+        {% endfor %}
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="label" for="id_password1">Password</label>
+          <div class="relative" x-data="{ show: false }">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+              {% icon "lock" size=16 %}
+            </span>
+            <input
+              id="id_password1"
+              :type="show ? 'text' : 'password'"
+              name="password1"
+              autocomplete="new-password" required
+              class="input pl-9 pr-10"
+            />
+            <button type="button"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors"
+                    @click="show = !show" aria-label="Toggle password visibility">
+              <span x-show="!show">{% icon "eye" size=16 %}</span>
+              <span x-show="show" x-cloak>{% icon "eye-off" size=16 %}</span>
+            </button>
+          </div>
+          {% for err in form.password1.errors %}
+            <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+          {% endfor %}
+        </div>
+
+        <div>
+          <label class="label" for="id_password2">Confirm password</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+              {% icon "lock" size=16 %}
+            </span>
+            <input
+              id="id_password2" type="password" name="password2"
+              autocomplete="new-password" required
+              class="input pl-9"
+            />
+          </div>
+          {% for err in form.password2.errors %}
+            <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div>
+        <label class="label" for="id_role">Initial role</label>
+        <select id="id_role" name="role" required class="input">
+          <option value="" disabled selected>Select role</option>
+          <option value="viewer">Viewer · read-only access to scans and analytics</option>
+          <option value="maintainer">Maintainer · upload, scan, suppress findings</option>
+        </select>
+        {% for err in form.role.errors %}
+          <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+        {% endfor %}
+        <p class="text-tiny text-text-tertiary mt-1">
+          You can grant additional roles (Administrator, Security Analyst, API User, custom) from the Users page after creating this account.
+        </p>
+      </div>
+
+      {% if form.password1.help_text %}
+        <details class="text-tiny text-text-tertiary">
+          <summary class="cursor-pointer text-text-secondary hover:text-text-primary inline-flex items-center gap-1">
+            {% icon "info" size=12 %} Password requirements
+          </summary>
+          <div class="mt-2 pl-4 prose-tiny">{{ form.password1.help_text|safe }}</div>
+        </details>
+      {% endif %}
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+        <a href="{% url 'users' %}" class="btn btn-ghost btn-md">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-md">
+          {% icon "user" size=14 %} Create user
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

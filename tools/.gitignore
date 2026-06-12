@@ -1,0 +1,4 @@
+# Tailwind CSS standalone CLI binary — downloaded by scripts/install-tailwind.sh.
+# We don't commit binaries; the install script verifies a pinned version.
+tailwindcss
+tailwindcss-*

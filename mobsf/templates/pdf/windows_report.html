@@ -1,0 +1,798 @@
+{% block content %}
+{% load static %}
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>MobInspect Static Analysis Report</title>
+    <meta name="description" content="MobInspect Windows Static Analysis Report for {{ app_name }}">
+    {% if host_os == 'windows' %}
+        <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,600,700' rel='stylesheet' type='text/css'>
+        <link href='https://fonts.googleapis.com/css?family=Oswald:400,500,600' rel='stylesheet' type='text/css'>
+    {% else %}
+    <style>
+      /* latin */
+      @font-face {
+        font-family: 'Open Sans';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: local('Open Sans Regular'), local('OpenSans-Regular'), url('{{base_url}}{% static 'fonts/Open_Sans/OpenSans-Regular.ttf' %}') format('truetype');
+      }
+      /* latin */
+      @font-face {
+        font-family: 'Oswald';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: local('Oswald'), local('Oswald'), url('{{base_url}}{% static 'fonts/Oswald/Oswald-Regular.ttf' %}') format('truetype');
+      }
+    </style>
+    {% endif %}
+    <style>
+      /* =========================================================
+         MobInspect — Windows Static Analysis Report (PDF)
+         Self-contained print stylesheet. Rendered by wkhtmltopdf
+         (Letter, Landscape). No Tailwind / no external CSS.
+         ========================================================= */
+
+      /* --- Brand & semantic palette (print-safe hex) --- */
+      :root {
+        --c-primary:        #2563EB;
+        --c-primary-dark:   #1E40AF;
+        --c-critical:       #DC2626;
+        --c-high:           #EA580C;
+        --c-medium:         #D97706;
+        --c-low:            #2563EB;
+        --c-passed:         #16A34A;
+        --c-unknown:        #64748B;
+        --c-bg:             #f8fafc;
+        --c-bg-alt:         #f1f5f9;
+        --c-border:         #e2e8f0;
+        --c-border-strong:  #cbd5e1;
+        --c-text:           #0f172a;
+        --c-text-2:         #475569;
+        --c-text-3:         #64748B;
+      }
+
+      * { box-sizing: border-box; }
+
+      @page { margin: 0; }
+
+      html { background: #ffffff; }
+
+      body {
+        font-family: 'Open Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+        color: var(--c-text);
+        font-size: 12px;
+        line-height: 1.55;
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      a { color: var(--c-primary); text-decoration: none; }
+
+      /* --- Headings --- */
+      h1, h2, h3, h4, h5 {
+        font-family: 'Oswald', 'Open Sans', 'Segoe UI', sans-serif;
+        color: var(--c-text);
+        margin: 0;
+      }
+
+      h2.section-title {
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        margin: 34px 0 14px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--c-primary);
+        page-break-after: avoid;
+        display: flex;
+        align-items: center;
+      }
+      h2.section-title .sec-ico {
+        display: inline-block;
+        width: 22px; height: 22px;
+        margin-right: 10px;
+        border-radius: 5px;
+        background: var(--c-primary);
+        color: #fff;
+        font-family: 'Open Sans', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 22px;
+        text-align: center;
+        text-transform: none;
+        letter-spacing: 0;
+      }
+
+      h3 { font-size: 15px; font-weight: 600; margin: 18px 0 8px; page-break-after: avoid; }
+
+      p { margin: 8px 0; }
+
+      .muted { color: var(--c-text-3); }
+      .mono  { font-family: 'Consolas', 'JetBrains Mono', 'Courier New', monospace; }
+
+      /* ============================ COVER ============================ */
+      .cover {
+        page-break-after: always;
+        position: relative;
+        min-height: 720px;
+        padding: 64px 70px 60px;
+        background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%);
+        color: #ffffff;
+        overflow: hidden;
+      }
+      .cover::after {
+        /* subtle corner accent */
+        content: "";
+        position: absolute;
+        right: -120px; top: -120px;
+        width: 420px; height: 420px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.06);
+      }
+      .cover .brandbar {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(255,255,255,0.25);
+        padding-bottom: 22px;
+      }
+      .cover .brandbar .logo { height: 46px; }
+      .cover .brandbar .kicker {
+        font-family: 'Oswald', sans-serif;
+        font-size: 13px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        opacity: 0.85;
+      }
+
+      .cover .cover-body {
+        position: relative;
+        z-index: 2;
+        margin-top: 90px;
+      }
+      .cover .report-kind {
+        font-family: 'Oswald', sans-serif;
+        font-size: 14px;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        opacity: 0.85;
+        margin-bottom: 10px;
+      }
+      .cover h1.cover-title {
+        font-size: 46px;
+        font-weight: 600;
+        line-height: 1.1;
+        margin: 0 0 6px;
+        max-width: 80%;
+      }
+      .cover .cover-sub {
+        font-size: 18px;
+        opacity: 0.92;
+        margin: 0;
+      }
+      .cover .app-row {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-top: 34px;
+      }
+      .cover .app-icon {
+        width: 72px; height: 72px;
+        border-radius: 14px;
+        background: rgba(255,255,255,0.15);
+        padding: 8px;
+      }
+      .cover .app-icon img { width: 100%; height: 100%; object-fit: contain; }
+      .cover .app-name {
+        font-family: 'Oswald', sans-serif;
+        font-size: 26px;
+        font-weight: 500;
+      }
+      .cover .app-ver { font-size: 14px; opacity: 0.85; }
+
+      .cover .meta-grid {
+        position: relative;
+        z-index: 2;
+        margin-top: 56px;
+        display: table;
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .cover .meta-grid .meta-cell {
+        display: table-cell;
+        width: 25%;
+        padding: 14px 18px;
+        border-left: 2px solid rgba(255,255,255,0.35);
+        vertical-align: top;
+      }
+      .cover .meta-grid .meta-cell:first-child { padding-left: 0; border-left: 0; }
+      .cover .meta-label {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        opacity: 0.75;
+        margin-bottom: 5px;
+      }
+      .cover .meta-value {
+        font-size: 13px;
+        font-weight: 600;
+        word-break: break-word;
+      }
+      .cover .meta-value .pill-danger,
+      .cover .meta-value .pill-ok {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+      }
+      .cover .pill-danger { background: rgba(255,255,255,0.92); color: var(--c-critical); }
+      .cover .pill-ok { background: rgba(255,255,255,0.92); color: var(--c-passed); }
+
+      .cover .cover-foot {
+        position: absolute;
+        left: 70px; right: 70px; bottom: 40px;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        opacity: 0.8;
+        border-top: 1px solid rgba(255,255,255,0.25);
+        padding-top: 16px;
+      }
+
+      /* ============================ PAGE ============================ */
+      .page { padding: 36px 44px 28px; }
+      .page-break { page-break-before: always; }
+
+      /* --- Executive summary --- */
+      .exec {
+        background: var(--c-bg-alt);
+        border-left: 4px solid var(--c-primary);
+        border-radius: 6px;
+        padding: 18px 22px;
+        margin: 8px 0 22px;
+      }
+      .exec h3 { margin-top: 0; color: var(--c-primary-dark); }
+      .exec p { margin: 6px 0; color: var(--c-text-2); }
+
+      /* --- Score / posture cards --- */
+      .summary-cards {
+        display: table;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 12px 0;
+        margin: 0 -12px 8px;
+        table-layout: fixed;
+      }
+      .summary-cards .scard {
+        display: table-cell;
+        width: 20%;
+        background: #ffffff;
+        border: 1px solid var(--c-border);
+        border-top: 3px solid var(--c-border-strong);
+        border-radius: 8px;
+        padding: 16px 14px;
+        text-align: center;
+        vertical-align: top;
+      }
+      .scard.sc-critical { border-top-color: var(--c-critical); }
+      .scard.sc-high     { border-top-color: var(--c-high); }
+      .scard.sc-medium   { border-top-color: var(--c-medium); }
+      .scard.sc-low      { border-top-color: var(--c-low); }
+      .scard.sc-passed   { border-top-color: var(--c-passed); }
+      .scard .scard-num {
+        font-family: 'Oswald', sans-serif;
+        font-size: 34px;
+        font-weight: 600;
+        line-height: 1;
+      }
+      .sc-critical .scard-num { color: var(--c-critical); }
+      .sc-high     .scard-num { color: var(--c-high); }
+      .sc-medium   .scard-num { color: var(--c-medium); }
+      .sc-low      .scard-num { color: var(--c-low); }
+      .sc-passed   .scard-num { color: var(--c-passed); }
+      .scard .scard-label {
+        margin-top: 8px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--c-text-3);
+      }
+
+      /* --- Severity breakdown table --- */
+      .sev-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0 4px;
+      }
+      .sev-table th, .sev-table td {
+        padding: 10px 12px;
+        text-align: center;
+        border: 1px solid var(--c-border);
+      }
+      .sev-table thead th {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #ffffff;
+      }
+      .sev-table th.h-high     { background: var(--c-high); }
+      .sev-table th.h-medium   { background: var(--c-medium); }
+      .sev-table th.h-info     { background: var(--c-low); }
+      .sev-table th.h-passed   { background: var(--c-passed); }
+      .sev-table th.h-total    { background: var(--c-unknown); }
+      .sev-table tbody td {
+        font-family: 'Oswald', sans-serif;
+        font-size: 22px;
+        font-weight: 600;
+        background: #ffffff;
+      }
+      .sev-table td.v-high   { color: var(--c-high); }
+      .sev-table td.v-medium { color: var(--c-medium); }
+      .sev-table td.v-info   { color: var(--c-low); }
+      .sev-table td.v-passed { color: var(--c-passed); }
+      .sev-table td.v-total  { color: var(--c-text); }
+
+      /* --- Key/value info grid --- */
+      .info-grid {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 6px 0 8px;
+        table-layout: fixed;
+      }
+      .info-grid td {
+        padding: 9px 14px;
+        border: 1px solid var(--c-border);
+        vertical-align: top;
+        font-size: 12px;
+      }
+      .info-grid td.k {
+        width: 18%;
+        background: var(--c-bg);
+        font-weight: 600;
+        color: var(--c-text-3);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .info-grid td.v {
+        width: 32%;
+        color: var(--c-text);
+        word-break: break-word;
+      }
+      .info-grid td.v.mono {
+        font-family: 'Consolas', 'JetBrains Mono', 'Courier New', monospace;
+        font-size: 11px;
+      }
+
+      /* --- Generic data tables --- */
+      table.data {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 8px;
+        font-size: 11.5px;
+      }
+      table.data thead th {
+        background: var(--c-bg-alt);
+        color: var(--c-text-2);
+        text-align: left;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 9px 12px;
+        border-bottom: 2px solid var(--c-border-strong);
+      }
+      table.data tbody td {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--c-border);
+        vertical-align: top;
+        color: var(--c-text-2);
+        word-break: break-word;
+      }
+      table.data tbody tr:nth-child(even) td { background: var(--c-bg); }
+      table.data tbody tr { page-break-inside: avoid; }
+      table.data td.rule {
+        font-family: 'Consolas', 'JetBrains Mono', 'Courier New', monospace;
+        font-size: 11px;
+        color: var(--c-text);
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      /* --- Status badges --- */
+      .badge {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 11px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .badge.danger  { background: rgba(220,38,38,0.10);  color: var(--c-critical); border: 1px solid rgba(220,38,38,0.30); }
+      .badge.success { background: rgba(22,163,74,0.10);  color: var(--c-passed);   border: 1px solid rgba(22,163,74,0.30); }
+      .badge.info    { background: rgba(37,99,235,0.10);  color: var(--c-low);      border: 1px solid rgba(37,99,235,0.30); }
+      .badge.warning { background: rgba(217,119,6,0.10);  color: var(--c-medium);   border: 1px solid rgba(217,119,6,0.30); }
+
+      /* Inline severity text (kept for compatibility w/ existing class hooks) */
+      .danger  { color: var(--c-critical); font-weight: 600; }
+      .success { color: var(--c-passed);   font-weight: 600; }
+      .info    { color: var(--c-low);      font-weight: 600; }
+      .warning { color: var(--c-medium);   font-weight: 600; }
+      .text-success { color: var(--c-passed); }
+      .text-danger  { color: var(--c-critical); }
+
+      /* --- VirusTotal callout --- */
+      .vt-callout {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 18px;
+        border-radius: 8px;
+        margin: 6px 0 12px;
+      }
+      .vt-callout.clean  { background: rgba(22,163,74,0.08); border: 1px solid rgba(22,163,74,0.30); }
+      .vt-callout.dirty  { background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.30); }
+      .vt-callout .vt-ratio {
+        font-family: 'Oswald', sans-serif;
+        font-size: 26px;
+        font-weight: 600;
+      }
+      .vt-callout.clean .vt-ratio { color: var(--c-passed); }
+      .vt-callout.dirty .vt-ratio { color: var(--c-critical); }
+      .vt-callout .vt-text { color: var(--c-text-2); font-size: 12px; }
+
+      /* --- Empty state --- */
+      .empty {
+        text-align: center;
+        padding: 22px;
+        color: var(--c-text-3);
+        background: var(--c-bg);
+        border: 1px dashed var(--c-border-strong);
+        border-radius: 8px;
+        font-size: 12px;
+      }
+
+      /* --- Appendix / footer --- */
+      .appendix {
+        margin-top: 26px;
+        padding: 20px 24px;
+        background: var(--c-bg);
+        border: 1px solid var(--c-border);
+        border-radius: 8px;
+      }
+      .appendix h3 { color: var(--c-primary-dark); margin-top: 0; }
+      .appendix p { color: var(--c-text-2); font-size: 12px; }
+      .report-footer {
+        margin-top: 22px;
+        padding-top: 14px;
+        border-top: 1px solid var(--c-border-strong);
+        text-align: center;
+        font-size: 11px;
+        color: var(--c-text-3);
+      }
+
+      @media print {
+        nav, aside { display: none !important; }
+        .page-break { page-break-before: always; }
+      }
+    </style>
+  </head>
+
+  <body bgcolor="FFFFFF">
+
+    <!-- ============================ COVER ============================ -->
+    <article class="cover" id="cover">
+      <div class="brandbar">
+        <img src="{{base_url}}{% static "mobinspect/img/logo.svg" %}" class="logo" alt="MobInspect"/>
+        <span class="kicker">Security Assessment</span>
+      </div>
+
+      <div class="cover-body">
+        <div class="report-kind">Windows &middot; APPX Static Analysis</div>
+        <h1 class="cover-title">Security Analysis Report</h1>
+        <p class="cover-sub">Automated static security assessment</p>
+
+        <div class="app-row">
+          <div class="app-icon">
+            <img id="icon" src="{{base_url}}{% static 'img/no_icon.png' %}" alt="app_icon"/>
+          </div>
+          <div>
+            <div class="app-name">{{ app_name }}</div>
+            <div class="app-ver">{% if app_version %}Version {{app_version}}{% else %}{{ file_name }}{% endif %}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-cell">
+          <div class="meta-label">File Name</div>
+          <div class="meta-value">{{ file_name }}</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-label">Publisher</div>
+          <div class="meta-value">{{ publisher_name }}</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-label">Scan Date</div>
+          <div class="meta-value">{{ timestamp }}</div>
+        </div>
+        {% if virus_total and virus_total.items|length > 9 and 'request successfully queued' not in virus_total.verbose_msg %}
+        <div class="meta-cell">
+          <div class="meta-label">VirusTotal</div>
+          <div class="meta-value">
+            <span class="{% if virus_total.positives > 0 %}pill-danger{% else %}pill-ok{% endif %}">{{ virus_total.positives }}/{{ virus_total.total }}</span>
+          </div>
+        </div>
+        {% else %}
+        <div class="meta-cell">
+          <div class="meta-label">SHA256</div>
+          <div class="meta-value" style="font-size:10px;font-weight:400;word-break:break-all;">{{ sha256 }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="cover-foot">
+        <span>MobInspect {{ version }}</span>
+        <span>&copy; {% now "Y" %} Appdirs &middot; MobInspect &middot; GPL-3.0</span>
+      </div>
+    </article>
+
+    <!-- ====================== EXECUTIVE SUMMARY ====================== -->
+    <article class="page" id="contents">
+
+      <h2 class="section-title"><span class="sec-ico">&#9633;</span> Executive Summary</h2>
+
+      <div class="exec">
+        <h3>Overview</h3>
+        <p>
+          This report presents an automated static security assessment of
+          <strong>{{ app_name }}</strong>{% if app_version %} (version {{ app_version }}){% endif %},
+          published by <strong>{{ publisher_name }}</strong>. The analysis inspects the
+          APPX package binaries, build configuration and metadata to surface insecure
+          binary mitigations, configuration weaknesses and informational findings.
+        </p>
+      </div>
+
+      {% regroup binary_analysis|dictsort:"status" by status as status_groups %}
+
+      <h3>Findings Posture</h3>
+      <div class="summary-cards">
+        <div class="scard sc-high">
+          <div class="scard-num">{% for grp in status_groups %}{% if grp.grouper == "Insecure" %}{{ grp.list|length }}{% endif %}{% empty %}0{% endfor %}{% if not binary_analysis %}0{% endif %}</div>
+          <div class="scard-label">Insecure</div>
+        </div>
+        <div class="scard sc-medium">
+          <div class="scard-num">{% if binary_warnings %}{{ binary_warnings|length }}{% else %}0{% endif %}</div>
+          <div class="scard-label">Warnings</div>
+        </div>
+        <div class="scard sc-low">
+          <div class="scard-num">{% for grp in status_groups %}{% if grp.grouper == "Info" %}{{ grp.list|length }}{% endif %}{% empty %}0{% endfor %}{% if not binary_analysis %}0{% endif %}</div>
+          <div class="scard-label">Info</div>
+        </div>
+        <div class="scard sc-passed">
+          <div class="scard-num">{% for grp in status_groups %}{% if grp.grouper == "Secure" %}{{ grp.list|length }}{% endif %}{% endfor %}{% if not binary_analysis %}0{% endif %}</div>
+          <div class="scard-label">Secure</div>
+        </div>
+        <div class="scard sc-critical">
+          <div class="scard-num">{% if virus_total and virus_total.positives %}{{ virus_total.positives }}{% else %}0{% endif %}</div>
+          <div class="scard-label">AV Hits</div>
+        </div>
+      </div>
+
+      <h3>Severity Breakdown</h3>
+      <table class="sev-table">
+        <thead>
+          <tr>
+            <th class="h-high">Insecure</th>
+            <th class="h-medium">Warnings</th>
+            <th class="h-info">Info</th>
+            <th class="h-passed">Secure</th>
+            <th class="h-total">Total Checks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="v-high">{% for grp in status_groups %}{% if grp.grouper == "Insecure" %}{{ grp.list|length }}{% endif %}{% endfor %}{% if not binary_analysis %}0{% endif %}</td>
+            <td class="v-medium">{% if binary_warnings %}{{ binary_warnings|length }}{% else %}0{% endif %}</td>
+            <td class="v-info">{% for grp in status_groups %}{% if grp.grouper == "Info" %}{{ grp.list|length }}{% endif %}{% endfor %}{% if not binary_analysis %}0{% endif %}</td>
+            <td class="v-passed">{% for grp in status_groups %}{% if grp.grouper == "Secure" %}{{ grp.list|length }}{% endif %}{% endfor %}{% if not binary_analysis %}0{% endif %}</td>
+            <td class="v-total">{% if binary_analysis %}{{ binary_analysis|length }}{% else %}0{% endif %}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted" style="font-size:10.5px;margin-top:4px;">
+        Counts reflect the APPX binary analysis checks and scan warnings recorded for this package.
+        Review the detailed sections below for the status of each individual check.
+      </p>
+
+      <!-- ====================== FILE INFORMATION ====================== -->
+      <h2 class="section-title"><span class="sec-ico">&#9635;</span> File Information</h2>
+      <table class="info-grid">
+        <tr>
+          <td class="k">File Name</td><td class="v">{{ file_name }}</td>
+          <td class="k">Size</td><td class="v">{{ size }}</td>
+        </tr>
+        <tr>
+          <td class="k">MD5</td><td class="v mono">{{ md5 }}</td>
+          <td class="k">SHA1</td><td class="v mono">{{ sha1 }}</td>
+        </tr>
+        <tr>
+          <td class="k">SHA256</td><td class="v mono" colspan="3">{{ sha256 }}</td>
+        </tr>
+      </table>
+
+      <!-- ====================== APP INFORMATION ====================== -->
+      <h2 class="section-title"><span class="sec-ico">i</span> Application Information</h2>
+      <table class="info-grid">
+        <tr>
+          <td class="k">App Name</td><td class="v">{{ app_name }}</td>
+          <td class="k">Publisher</td><td class="v">{{ publisher_name }}</td>
+        </tr>
+        <tr>
+          <td class="k">Version</td><td class="v">{{ app_version }}</td>
+          <td class="k">Architecture</td><td class="v">{{ architecture }}</td>
+        </tr>
+      </table>
+
+      <!-- ====================== XML / BUILD INFORMATION ====================== -->
+      <h2 class="section-title"><span class="sec-ico">&lt;&gt;</span> Build &amp; XML Information</h2>
+      <table class="info-grid">
+        <tr>
+          <td class="k">Compiler Version</td><td class="v">{{ compiler_version }}</td>
+          <td class="k">Visual Studio Version</td><td class="v">{{ visual_studio_version }}</td>
+        </tr>
+        <tr>
+          <td class="k">Visual Studio Edition</td><td class="v">{{ visual_studio_edition }}</td>
+          <td class="k">Target OS</td><td class="v">{{ target_os }}</td>
+        </tr>
+        <tr>
+          <td class="k">APPX DLL Version</td><td class="v">{{ appx_dll_version }}</td>
+          <td class="k">Project GUID</td><td class="v mono">{{ proj_guid }}</td>
+        </tr>
+        <tr>
+          <td class="k">Optimization Tool</td><td class="v">{{ opti_tool }}</td>
+          <td class="k">Target Run</td><td class="v">{{ target_run }}</td>
+        </tr>
+      </table>
+
+      <!-- ====================== VIRUSTOTAL ====================== -->
+      {% if virus_total and virus_total.items|length > 9 and 'request successfully queued' not in virus_total.verbose_msg %}
+      <h2 class="section-title page-break"><span class="sec-ico">&#9888;</span> VirusTotal Scan</h2>
+      <div class="vt-callout {% if virus_total.positives > 0 %}dirty{% else %}clean{% endif %}">
+        <span class="vt-ratio">{{ virus_total.positives }} / {{ virus_total.total }}</span>
+        <span class="vt-text">
+          {% if virus_total.positives > 0 %}
+            Antivirus engines flagged this file as malicious. Review the detections below.
+          {% else %}
+            No antivirus engine flagged this file as malicious.
+          {% endif %}
+        </span>
+      </div>
+        {% if virus_total.positives %}
+        <table class="data">
+          <thead>
+            <tr>
+              <th style="width:30%;">Antivirus Engine</th>
+              <th>Detection</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for av_name,av_result in virus_total.scans.items %}
+              {% if av_result.detected == True %}
+                <tr>
+                  <td class="rule">{{ av_name }}</td>
+                  <td><span class="danger">{{ av_result.result }}</span></td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+      {% endif %}
+
+      <!-- ====================== APPX BINARY ANALYSIS ====================== -->
+      <h2 class="section-title page-break"><span class="sec-ico">&#9873;</span> APPX Binary Analysis</h2>
+      <table class="data">
+        <thead>
+          <tr>
+            <th style="width:18%;">Issue</th>
+            <th style="width:12%;">Status</th>
+            <th style="width:40%;">Description</th>
+            <th style="width:30%;">Info</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in binary_analysis %}
+            <tr>
+              <td class="rule">{{ result.rule_id }}</td>
+              <td>
+                {% if result.status == "Insecure" %}
+                  <span class="badge danger">{{ result.status }}</span>
+                {% elif result.status == "Secure" %}
+                  <span class="badge success">{{ result.status }}</span>
+                {% elif result.status == "Info" %}
+                  <span class="badge info">{{ result.status }}</span>
+                {% else %}
+                  <span class="badge warning">{{ result.status }}</span>
+                {% endif %}
+              </td>
+              <td>{{ result.desc }}</td>
+              <td class="mono" style="font-size:10.5px;">{{ result.info }}</td>
+            </tr>
+          {% endfor %}
+          {% for warn in binary_warnings %}
+            <tr>
+              <td class="rule">{{ warn.rule_id }}</td>
+              <td><span class="badge warning">{{ warn.status }}</span></td>
+              <td>{{ warn.desc }}</td>
+              <td class="mono" style="font-size:10.5px;">{{ warn.info }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- ====================== SCAN LOGS ====================== -->
+      <h2 class="section-title page-break"><span class="sec-ico">&#9776;</span> Scan Logs</h2>
+      <table class="data" id="scan_logs">
+        <thead>
+          <tr>
+            <th style="width:24%;">Timestamp</th>
+            <th style="width:36%;">Event</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+            <tr>
+              <td class="mono" style="font-size:10.5px;white-space:nowrap;">{{log.timestamp}}</td>
+              <td>{{log.status}}</td>
+              <td>
+                {% if not log.exception %}
+                  <span class="text-success">OK</span>
+                {% else %}
+                  <span class="text-danger">{{log.exception}}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- ====================== APPENDIX ====================== -->
+      <h2 class="section-title page-break"><span class="sec-ico">&#9432;</span> Appendix</h2>
+      <div class="appendix">
+        <h3>About This Report</h3>
+        <p>
+          MobInspect is an automated, all-in-one mobile application (Android / iOS / Windows)
+          pen-testing, malware analysis and security assessment framework capable of performing
+          static and dynamic analysis. The findings in this document are produced by automated
+          static analysis and may require manual verification before remediation.
+        </p>
+        <p><strong>Report ID:</strong> <span class="mono">{{ sha256 }}</span></p>
+        <p><strong>Generated:</strong> {{ timestamp }}</p>
+        <p><strong>Engine:</strong> MobInspect {{ version }}</p>
+      </div>
+
+      <div class="report-footer">
+        Report Generated by MobInspect {{ version }} &nbsp;&middot;&nbsp;
+        <strong>&copy; {% now "Y" %} Appdirs &middot; MobInspect &middot; GPL-3.0</strong>
+      </div>
+
+    </article>
+  </body>
+</html>
+{% endblock %}

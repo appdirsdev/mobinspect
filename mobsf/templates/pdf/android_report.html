@@ -1,0 +1,1482 @@
+{% block content %}
+{% load static %}
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>MobInspect Static Analysis Report</title>
+    <meta name="description" content="MobInspect Static Analysis Report for {% if app_name %}{{ app_name }}{% else %}{{ file_name }}{% endif %}">
+    {% if host_os == 'windows' %}
+        <link href='https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700' rel='stylesheet' type='text/css'>
+        <link href='https://fonts.googleapis.com/css?family=Oswald:400,600,700' rel='stylesheet' type='text/css'>
+    {% else %}
+    <style>
+      /* latin */
+      @font-face {
+        font-family: 'Open Sans';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: local('Open Sans Regular'), local('OpenSans-Regular'), url('{{base_url}}{% static 'fonts/Open_Sans/OpenSans-Regular.ttf' %}') format('truetype');
+      }
+
+      /* latin */
+      @font-face {
+        font-family: 'Oswald';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: local('Oswald'), local('Oswald'), url('{{base_url}}{% static 'fonts/Oswald/Oswald-Regular.ttf' %}') format('truetype');
+      }
+  </style>
+  {% endif %}
+  <style>
+    /* =========================================================================
+       MobInspect — Self-contained professional print stylesheet (wkhtmltopdf)
+       Letter / Landscape. No external CSS, no Tailwind. Print-CSS only.
+       ========================================================================= */
+
+    /* ---- Design tokens (print palette) ---- */
+    :root {
+      --brand:        #2563EB;
+      --brand-dark:   #1E40AF;
+      --critical:     #DC2626;
+      --high:         #EA580C;
+      --warning:      #D97706;
+      --info:         #2563EB;
+      --secure:       #16A34A;
+      --neutral:      #64748B;
+      --ink:          #0F172A;
+      --ink-2:        #334155;
+      --ink-3:        #475569;
+      --muted:        #64748B;
+      --line:         #E2E8F0;
+      --line-2:       #CBD5E1;
+      --surface:      #F8FAFC;
+      --surface-2:    #F1F5F9;
+      --white:        #FFFFFF;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      color: var(--ink);
+      font-size: 10.5pt;
+      line-height: 1.55;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      font-family: 'Open Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: var(--white);
+      color: var(--ink);
+    }
+
+    p { margin: 7px 0; }
+
+    a { color: var(--brand); text-decoration: none; word-break: break-all; }
+
+    code, .mono {
+      font-family: 'Consolas', 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 9pt;
+    }
+
+    /* ---- Section headings ---- */
+    h2 {
+      font-family: 'Oswald', 'Open Sans', sans-serif;
+      font-size: 17pt;
+      font-weight: 600;
+      color: var(--ink);
+      margin: 26px 0 12px;
+      padding: 0 0 7px 12px;
+      border-left: 5px solid var(--brand);
+      border-bottom: 2px solid var(--line);
+      letter-spacing: 0.2px;
+      page-break-after: avoid;
+      text-transform: uppercase;
+    }
+    h2 .sec-tag {
+      display: inline-block;
+      font-family: 'Open Sans', sans-serif;
+      font-size: 8pt;
+      font-weight: 700;
+      color: var(--brand);
+      background: rgba(37, 99, 235, 0.08);
+      border: 1px solid rgba(37, 99, 235, 0.25);
+      border-radius: 4px;
+      padding: 1px 7px;
+      margin-right: 8px;
+      vertical-align: middle;
+      letter-spacing: 0.5px;
+    }
+
+    h3 {
+      font-family: 'Oswald', 'Open Sans', sans-serif;
+      font-size: 12.5pt;
+      font-weight: 600;
+      color: var(--ink-2);
+      margin: 16px 0 6px;
+      page-break-after: avoid;
+    }
+    h4 { font-size: 11pt; font-weight: 600; color: var(--ink-2); margin: 12px 0 5px; }
+
+    h5 {
+      font-family: 'Oswald', 'Open Sans', sans-serif;
+      font-size: 10pt;
+      font-weight: 600;
+      color: var(--ink-3);
+      display: inline;
+    }
+
+    h1 {
+      color: var(--ink);
+      font-size: 22pt;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .center { display: block; margin-left: auto; margin-right: auto; }
+    .wrapped-text { white-space: pre-wrap; word-wrap: break-word; }
+    .description-header { display: inline; font-weight: 700; }
+
+    /* =========================================================================
+       COVER
+       ========================================================================= */
+    #cover {
+      page-break-after: always;
+      text-align: center;
+      padding: 0;
+      margin: -0.50in;            /* bleed to page edge under wkhtmltopdf margins */
+    }
+    #cover .cover-band {
+      background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%);
+      color: #ffffff;
+      padding: 56px 48px 48px;
+    }
+    #cover .brand-logo { height: 56px; width: auto; margin: 0 auto 22px; display: block; filter: brightness(0) invert(1); }
+    #cover .report-kicker {
+      font-family: 'Oswald', sans-serif;
+      font-size: 11pt;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      opacity: 0.92;
+      margin: 0 0 6px;
+    }
+    #cover .report-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 30pt;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+    }
+    #cover .cover-body { padding: 30px 48px 8px; }
+    #cover .app-icon { width: 110px; height: 110px; margin: 0 auto 14px; display: block; border-radius: 22px; border: 1px solid var(--line); }
+    #cover .app-name {
+      font-family: 'Oswald', sans-serif;
+      font-size: 21pt;
+      font-weight: 600;
+      color: var(--ink);
+      margin: 0 0 4px;
+    }
+    #cover .app-name .ver { color: var(--muted); font-weight: 400; font-size: 15pt; }
+
+    .cover-meta {
+      width: 86%;
+      margin: 22px auto 0;
+      border-collapse: collapse;
+      font-size: 10pt;
+    }
+    .cover-meta td {
+      border: none;
+      border-bottom: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: middle;
+      height: auto;
+    }
+    .cover-meta .k {
+      text-align: left;
+      width: 38%;
+      color: var(--muted);
+      font-family: 'Oswald', sans-serif;
+      font-weight: 600;
+      font-size: 9.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .cover-meta .v { text-align: left; color: var(--ink); font-weight: 600; }
+    .cover-meta .v .mono { font-weight: 400; }
+
+    /* Cover grade chip */
+    .cover-grade {
+      display: inline-block;
+      width: 76px; height: 76px; line-height: 76px;
+      border-radius: 16px;
+      color: #fff;
+      font-family: 'Oswald', sans-serif;
+      font-size: 40pt;
+      font-weight: 700;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .grade {
+      display: inline-block;
+      width: 64px; height: 64px; line-height: 64px;
+      border-radius: 12px;
+      color: #fff;
+      font-family: 'Oswald', sans-serif;
+      font-size: 30pt;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    /* =========================================================================
+       EXECUTIVE SUMMARY
+       ========================================================================= */
+    .exec-grid { width: 100%; border-collapse: separate; border-spacing: 0; margin: 4px 0 0; }
+    .exec-grid > tbody > tr > td { border: none; padding: 0 8px; vertical-align: top; height: auto; }
+
+    .score-card {
+      text-align: center;
+      padding: 18px 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--brand);
+      border-radius: 8px;
+    }
+    .score-card .score-num { font-family: 'Oswald', sans-serif; font-size: 44pt; font-weight: 700; line-height: 1; }
+    .score-card .score-den { font-size: 16pt; font-weight: 600; color: var(--muted); }
+    .score-card .score-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 8px; font-weight: 700; }
+    .score-card .risk-pill {
+      display: inline-block; margin-top: 10px; padding: 3px 12px; border-radius: 12px;
+      font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #fff;
+    }
+
+    /* KPI stat tiles */
+    .stat-row { width: 100%; border-collapse: separate; border-spacing: 6px 0; margin: 6px 0 4px; }
+    .stat-row td { border: none; padding: 0; vertical-align: top; height: auto; }
+    .stat-tile {
+      text-align: center;
+      padding: 14px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--white);
+    }
+    .stat-tile .stat-num { font-family: 'Oswald', sans-serif; font-size: 26pt; font-weight: 700; line-height: 1; }
+    .stat-tile .stat-name { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; margin-top: 7px; }
+    .tile-high    { border-top: 4px solid var(--critical); }
+    .tile-high    .stat-num, .tile-high .stat-name    { color: var(--critical); }
+    .tile-warning { border-top: 4px solid var(--warning); }
+    .tile-warning .stat-num, .tile-warning .stat-name { color: var(--warning); }
+    .tile-info    { border-top: 4px solid var(--info); }
+    .tile-info    .stat-num, .tile-info .stat-name    { color: var(--info); }
+    .tile-secure  { border-top: 4px solid var(--secure); }
+    .tile-secure  .stat-num, .tile-secure .stat-name  { color: var(--secure); }
+    .tile-hotspot { border-top: 4px solid var(--neutral); }
+    .tile-hotspot .stat-num, .tile-hotspot .stat-name { color: var(--neutral); }
+
+    /* =========================================================================
+       TABLES
+       ========================================================================= */
+    table { border-collapse: collapse; width: 100%; page-break-inside: auto; }
+    thead { display: table-header-group; }
+    tfoot { display: table-row-group; }
+    tr { page-break-inside: avoid; }
+
+    .basic { width: 100%; border: 1px solid var(--line); border-radius: 6px; margin: 8px 0 4px; }
+    .basic th, .basic td { border: 1px solid var(--line); padding: 8px 11px; text-align: left; vertical-align: top; }
+    .basic th {
+      background: var(--surface-2);
+      color: var(--ink-2);
+      font-family: 'Oswald', sans-serif;
+      font-size: 9.5pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 2px solid var(--line-2);
+    }
+    .basic td { font-size: 9.5pt; color: var(--ink-2); }
+    .basic tbody tr:nth-child(even) td { background: var(--surface); }
+
+    /* default fallbacks for legacy generic tables */
+    th, td { padding: 8px 11px; }
+    td { height: auto; }
+    .table { width: 100%; }
+    .table-bordered th, .table-bordered td { border: 1px solid var(--line); }
+    .table-striped tbody tr:nth-child(odd) td { background: var(--surface); }
+
+    /* no-border helpers (cover summary) */
+    table.no_border, th.no_border, td.no_border { border: none; }
+
+    /* Nested table (APKiD) */
+    .basic .basic { margin: 0; border: 1px solid var(--line); }
+    .basic .basic th { font-size: 8.5pt; padding: 5px 8px; }
+    .basic .basic td { font-size: 8.5pt; padding: 5px 8px; }
+
+    /* =========================================================================
+       SEVERITY COLORS + BADGES
+       ========================================================================= */
+    .danger  { color: var(--critical); font-weight: 600; }
+    .high    { color: var(--high); font-weight: 600; }
+    .warning { color: var(--warning); font-weight: 600; }
+    .info    { color: var(--info); font-weight: 600; }
+    .success { color: var(--secure); font-weight: 600; }
+    .secondary { color: var(--neutral); font-weight: 600; }
+    .disabled { color: var(--neutral); font-weight: 600; }
+    .text-success { color: var(--secure); }
+    .text-danger  { color: var(--critical); }
+
+    /* Severity pills used inside finding tables */
+    .danger, .high, .warning, .info, .success, .secondary, .disabled {
+      display: inline-block;
+    }
+
+    /* Severity breakdown table on cover */
+    .tbl-white { color: #ffffff; }
+    .severity-breakdown { border-collapse: collapse; width: 100%; margin: 6px 0; }
+    .severity-breakdown th {
+      padding: 9px; text-align: center; color: #fff; font-family: 'Oswald', sans-serif;
+      font-weight: 600; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px;
+      border: 1px solid rgba(255,255,255,0.35);
+    }
+    .severity-breakdown td {
+      padding: 12px; text-align: center; font-family: 'Oswald', sans-serif;
+      font-size: 22pt; font-weight: 700; border: 1px solid var(--line);
+    }
+    .td-high    { background-color: var(--critical); }
+    .td-warning { background-color: var(--warning); }
+    .td-info    { background-color: var(--info); }
+    .td-success { background-color: var(--secure); }
+    .td-secondary { background-color: var(--neutral); }
+    .severity-breakdown td.td-high    { color: var(--critical);  background: rgba(220,38,38,0.06); }
+    .severity-breakdown td.td-warning { color: var(--warning);   background: rgba(217,119,6,0.06); }
+    .severity-breakdown td.td-info    { color: var(--info);      background: rgba(37,99,235,0.06); }
+    .severity-breakdown td.td-success { color: var(--secure);    background: rgba(22,163,74,0.06); }
+    .severity-breakdown td.td-secondary { color: var(--neutral); background: rgba(100,116,139,0.06); }
+
+    /* Findings summary chip line (HIGH / WARNING / INFO ...) */
+    .summary-line {
+      margin: 4px 0 8px;
+      padding: 9px 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 9.5pt;
+    }
+    .summary-line .description-header { font-family: 'Oswald', sans-serif; }
+
+    /* =========================================================================
+       PANELS / CALLOUTS
+       ========================================================================= */
+    .panel-body {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin: 8px 0;
+      font-size: 9pt;
+    }
+
+    /* File / App info definition lists */
+    .info-list { margin: 6px 0 10px; }
+    .info-list .row {
+      padding: 5px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .info-list h5 { min-width: 190px; }
+
+    hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+
+    /* =========================================================================
+       PAGE BREAKS / FOOTER
+       ========================================================================= */
+    #contents { padding: 0; }
+    article { page-break-inside: auto; }
+
+    #columns {
+      margin-top: 30px;
+      padding-top: 14px;
+      border-top: 2px solid var(--line);
+      font-size: 8.5pt;
+      color: var(--muted);
+    }
+    #columns h3 {
+      font-family: 'Oswald', sans-serif;
+      color: var(--ink-2);
+      font-size: 11pt;
+      margin: 0 0 6px;
+    }
+    #columns p { font-size: 8.5pt; color: var(--ink-3); }
+
+    @media print {
+      .page-break { page-break-before: always; }
+      h2 { page-break-after: avoid; }
+      .finding, .panel-body, .score-card { page-break-inside: avoid; }
+    }
+  </style>
+  </head>
+
+  <body bgcolor="FFFFFF">
+    <article id="cover">
+      <div class="cover-band">
+        <img src="{{base_url}}{% static "mobinspect/img/logo.svg" %}" class="brand-logo" alt="MobInspect Logo"/>
+        <p class="report-kicker">Mobile Application Security Assessment</p>
+        <h2 class="report-title" style="border:none;padding:0;margin:0;text-transform:none;color:#fff;">ANDROID STATIC ANALYSIS REPORT</h2>
+      </div>
+
+      <div class="cover-body">
+        <img class="app-icon center" id="icon" src="{% if icon_path %}{{dwd_dir}}{{icon_path}}{% else %}{{base_url}}{% static 'img/no_icon.png' %}{% endif %}" alt="app_icon"/>
+        <div class="app-name">{% if app_name %}{{ app_name }}{% else %}{{ file_name }}{% endif %} {% if version_name %}<span class="ver">({{version_name}})</span>{% endif %}</div>
+
+        <table class="cover-meta no_border">
+        <tr>
+          <td class="k no_border">File Name</td>
+          <td class="v no_border"><span class="mono">{{file_name}}</span></td>
+        </tr>
+        <tr>
+          <td class="k no_border">Package Name</td>
+          <td class="v no_border"><span class="mono">{{ package_name }}</span></td>
+        </tr>
+        <tr>
+          <td class="k no_border">Scan Date</td>
+          <td class="v no_border">{{ timestamp }}</td>
+        </tr>
+{% if app_type not in 'so' %}
+      {% if average_cvss %}
+        <tr>
+          <td class="k no_border">Average CVSS Score</td>
+          <td class="v no_border">
+        {% if average_cvss > 6 %}
+        <span class="danger">{{ average_cvss }} </span>
+        {% elif average_cvss == 0 %}
+        {{ average_cvss }}
+        {% elif average_cvss >= 4 %}
+        <span class="warning">{{ average_cvss }}</span>
+        {% elif average_cvss < 4 %}
+        <span class="success">{{ average_cvss }}</span>
+        {% endif %}
+          </td>
+        </tr>
+      {% endif %}
+        <tr>
+          <td class="k no_border">App Security Score</td>
+          <td class="v no_border">
+          {% if appsec.security_score < 30 %}
+            <span class="danger">{{ appsec.security_score }}/100 (CRITICAL RISK)</span>
+          {% elif appsec.security_score < 40 %}
+            <span class="high">{{ appsec.security_score }}/100 (HIGH RISK)</span>
+          {% elif appsec.security_score < 60 %}
+            <span class="warning">{{ appsec.security_score }}/100 (MEDIUM RISK)</span>
+          {% else %}
+            <span class="success">{{ appsec.security_score }}/100 (LOW RISK)</span>
+          {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="k no_border">Grade</td>
+          <td class="v no_border">
+          <span class="grade" style="background:
+          {% if appsec.security_score < 30 %}
+          #DC2626">F
+          {% elif appsec.security_score < 40 %}
+          #D97706">C
+          {% elif appsec.security_score < 60 %}
+          #2563EB">B
+          {% else %}
+          #16A34A">A
+          {% endif %}
+          </span>
+          </td>
+        </tr>
+{% endif %}
+      {% if trackers|key:"trackers" %}
+        <tr>
+          <td class="k no_border">Trackers Detection</td>
+          <td class="v no_border"><span {% if trackers.detected_trackers > 0 %} class="warning" {% endif %}>{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span></td>
+        </tr>
+      {% endif %}
+      {% if virus_total and virus_total.items|length > 9 and 'request successfully queued' not in virus_total.verbose_msg %}
+        <tr>
+          <td class="k no_border">VirusTotal Detection</td>
+          <td class="v no_border"><span class="{% if virus_total.positives > 0 %}danger{% else %}success{% endif %}">{{ virus_total.positives }}/{{ virus_total.total }}</span></td>
+        </tr>
+      {% endif %}
+        </table>
+
+    {% if app_type not in 'so' %}
+        <h2><span class="sec-tag">SUMMARY</span> FINDINGS SEVERITY</h2>
+        <table class="severity-breakdown">
+          <thead>
+            <tr>
+              <th class="td-high">HIGH</th>
+              <th class="td-warning">MEDIUM</th>
+              <th class="td-info">INFO</th>
+              <th class="td-success">SECURE</th>
+              <th class="td-secondary">HOTSPOT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="td-high">{{ appsec.high | length}}</td>
+              <td class="td-warning">{{ appsec.warning | length}}</td>
+              <td class="td-info">{{ appsec.info | length}}</td>
+              <td class="td-success">{{ appsec.secure | length}}</td>
+              <td class="td-secondary">{{ appsec.hotspot | length}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+  {% endif %}
+    <article id="contents">
+
+      <h2><span class="sec-tag">01</span> FILE INFORMATION</h2>
+      <div class="info-list">
+        <div class="row"><h5>File Name:</h5> <span class="mono">{{ file_name }}</span></div>
+        <div class="row"><h5>Size:</h5> {{ size }}</div>
+        <div class="row"><h5>MD5:</h5> <span class="mono">{{ md5 }}</span></div>
+        <div class="row"><h5>SHA1:</h5> <span class="mono">{{ sha1 }}</span></div>
+        <div class="row"><h5>SHA256:</h5> <span class="mono">{{ sha256 }}</span></div>
+      </div>
+
+{% if app_type not in 'so' %}
+      <h2><span class="sec-tag">02</span> APP INFORMATION</h2>
+      <div class="info-list">
+        <div class="row"><h5>App Name:</h5> {{ app_name }}</div>
+        <div class="row"><h5>Package Name:</h5> <span class="mono">{{ package_name }}</span></div>
+        <div class="row"><h5>Main Activity:</h5> <span class="mono">{{ main_activity }}</span></div>
+        <div class="row"><h5>Target SDK:</h5> {{ target_sdk }}</div>
+        <div class="row"><h5>Min SDK:</h5> {{ min_sdk }}</div>
+        <div class="row"><h5>Max SDK:</h5> {{ max_sdk }}</div>
+        <div class="row"><h5>Android Version Name:</h5> {{ version_name }}</div>
+        <div class="row"><h5>Android Version Code:</h5> {{ version_code }}</div>
+      </div>
+{% endif %}
+
+{% if app_type not in 'jar,aar,so' %}
+      <h2><span class="sec-tag">03</span> APP COMPONENTS</h2>
+      <div class="info-list">
+        <div class="row"><h5>Activities:</h5> {{ activities | length }}</div>
+        <div class="row"><h5>Services:</h5> {{ services | length }}</div>
+        <div class="row"><h5>Receivers:</h5> {{ receivers | length }}</div>
+        <div class="row"><h5>Providers:</h5> {{ providers | length }}</div>
+        <div class="row"><h5>Exported Activities:</h5> <span {% if exported_count.exported_activities > 0 %} class="danger" {% endif %}> {{ exported_count.exported_activities }}</span></div>
+        <div class="row"><h5>Exported Services:</h5> <span {% if exported_count.exported_services > 0 %} class="danger" {% endif %}> {{ exported_count.exported_services }}</span></div>
+        <div class="row"><h5>Exported Receivers:</h5> <span {% if exported_count.exported_receivers > 0 %} class="danger" {% endif %}> {{ exported_count.exported_receivers }}</span></div>
+        <div class="row"><h5>Exported Providers:</h5> <span {% if exported_count.exported_providers > 0 %} class="danger" {% endif %}> {{ exported_count.exported_providers }}</span></div>
+      </div>
+  {% endif %}
+  {% if app_type not in 'so' %}
+        <h2><span class="sec-tag">04</span> CERTIFICATE INFORMATION</h2>
+        {% if certificate_analysis.certificate_info %}
+        <div class="panel-body">
+              <p class="wrapped-text mono">{{ certificate_analysis.certificate_info }}</p>
+        </div>
+      {% else %}
+      <div class="panel-body"><span class="danger">Failed to read Code Signing Certificate or none available.</span></div>
+      {% endif %}
+  {% endif %}
+      {% if permissions %}
+      <h2><span class="sec-tag">05</span> APPLICATION PERMISSIONS</h2>
+            <table class="basic">
+              <thead>
+            <tr>
+                <th>PERMISSION</th>
+                <th>STATUS</th>
+                <th>INFO</th>
+                <th>DESCRIPTION</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for perm,desc in permissions.items %}
+            <tr>
+            <td class="mono">{{ perm }}</td>
+            <td>
+            {% if desc.status == 'dangerous' %}
+              <span class="danger">dangerous</span>
+            {% elif desc.status == 'normal' %}
+              <span class="info">normal</span>
+            {% elif desc.status == 'signatureOrSystem' %}
+              <span class="warning">SignatureOrSystem</span>
+            {% elif desc.status == 'signature' %}
+              <span class="success">signature</span>
+            {% elif desc.status == 'unknown' %}
+              <span class="secondary">unknown</span>
+            {% endif %}
+            </td>
+            <td>{{ desc.info }}</td>
+            <td>{{ desc.description }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+            </table>
+      {% endif %}
+
+       {% if virus_total and virus_total.items|length > 9 and 'request successfully queued' not in virus_total.verbose_msg %}
+       <h2><span class="sec-tag">06</span> VIRUSTOTAL SCAN</h2>
+       <div class="summary-line"><h5>{{ virus_total.positives }} / {{ virus_total.total }}</h5> &nbsp; AVs found this file Malicious!</div>
+            {% if virus_total.positives %}
+                    <table class="basic">
+                                    <thead>
+                                        <tr>
+                                            <th>AV</th>
+                                            <th>DETECTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for av_name,av_result in virus_total.scans.items %}
+                                        {% if av_result.detected == True %}
+                                            <tr>
+                                                <td>
+                                                    {{ av_name }}
+                                                </td>
+                                                <td>
+                                                    <span class="danger">{{ av_result.result }}</span>
+                                                </td>
+                                          </tr>
+                                        {% endif %}
+                                    {% endfor %}
+                               </tbody>
+                    </table>
+            {% endif %}
+      {% endif %}
+      {% if apkid and app_type not in 'jar,aar'%}
+      <h2><span class="sec-tag">07</span> APKID ANALYSIS</h2>
+       <table class="basic">
+                  <thead>
+                      <tr>
+                          <th>FILE</th>
+                          <th>DETAILS</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {% if apkid %}
+                       {% for file, details in apkid.items %}
+                       <tr>
+                         <td class="mono">
+                             {{file}}
+                        </td>
+                        <td>
+                            <table class="basic">
+                              <thead>
+                                  <tr>
+                                      <th>FINDINGS</th>
+                                      <th>DETAILS</th>
+                                  </tr>
+                              </thead>
+                            <tbody>
+                            {% for detail, idens in details.items %}
+                            <tr>
+                              <td>
+                               {% if detail == "anti_vm" %}
+                               <span class="warning">Anti-VM Code</span>
+                               {% elif detail == "anti_disassembly" %}
+                               <span class="warning">Anti Disassembly Code</span>
+                               {% elif detail == "anti_debug" %}
+                               <span class="warning">Anti Debug Code</span>
+                               {% elif detail == "compiler" %}
+                               <span class="info">Compiler</span>
+                               {% elif detail == "abnormal" %}
+                               <span class="warning">Abnormal Code</span>
+                               {% elif detail == "obfuscator" %}
+                               <span class="warning">Obfuscator</span>
+                               {% elif detail == "protector" %}
+                               <span class="info">Protector</span>
+                               {% elif detail == "packer" %}
+                               <span class="danger">Packer Found</span>
+                               {% elif detail == "dropper" %}
+                               <span class="danger">Dropper Found</span>
+                               {% elif detail == "manipulator" %}
+                               <span class="warning">Manipulator Found</span>
+                               {% else %}
+                               <span class="info">{{detail}}</span>
+                               {% endif %}
+                            </td>
+                              <td> {% for idn in idens %} {{ idn }}<br/> {% endfor %}</td>
+                            </tr>
+                            {% endfor %}
+                           </tbody>
+                            </table>
+                        </td>
+                        </tr>
+                         {% endfor %}
+                      {% else %}
+                      <p align="center"><strong>APKiD not enabled.</strong></p>
+                      {% endif %}
+                    </tbody>
+                    </table>
+      {% endif %}
+      {% if browsable_activities %}
+      <h2><span class="sec-tag">08</span> BROWSABLE ACTIVITIES</h2>
+       <table class="basic">
+                                        <thead>
+                                            <tr>
+                                                <th>ACTIVITY</th>
+                                                <th>INTENT</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                      {% for activity,intent_details in browsable_activities.items %}
+                          <tr>
+                            <td class="mono">{{activity}}</td>
+                            <td>
+                                   {% if intent_details|key:"schemes" %}
+                                      <strong>Schemes</strong>:
+                                      {% for scheme in intent_details|key:"schemes" %}
+                                        {{scheme}},
+                                      {% endfor %}
+                                       <br/>
+                                   {% endif %}
+                                   {% if intent_details|key:"hosts" %}
+                                      <strong>Hosts:</strong> {% for host in intent_details|key:"hosts" %}
+                                        {{host}},
+                                      {% endfor %}
+                                      <br/>
+                                   {% endif %}
+                                   {% if intent_details|key:"ports" %}
+                                      <strong>Ports:</strong> {% for port in intent_details|key:"ports" %}
+                                        {{port}},
+                                      {% endfor %}
+                                      <br/>
+                                   {% endif %}
+                                   {% if intent_details|key:"mime_types" %}
+                                      <strong>Mime Types:</strong> {% for mime in intent_details|key:"mime_types" %}
+                                        {{mime}},
+                                      {% endfor %}
+                                      <br/>
+                                   {% endif %}
+                                   {% if intent_details|key:"paths" %}
+                                      <strong>Paths:</strong> {% for path in intent_details|key:"paths" %}
+                                        {{path}},
+                                      {% endfor %}
+                                      <br/>
+                                   {% endif %}
+                                   {% if intent_details|key:"path_prefixs" %}
+                                      <strong>Path Prefixes:</strong> {% for prefix in intent_details|key:"path_prefixs" %}
+                                        {{prefix}},
+                                      {% endfor %}
+                                      <br/>
+                                   {% endif %}
+                                   {% if intent_details|key:"path_patterns" %}
+                                      <strong>Path Patterns:</strong> {% for pattern in intent_details|key:"path_patterns" %}
+                                        {{pattern}},
+                                      {% endfor %}
+                                      <br/>
+                                   {% endif %}
+                              {% endfor %}
+                            </td>
+                          </tr>
+                    </tbody>
+                    </table>
+      {% endif %}
+    {% if app_type not in 'so' %}
+     <h2><span class="sec-tag">09</span> NETWORK SECURITY</h2>
+     {% if network_security and 'network_summary' in network_security and network_security.network_summary|length > 0 %}
+     <div class="summary-line">
+     <span class="danger">HIGH: </span>
+     <h5 class="description-header">{{ network_security.network_summary.high }}</h5> &nbsp;|&nbsp;
+     <span class="warning">WARNING: </span>
+     <h5 class="description-header">{{ network_security.network_summary.warning }}</h5> &nbsp;|&nbsp;
+     <span class="info">INFO: </span>
+     <h5 class="description-header">{{ network_security.network_summary.info }}</h5> &nbsp;|&nbsp;
+     <span class="success">SECURE: </span>
+     <h5 class="description-header">{{ network_security.network_summary.secure }}</h5>
+     </div>
+   {% endif %}
+     <table class="basic">
+        <thead>
+            <tr>
+              <th>NO</th>
+              <th>SCOPE</th>
+              <th>SEVERITY</th>
+              <th>DESCRIPTION</th>
+                    </tr>
+                </thead>
+                <tbody>
+        {% if network_security and 'network_findings' in network_security %}
+        {% for item in network_security.network_findings %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td class="mono">
+              {% for url in item.scope %}
+              {{ url }}<br/>
+            {% endfor %}
+            </td>
+            <td>
+              {% if item.severity == "high" %}
+                <span class="danger">high</span>
+              {% elif item.severity == "secure" %}
+                <span class="success">secure</span>
+              {% elif item.severity == "info" %}
+                <span class="info">info</span>
+              {% elif item.severity == "warning" %}
+                  <span class="warning">warning</span>
+              {% endif %}
+            </td>
+            <td>
+            {{item.description }}
+            </td>
+            </tr>
+          {% endfor %}
+          {% endif %}
+        </tbody>
+        </table>
+
+      <h2><span class="sec-tag">10</span> CERTIFICATE ANALYSIS</h2>
+      {% if certificate_analysis and 'certificate_summary' in certificate_analysis and certificate_analysis.certificate_summary|length > 0 %}
+      <div class="summary-line">
+      <span class="danger">HIGH: </span>
+      <h5 class="description-header">{{ certificate_analysis.certificate_summary.high }}</h5> &nbsp;|&nbsp;
+      <span class="warning">WARNING: </span>
+      <h5 class="description-header">{{ certificate_analysis.certificate_summary.warning }}</h5> &nbsp;|&nbsp;
+      <span class="info">INFO: </span>
+      <h5 class="description-header">{{ certificate_analysis.certificate_summary.info }}</h5>
+      </div>
+    {% endif %}
+      <table class="basic">
+        <thead>
+            <tr>
+                <th>TITLE</th>
+                <th>SEVERITY</th>
+                <th>DESCRIPTION</th>
+            </tr>
+        </thead>
+        <tbody>
+          {% if certificate_analysis and 'certificate_findings' in certificate_analysis %}
+            {% for find in certificate_analysis.certificate_findings %}
+            <tr>
+            <td>{{ find.2 }}</td>
+            <td>
+            {% if find.0 == 'high' %}
+              <span class="danger">high</span>
+            {% elif find.0  == 'secure' %}
+              <span class="success">secure</span>
+            {% elif find.0  == 'warning' %}
+              <span class="warning">warning</span>
+              {% elif find.0  == 'info' %}
+              <span class="info">info</span>
+            {% endif %}
+            </td>
+            <td>{{ find.1 }}</td>
+            </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+    </table>
+
+    <h2><span class="sec-tag">11</span> MANIFEST ANALYSIS</h2>
+    {% if manifest_analysis and 'manifest_summary' in manifest_analysis and manifest_analysis.manifest_summary|length > 0 %}
+    <div class="summary-line">
+    <span class="danger">HIGH: </span>
+    <h5 class="description-header">{{ manifest_analysis.manifest_summary.high }}</h5> &nbsp;|&nbsp;
+    <span class="warning">WARNING: </span>
+    <h5 class="description-header">{{ manifest_analysis.manifest_summary.warning }}</h5> &nbsp;|&nbsp;
+    <span class="info">INFO: </span>
+    <h5 class="description-header">{{ manifest_analysis.manifest_summary.info }}</h5> &nbsp;|&nbsp;
+    <span class="disabled">SUPPRESSED: </span>
+    <h5 class="description-header">{{ manifest_analysis.manifest_summary.suppressed }}</h5>
+    </div>
+  {% endif %}
+     <table class="basic">
+                    <thead>
+                        <tr>
+                            <th>NO</th>
+                            <th>ISSUE</th>
+                            <th>SEVERITY</th>
+                            <th>DESCRIPTION</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    {% if manifest_analysis and 'manifest_findings' in manifest_analysis %}
+                    {% for item in manifest_analysis.manifest_findings %}
+                    <tr>
+                      <td>{{ forloop.counter }}</td>
+                      <td>
+                      {{item|key:"title"}}
+                      </td>
+                      <td>
+                        {% if item|key:"severity" == "high" %}
+                          <span class="danger">high</span>
+                        {% elif item|key:"severity" == "info" %}
+                          <span class="info">info</span>
+                        {% elif item|key:"severity" == "warning" %}
+                          <span class="warning">warning</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                      {{item|key:"description"}}
+                      </td>
+                     </tr>
+                     {% endfor %}
+                     {% endif %}
+											</tbody>
+											</table>
+
+      <h2><span class="sec-tag">12</span> CODE ANALYSIS</h2>
+      {% if code_analysis and 'summary' in code_analysis and code_analysis.summary|length > 0 %}
+      <div class="summary-line">
+      <span class="danger">HIGH: </span>
+      <h5 class="description-header">{{ code_analysis.summary.high }}</h5> &nbsp;|&nbsp;
+      <span class="warning">WARNING: </span>
+      <h5 class="description-header">{{ code_analysis.summary.warning }}</h5> &nbsp;|&nbsp;
+      <span class="info">INFO: </span>
+      <h5 class="description-header">{{ code_analysis.summary.info }}</h5> &nbsp;|&nbsp;
+      <span class="success">SECURE: </span>
+      <h5 class="description-header">{{ code_analysis.summary.secure }}</h5> &nbsp;|&nbsp;
+      <span class="disabled">SUPPRESSED: </span>
+      <h5 class="description-header">{{ code_analysis.summary.suppressed }}</h5>
+      </div>
+    {% endif %}
+       <table class="basic">
+                <thead>
+                    <tr>
+                        <th>NO</th>
+                        <th>ISSUE</th>
+                        <th>SEVERITY</th>
+                        <th>STANDARDS</th>
+                        <th>FILES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                   {% if code_analysis and 'findings' in code_analysis %}
+                   {% for rule, details in code_analysis.findings.items %}
+                  <tr>
+                  <td>{{ forloop.counter }}</td>
+                  <td width="25%">
+                    {% if details.metadata|key:"ref" %}
+                    <a href="{{details.metadata.ref}}" target="_blank" rel="noopener"> {{ details.metadata.description }}</a>
+                    {% else %}
+                      {{ details.metadata.description }}
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if details.metadata.severity == "high" %}
+                      <span class="danger">high</span>
+                      {% elif details.metadata.severity == "good" %}
+                      <span class="success">secure</span>
+                      {% elif details.metadata.severity == "warning" %}
+                      <span class="warning">warning</span>
+                      {% elif details.metadata.severity == "info" %}
+                      <span class="info">info</span>
+                      {% endif %}
+                  </td>
+                  <td>
+                    {% if average_cvss %}
+                      <strong>CVSS V2:</strong>
+                      {{ details.metadata.cvss }}
+                      {% if details.metadata.cvss > 6 %}
+                         <span class="danger"> (high)</span>
+                      {% elif details.metadata.cvss == 0 %}
+                        <span class="info">(info)</span>
+                      {% elif details.metadata.cvss >= 4 %}
+                        <span class="warning"> (medium)</span>
+                      {% elif details.metadata.cvss < 4 %}
+                        <span class="success"> (low)</span>
+                      {% endif %}
+                      <br/>
+                    {% endif %}
+                      {% if details.metadata.cwe %}<strong>CWE: </strong>{{ details.metadata.cwe }}{% endif %}
+                      {% if details.metadata|key:"owasp-mobile" %}<br/> <strong>OWASP Top 10: </strong>{{ details.metadata|key:"owasp-mobile" }}{% endif %}
+                      {% if details.metadata.masvs %}<br/> <strong>OWASP MASVS: </strong>{{ details.metadata.masvs }}{% endif %}
+                  </td>
+                 <td style="word-break:break-all;" class="mono">
+                  {% for file_path in details.files %}
+                    {{ file_path }}
+                  <br/>
+                  {% endfor %}
+                  </td>
+                </tr>
+              {% endfor %}
+              {% endif %}
+          </tbody>
+          </table>
+    {% endif %}
+
+     {% if binary_analysis  %}
+      <h2><span class="sec-tag">13</span> SHARED LIBRARY BINARY ANALYSIS</h2>
+        <table class="basic">
+                    <thead>
+                      <tr>
+                        <th>NO</th>
+                        <th>SHARED OBJECT</th>
+                        <th>NX</th>
+                        <th>PIE</th>
+                        <th>STACK CANARY</th>
+                        <th>RELRO</th>
+                        <th>RPATH</th>
+                        <th>RUNPATH</th>
+                        <th>FORTIFY</th>
+                        <th>SYMBOLS STRIPPED</th>
+                     </tr>
+                    </thead>
+                    <tbody>
+                      {% if not binary_analysis %}
+                        No Shared Objects found.
+                      {% endif %}
+                       {% for so in binary_analysis %}
+                       <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td width="20%" class="mono">{{so.name | relative_path}}</td>
+                        <td style="vertical-align: top;"><b>{{so.nx.is_nx}}</b>
+                          <br/>
+                          <span class="{% if so.nx.severity == 'high' %}danger{% elif so.nx.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.nx.severity}}</span>
+                          <br/>{{so.nx.description}}</td>
+                          <td style="vertical-align: top;"><b>{{so.pie.is_pie}}</b>
+                            <br/>
+                            <span class="{% if so.pie.severity == 'high' %}danger{% elif so.pie.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.pie.severity}}</span>
+                            <br/>{{so.pie.description}}</td>
+                          <td style="vertical-align: top;"><b>{{so.stack_canary.has_canary}}</b>
+                            <br/>
+                            <span class="{% if so.stack_canary.severity == 'high' %}danger{% elif so.stack_canary.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.stack_canary.severity}}</span>
+                            <br/>{{so.stack_canary.description}}</td>
+                        <td style="vertical-align: top;"><b>{{so.relocation_readonly.relro}}</b>
+                              <br/>
+                              <span class="{% if so.relocation_readonly.severity == 'high' %}danger{% elif so.relocation_readonly.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.relocation_readonly.severity}}</span>
+                              <br/>{{so.relocation_readonly.description}}</td>
+                        <td style="vertical-align: top;"><b>{{so.rpath.rpath}}</b>
+                          <br/>
+                          <span class="{% if so.rpath.severity == 'high' %}danger{% elif so.rpath.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.rpath.severity}}</span>
+                          <br/>{{so.rpath.description}}</td>
+                        <td style="vertical-align: top;"><b>{{so.runpath.runpath}}</b>
+                          <br/>
+                          <span class="{% if so.runpath.severity == 'high' %}danger{% elif so.runpath.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.runpath.severity}}</span>
+                          <br/>{{so.runpath.description}}</td>
+                        <td style="vertical-align: top;"><b>{{so.fortify.is_fortified}}</b>
+                          <br/>
+                          <span class="{% if so.fortify.severity == 'high' %}danger{% elif so.fortify.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.fortify.severity}}</span>
+                          <br/>{{so.fortify.description}}</td>
+                        <td style="vertical-align: top;"><b>{{so.symbol.is_stripped}}</b>
+                          <br/>
+                          <span class="{% if so.symbol.severity == 'high' %}danger{% elif so.symbol.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.symbol.severity}}</span>
+                          <br/>{{so.symbol.description}}</td>
+                      </tr>
+                       {% endfor %}
+                  </tbody>
+                    </table>
+    {% endif %}
+    {% if app_type not in 'so' %}
+    <h2><span class="sec-tag">14</span> NIAP ANALYSIS v1.3</h2>
+    <table class="basic">
+              <thead>
+                  <tr>
+                    <th>NO</th>
+                    <th>IDENTIFIER</th>
+                    <th>REQUIREMENT</th>
+                    <th>FEATURE</th>
+                    <th>DESCRIPTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for iden, details in niap_analysis.items %}
+                  <tr>
+                  <td>{{ forloop.counter }}</td>
+                  <td>
+                    <span class="{% if 'does not' in details.choice %} warning {% elif 'not in accordance' in details.choice %} danger {% else %} info {% endif %}"> {{ iden }}</span>
+                  </td>
+                   <td>
+                   {{ details.class }}
+                  </td>
+                  <td>
+                    {{ details.description }}
+                   </td>
+                   <td>
+                    {{ details.choice }}
+                   </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+    {% endif %}
+
+    {% if behaviour %}
+    <h2><span class="sec-tag">15</span> BEHAVIOUR ANALYSIS</h2>
+    <table class="basic">
+      <thead>
+        <tr>
+          <th>RULE ID</th>
+          <th>BEHAVIOUR</th>
+          <th>LABEL</th>
+          <th>FILES</th>
+      </tr>
+      </thead>
+      <tbody>
+          {% for rule, details in behaviour.items %}
+          <tr>
+          <td class="mono">{{ rule }}</td>
+          <td width="25%">
+            {{ details.metadata.description }}
+          </td>
+          <td> {% for lbl in details.metadata.label %}
+            <span class="warning">{{ lbl }}</span>
+          {% endfor %}
+          </td>
+          <td style="word-break:break-all;" class="mono">
+            {% for file_path in details.files %}
+              {{ file_path }}
+            <br/>
+            {% endfor %}
+          </td>
+        </tr>
+      {% endfor %}
+  </tbody>
+  </table>
+  {% endif %}
+
+  {% if firebase_urls %}
+  <h2><span class="sec-tag">16</span> FIREBASE DATABASES ANALYSIS</h2>
+        <table class="basic">
+              <thead>
+              <tr>
+                <th>TITLE</th>
+                <th>SEVERITY</th>
+                <th>DESCRIPTION</th>
+              </tr>
+            </thead>
+        <tbody>
+              {% for find in firebase_urls %}
+              <tr>
+                <td>{{ find.title }}</td>
+                <td>
+                {% if find.severity == 'high' %}
+                <span class="danger">high</span>
+                {% elif find.severity  == 'secure' %}
+                  <span class="success">secure</span>
+                {% elif find.severity  == 'warning' %}
+                  <span class="warning">warning</span>
+                {% elif find.severity  == 'info' %}
+                <span class="info">info</span>
+                {% endif %}
+                </td>
+                <td>{{ find.description }}</td>
+                </tr>
+              {% endfor %}
+                </tbody>
+                </table>
+    {% endif %}
+
+    {% if malware_permissions %}
+    <h2><span class="sec-tag">17</span> ABUSED PERMISSIONS</h2>
+    <table id="table_ofac" class="basic table table-bordered table-hover table-striped">
+      <thead>
+      <tr>
+         <th>TYPE</th>
+         <th>MATCHES</th>
+         <th>PERMISSIONS</th>
+      </tr>
+     </thead>
+     <tbody>
+      <tr>
+        <td>Malware Permissions</td>
+        <td>{{ malware_permissions.top_malware_permissions | length}}</b>/{{malware_permissions.total_malware_permissions}}</td>
+        <td class="mono">
+          {{ malware_permissions.top_malware_permissions | join:", "}}
+      </td>
+      </tr>
+      <tr>
+        <td>Other Common Permissions</td>
+        <td>{{ malware_permissions.other_abused_permissions | length}}</b>/{{malware_permissions.total_other_permissions}}</td>
+        <td class="mono">
+          {{ malware_permissions.other_abused_permissions | join:", "}}
+      </td>
+      </tr>
+    </tbody>
+</table>
+    <hr>
+    <p>
+      <h3>Malware Permissions:</h3> Top permissions that are widely abused by known malware.
+      <br/>
+      <h3>Other Common Permissions:</h3> Permissions that are commonly abused by known malware.
+    </p>
+      {% endif %}
+
+ <!-- ===========================end malware permissions  ================================== -->
+
+      {% if domains  %}
+      <h2><span class="sec-tag">18</span> OFAC SANCTIONED COUNTRIES</h2>
+      <p>This app may communicate with the following OFAC sanctioned list of countries.</p>
+      <table id="table_ofac" class="basic table table-bordered table-hover table-striped">
+           <thead>
+           <tr>
+              <th>DOMAIN</th>
+              <th>COUNTRY/REGION</th>
+           </tr>
+          </thead>
+          <tbody>
+          {% for domain, details in domains.items %}
+          {% if details|key:"ofac" == True %}
+           <tr><td class="mono">{{domain}}</td>
+           <td>
+             <strong>IP: </strong>{{details|key:"geolocation"|key:"ip"}}  <br/>
+             <strong>Country: </strong>{{details|key:"geolocation"|key:"country_long"}} <br/>
+             <strong>Region: </strong>{{details|key:"geolocation"|key:"region"}} <br/>
+             <strong>City: </strong>{{details|key:"geolocation"|key:"city"}} <br/>
+           </td>
+           </tr>
+           {% endif %}
+           {% endfor %}
+         </tbody>
+     </table>
+
+      <h2><span class="sec-tag">19</span> DOMAIN MALWARE CHECK</h2>
+         <table  class="basic">
+                  <thead>
+                  <tr>
+                     <th>DOMAIN</th>
+                     <th>STATUS</th>
+                     <th>GEOLOCATION</th>
+                  </tr>
+                 </thead>
+                 <tbody>
+                 {% for domain, details in domains.items %}
+                  <tr><td class="mono">{{domain}}</td><td>
+
+                    {% if details|key:"bad" == "yes" %}
+                    <span class="danger">malware</span><br/>
+
+                      <h5>URL: </h5> {{details|key:"domain_or_url"}}
+                      <h5>IP: </h5> <span class="danger">{{details|key:"ip"}}</span>
+                      <h5>Description: </h5> {{details|key:"desc"}}
+
+                  {% else %}
+                    <span class="success">ok</span><br/>
+                  {% endif %}
+                  </td>
+                  <td>
+                    {% if details|key:"geolocation" %}
+
+                      <h5>IP: </h5> {{details|key:"geolocation"|key:"ip"}}  <br/>
+                      <h5>Country: </h5> {{details|key:"geolocation"|key:"country_long"}} <br/>
+                      <h5>Region: </h5> {{details|key:"geolocation"|key:"region"}} <br/>
+                      <h5>City: </h5> {{details|key:"geolocation"|key:"city"}} <br/>
+                      <h5>Latitude: </h5> {{details|key:"geolocation"|key:"latitude"}} <br/>
+                      <h5>Longitude: </h5> {{details|key:"geolocation"|key:"longitude"}} <br/>
+                      <h5>View: </h5> <a target="_blank" href="http://maps.google.com/maps?q={{details|key:"geolocation"|key:"latitude"}},{{details|key:"geolocation"|key:"longitude"}}">Google Map</a>
+                    {% else %}
+                    No Geolocation information available.
+                    {% endif %}
+                  </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+            </table>
+      {% endif %}
+<!-- Display urls only for so files-->
+{% if app_type in 'so' %}
+       {% if urls %}
+      <h2><span class="sec-tag">20</span> URLS</h2>
+      <table class="basic">
+                  <thead>
+                  <tr>
+                     <th>URL</th>
+                     <th>FILE</th>
+                  </tr>
+                 </thead>
+                  <tbody>
+									{% for urldict in urls %}
+                    <tr>
+                       <td style="word-break:break-all;" class="mono">
+                       {% for u in urldict|key:"urls" %}
+                         {{ u }} <br/>
+                       {% endfor %}
+                        </td>
+                       <td style="word-break:break-all;" class="mono">
+                         {{urldict|key:"path"}}
+                       </td>
+                    </tr>
+                  {% endfor %}
+										</tbody>
+										</table>
+        {% endif %}
+{% endif %}
+      {% if emails %}
+      <h2><span class="sec-tag">21</span> EMAILS</h2>
+          <table class="basic">
+                  <thead>
+                  <tr>
+                     <th>EMAIL</th>
+                     <th>FILE</th>
+                  </tr>
+                 </thead>
+                  <tbody>
+									{% for email_dict in emails %}
+                    <tr>
+                       <td style="word-break:break-all;" class="mono">
+                       {% for em in email_dict|key:"emails" %}
+                         {{ em }} <br/>
+                       {% endfor %}
+                        </td>
+
+                       <td style="word-break:break-all;" class="mono">
+                         {{email_dict|key:"path"}}
+                       </td>
+                    </tr>
+                  {% endfor %}
+										</tbody>
+										</table>
+      {% endif %}
+
+
+      {% if trackers|key:"trackers" %}
+      <h2><span class="sec-tag">22</span> TRACKERS</h2>
+       <table class="basic">
+            <thead>
+                <tr>
+                    <th>TRACKER</th>
+                    <th>CATEGORIES</th>
+                    <th>URL</th>
+                </tr>
+            </thead>
+
+            <tbody>
+              {% for trk in trackers|key:"trackers" %}
+              <tr>
+                <td>
+                  {{trk.name}}
+                </td>
+                <td>
+                  {{trk.categories}}
+                </td>
+                <td class="mono">
+                  <a target="_blank" href="{{trk.url}}" rel="noopener noreferrer">{{trk.url}}</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+        </table>
+         {% endif %}
+
+        {% if secrets %}
+        <h2><span class="sec-tag">23</span> HARDCODED SECRETS</h2>
+            <table class="basic">
+                    <thead>
+                    <tr>
+                      <th>POSSIBLE SECRETS</th>
+                    </tr>
+                  </thead>
+                    <tbody>
+                    {% for sec in secrets %}
+                      <tr>
+                        <td style="word-break:break-all;" class="mono">
+                        {{ sec }}
+                          </td>
+                      </tr>
+                    {% endfor %}
+                      </tbody>
+                      </table>
+        {% endif %}
+
+        <!--Only for so-->
+        {% if app_type in 'so' %}
+        <h2><span class="sec-tag">24</span> SYMBOLS</h2>
+            <table class="basic">
+                    <tbody>
+                    {% for val in file_analysis %}
+                      <tr>
+                        <td style="word-break:break-all;" class="mono">
+                        {{ val }}
+                          </td>
+                      </tr>
+                    {% endfor %}
+                      </tbody>
+                      </table>
+       {% endif %}
+
+     {% if not playstore_details.error %}
+    <h2><span class="sec-tag">25</span> PLAYSTORE INFORMATION</h2>
+                  <p>
+                    <h5>Title:</h5>
+                    {{ playstore_details.title }}
+                  </p>
+                  <p>
+                    <h5>Score:</h5>
+                  {{ playstore_details.score}}
+
+                   <h5>Installs:</h5>
+                    {{ playstore_details.installs }}
+
+                   <h5>Price:</h5>
+                      {{ playstore_details.price }}
+
+                   <h5>Android Version Support:</h5>
+                    {{ playstore_details.androidVersionText }}
+
+                    <h5>Category:</h5>
+		                {{ playstore_details.genre }}
+
+                    <h5>Play Store URL:</h5>
+                      <a target="_blank" href="{{ playstore_details.url }}" rel="noopener noreferrer"> {{ package_name }} </a>
+                  </p>
+
+                  <p>
+                  <h5>Developer Details:</h5>
+                      {{playstore_details.developer}},
+                      {{playstore_details.developerId}},
+                      {{playstore_details.developerAddress }},
+                      {{playstore_details.developerWebsite}},
+                      {{playstore_details.developerEmail}},
+                  </p>
+		              <p>
+                  <h5>Release Date:</h5>
+                   {{ playstore_details.released }}
+		               <h5>Privacy Policy:</h5>
+                   <a target="_blank" href="{{ playstore_details.privacyPolicy }}" rel="noopener noreferrer">Privacy link</a>
+		            </p>
+                 <p>
+                      <h5>Description:</h5>
+                      <p>{{ playstore_details.description }}</p>
+                  </p>
+
+       {% endif %}
+       <h2><span class="sec-tag">26</span> SCAN LOGS</h2>
+    <table id="scan_logs" class="basic">
+      <thead>
+      <tr>
+          <th>Timestamp</th>
+          <th>Event</th>
+          <th>Error</th>
+      </tr>
+      </thead>
+  <tbody>
+    {% for log in logs %}
+    <tr>
+      <td class="mono">
+        {{log.timestamp}}
+      </td>
+      <td>
+        {{log.status}}
+      </td>
+      <td>
+        {% if not log.exception %}
+        <p class="text-success">
+          OK
+        </p>
+        {% else %}
+        <p class="text-danger">
+        {{log.exception}}
+         </p>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  </table>
+</article>
+    <article id="columns">
+      <hr>
+      <h3>Report Generated by - MobInspect {{ version }}</h3>
+      <section>
+        <p>
+          MobInspect is an automated, all-in-one mobile application (Android/iOS/Windows) pen-testing, malware analysis and security assessment framework capable of performing static and dynamic analysis.
+        </p>
+        <p>
+        <strong>© {% now "Y" %} Appdirs · MobInspect · GPL-3.0</strong>
+      </p>
+      </section>
+    </article>
+  </body>
+</html>
+{% endblock %}

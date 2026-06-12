@@ -1,0 +1,117 @@
+{% load mi_icons %}{% load rbac %}
+{% comment %}
+  Sidebar — role-aware navigation. Items are wrapped in the can tag so users
+  only see links to pages they can actually use. The backend enforces
+  permissions independently via @require_permission decorators.
+{% endcomment %}
+<div class="flex items-center gap-2 px-4 h-topbar border-b border-border-subtle">
+  <a href="{% url 'home' %}" class="flex items-center gap-2 min-w-0 group">
+    <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500 text-white shadow-elevation-1 transition-transform duration-fast group-hover:scale-105">
+      {% icon "shield-check" size=18 %}
+    </span>
+    <span x-show="!sidebarCollapsed" x-transition.opacity class="font-semibold tracking-tight text-text-primary truncate">
+      MobInspect
+    </span>
+  </a>
+  <button
+    type="button"
+    class="ml-auto p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
+    aria-label="Toggle sidebar"
+    @click="sidebarCollapsed = !sidebarCollapsed"
+  >
+    {% icon "chevron-left" size=16 %}
+  </button>
+</div>
+
+<nav class="flex-1 overflow-y-auto px-2 py-4 space-y-0.5">
+  {% with cur=request.resolver_match.url_name %}
+
+    {% can 'scan.create' %}
+      {% if cur == 'home' %}
+        {% include "components/sidebar_item.html" with url='home' icon='upload' label='New scan' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='home' icon='upload' label='New scan' active=False %}
+      {% endif %}
+    {% endcan %}
+
+    {% can_any 'scan.view' 'scan.view_own' %}
+      {% if cur == 'recent' %}
+        {% include "components/sidebar_item.html" with url='recent' icon='layers' label='Scans' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='recent' icon='layers' label='Scans' active=False %}
+      {% endif %}
+    {% endcan_any %}
+
+    {% can 'analytics.view' %}
+      {% if cur == 'dashboard' %}
+        {% include "components/sidebar_item.html" with url='analytics:dashboard' icon='bar-chart-3' label='Analytics' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='analytics:dashboard' icon='bar-chart-3' label='Analytics' active=False %}
+      {% endif %}
+    {% endcan %}
+
+    {% can_any 'dynamic.android.run' 'dynamic.ios.run' %}
+      {% if cur == 'dynamic' %}
+        {% include "components/sidebar_item.html" with url='dynamic' icon='smartphone' label='Dynamic' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='dynamic' icon='smartphone' label='Dynamic' active=False %}
+      {% endif %}
+    {% endcan_any %}
+
+    {% can_any 'admin.user.view' 'rbac.role.view' 'api.key.create' 'audit.view' 'settings.view' %}
+      <div class="my-3 border-t border-border-subtle"></div>
+    {% endcan_any %}
+
+    {% can 'admin.user.view' %}
+      {% if cur == 'users' %}
+        {% include "components/sidebar_item.html" with url='users' icon='users' label='Users' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='users' icon='users' label='Users' active=False %}
+      {% endif %}
+    {% endcan %}
+    {% can 'rbac.role.view' %}
+      {% if cur == 'roles_list' %}
+        {% include "components/sidebar_item.html" with url='rbac:roles_list' icon='shield' label='Roles' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='rbac:roles_list' icon='shield' label='Roles' active=False %}
+      {% endif %}
+    {% endcan %}
+    {% can 'api.key.create' %}
+      {% if cur == 'api_keys' %}
+        {% include "components/sidebar_item.html" with url='rbac:api_keys' icon='key' label='API keys' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='rbac:api_keys' icon='key' label='API keys' active=False %}
+      {% endif %}
+    {% endcan %}
+    {% can 'audit.view' %}
+      {% if cur == 'audit_log' %}
+        {% include "components/sidebar_item.html" with url='rbac:audit_log' icon='file-text' label='Audit log' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='rbac:audit_log' icon='file-text' label='Audit log' active=False %}
+      {% endif %}
+    {% endcan %}
+    {% can 'settings.view' %}
+      {% if cur == 'adb_connections' %}
+        {% include "components/sidebar_item.html" with url='rbac:adb_connections' icon='settings' label='Integrations' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='rbac:adb_connections' icon='settings' label='Integrations' active=False %}
+      {% endif %}
+    {% endcan %}
+  {% endwith %}
+</nav>
+
+<div class="border-t border-border-subtle p-3">
+  <div class="flex items-center gap-2.5 min-w-0">
+    <div class="w-8 h-8 rounded-full bg-mobinspect-500/15 text-mobinspect-500 flex items-center justify-center font-medium text-small flex-shrink-0">
+      {% if request.user.is_authenticated %}{{ request.user.username|slice:":1"|upper }}{% else %}?{% endif %}
+    </div>
+    <div x-show="!sidebarCollapsed" x-transition.opacity class="min-w-0 flex-1">
+      <p class="text-small font-medium text-text-primary truncate">
+        {% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Guest{% endif %}
+      </p>
+      <p class="text-tiny text-text-tertiary truncate">
+        {% if mi_roles %}{{ mi_roles.0 }}{% elif request.user.is_staff %}Administrator{% elif request.user.is_authenticated %}Member{% else %}Not signed in{% endif %}
+      </p>
+    </div>
+  </div>
+</div>

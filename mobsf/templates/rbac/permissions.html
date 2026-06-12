@@ -1,0 +1,49 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}
+
+{% block content %}
+<header class="mb-6">
+  <h1 class="text-h1">Permissions catalog</h1>
+  <p class="text-text-secondary mt-1">
+    Read-only reference. Permissions are defined in code; admins assign them to roles.
+  </p>
+</header>
+
+<div class="space-y-6">
+  {% for category, perms in grouped_perms.items %}
+    <section class="card" data-reveal>
+      <div class="card-header">
+        <h2 class="text-h3 capitalize">{{ category }}</h2>
+        <span class="text-small text-text-tertiary">{{ perms|length }} permission{{ perms|length|pluralize }}</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-small">
+          <thead>
+            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+              <th class="text-left px-5 py-2.5 font-medium w-1/3">Codename</th>
+              <th class="text-left px-5 py-2.5 font-medium">Description</th>
+              <th class="text-right px-5 py-2.5 font-medium">Held by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in perms %}
+              <tr class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
+                <td class="px-5 py-3">
+                  <div class="flex items-center gap-2">
+                    <code class="font-mono text-mono text-mobinspect-500 dark:text-mobinspect-400">{{ p.codename }}</code>
+                    {% if p.is_dangerous %}
+                      <span class="badge badge-critical">{% icon "alert-triangle" size=10 %} Dangerous</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td class="px-5 py-3 text-text-secondary">{{ p.description|default:p.name }}</td>
+                <td class="px-5 py-3 text-right text-text-secondary tabular">{{ p.roles.count }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endfor %}
+</div>
+{% endblock %}

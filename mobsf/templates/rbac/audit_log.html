@@ -1,0 +1,87 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}
+
+{% block content %}
+<header class="mb-6">
+  <h1 class="text-h1">Audit log</h1>
+  <p class="text-text-secondary mt-1">
+    Append-only record of consequential actions: role grants, denials, key creation.
+  </p>
+</header>
+
+<form method="get" class="card mb-4">
+  <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+    <div>
+      <label class="label" for="action">Action</label>
+      <input id="action" name="action" value="{{ action_filter }}" class="input" placeholder="role.assign / denied / …" />
+    </div>
+    <div>
+      <label class="label" for="actor">Actor</label>
+      <input id="actor" name="actor" value="{{ actor_filter }}" class="input" placeholder="username" />
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="btn btn-primary btn-md">{% icon "search" size=14 %} Filter</button>
+      <a href="{% url 'rbac:audit_log' %}" class="btn btn-ghost btn-md">Reset</a>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">When</th>
+          <th class="text-left px-5 py-2.5 font-medium">Actor</th>
+          <th class="text-left px-5 py-2.5 font-medium">Action</th>
+          <th class="text-left px-5 py-2.5 font-medium">Target</th>
+          <th class="text-left px-5 py-2.5 font-medium">IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in page %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
+            <td class="px-5 py-3 text-text-secondary tabular whitespace-nowrap">
+              {{ ev.occurred_at|date:"Y-m-d H:i:s" }}
+            </td>
+            <td class="px-5 py-3">
+              {% if ev.actor %}
+                <span class="text-text-primary">{{ ev.actor.username }}</span>
+              {% else %}
+                <span class="text-text-tertiary italic">system</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3">
+              <code class="font-mono text-mono text-mobinspect-500 dark:text-mobinspect-400">{{ ev.action }}</code>
+            </td>
+            <td class="px-5 py-3 text-text-secondary">
+              {% if ev.target_type %}{{ ev.target_type }}:{{ ev.target_id }}{% else %}—{% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary tabular">{{ ev.ip_address|default:"—" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="px-5 py-8 text-center text-text-tertiary">No events recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page.has_other_pages %}
+    <div class="card-footer flex items-center justify-between">
+      <span class="text-tiny text-text-tertiary">
+        Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} event{{ page.paginator.count|pluralize }}
+      </span>
+      <div class="flex gap-1">
+        {% if page.has_previous %}
+          <a href="?page={{ page.previous_page_number }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if actor_filter %}&actor={{ actor_filter }}{% endif %}"
+             class="btn btn-secondary btn-sm">{% icon "chevron-left" size=14 %} Prev</a>
+        {% endif %}
+        {% if page.has_next %}
+          <a href="?page={{ page.next_page_number }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if actor_filter %}&actor={{ actor_filter }}{% endif %}"
+             class="btn btn-secondary btn-sm">Next {% icon "chevron-right" size=14 %}</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

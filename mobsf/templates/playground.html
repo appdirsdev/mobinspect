@@ -1,0 +1,199 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}
+
+{% block page_title %}Playground{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+  {# ─────────── Page header ─────────── #}
+  <header class="flex items-center justify-between gap-4">
+    <div>
+      <h1 class="text-h1 text-text-primary">Design system playground</h1>
+      <p class="text-text-secondary mt-1">
+        Visual reference for every component primitive. Use this page to verify the design system after changes.
+      </p>
+    </div>
+    <span class="badge badge-low">DEV ONLY</span>
+  </header>
+
+  {# ─────────── KPI strip ─────────── #}
+  <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    {% for kpi in kpis %}
+      <div class="card card-body" data-reveal>
+        <p class="text-tiny text-text-secondary">{{ kpi.label }}</p>
+        <div class="flex items-baseline gap-2 mt-1">
+          <span class="text-h1 text-text-primary tabular">{{ kpi.value }}</span>
+          <span class="text-small {% if kpi.up %}text-severity-passed dark:text-severity-passed-dark{% else %}text-severity-critical dark:text-severity-critical-dark{% endif %} flex items-center gap-0.5">
+            {% if kpi.up %}{% icon "arrow-up" size=12 %}{% else %}{% icon "arrow-down" size=12 %}{% endif %}
+            {{ kpi.delta }}
+          </span>
+        </div>
+        <p class="text-tiny text-text-tertiary mt-2">{{ kpi.subtitle }}</p>
+      </div>
+    {% endfor %}
+  </section>
+
+  {# ─────────── Severity badges ─────────── #}
+  <section class="card">
+    <div class="card-header">
+      <h2 class="text-h3">Severity badges</h2>
+      <p class="text-small text-text-tertiary">semantic color tokens</p>
+    </div>
+    <div class="card-body flex flex-wrap gap-2">
+      <span class="badge badge-critical">{% icon "alert-triangle" size=12 %} Critical</span>
+      <span class="badge badge-high">High</span>
+      <span class="badge badge-medium">Medium</span>
+      <span class="badge badge-low">Low</span>
+      <span class="badge badge-passed">{% icon "check" size=12 %} Passed</span>
+      <span class="badge badge-unknown">Unknown</span>
+    </div>
+  </section>
+
+  {# ─────────── Buttons ─────────── #}
+  <section class="card">
+    <div class="card-header">
+      <h2 class="text-h3">Buttons</h2>
+    </div>
+    <div class="card-body space-y-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <button class="btn btn-primary btn-md">{% icon "plus" size=14 %} Primary</button>
+        <button class="btn btn-secondary btn-md">Secondary</button>
+        <button class="btn btn-ghost btn-md">Ghost</button>
+        <button class="btn btn-danger btn-md">{% icon "trash" size=14 %} Delete</button>
+        <a class="btn btn-link">Link button</a>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button class="btn btn-primary btn-sm">Small</button>
+        <button class="btn btn-primary btn-md">Medium</button>
+        <button class="btn btn-primary btn-lg">Large</button>
+        <button class="btn btn-primary btn-md" disabled>Disabled</button>
+      </div>
+    </div>
+  </section>
+
+  {# ─────────── Inputs ─────────── #}
+  <section class="card">
+    <div class="card-header">
+      <h2 class="text-h3">Inputs</h2>
+    </div>
+    <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+      <div>
+        <label class="label" for="pg-name">Username</label>
+        <input id="pg-name" class="input" placeholder="analyst@example.com" />
+      </div>
+      <div>
+        <label class="label" for="pg-pw">Password</label>
+        <input id="pg-pw" class="input" type="password" placeholder="••••••••" />
+      </div>
+    </div>
+  </section>
+
+  {# ─────────── Cards ─────────── #}
+  <section>
+    <h2 class="text-h2 mb-3">Cards</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="card card-hover">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <span class="badge badge-passed">Passed</span>
+            <span class="text-tiny text-text-tertiary">3m ago</span>
+          </div>
+          <h3 class="text-h3 mt-3">com.example.app</h3>
+          <p class="text-small text-text-secondary mt-1">v1.2.4 · 32.5 MB · APK</p>
+          <div class="mt-4 flex items-center justify-between">
+            <span class="text-small text-text-tertiary">Score</span>
+            <span class="text-display text-severity-passed dark:text-severity-passed-dark">87</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-hover">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <span class="badge badge-high">High</span>
+            <span class="text-tiny text-text-tertiary">17m ago</span>
+          </div>
+          <h3 class="text-h3 mt-3">com.example.bank</h3>
+          <p class="text-small text-text-secondary mt-1">v3.0.0 · 124 MB · IPA</p>
+          <div class="mt-4 flex items-center justify-between">
+            <span class="text-small text-text-tertiary">Score</span>
+            <span class="text-display text-severity-high dark:text-severity-high-dark">53</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-hover">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <span class="badge badge-critical">Critical</span>
+            <span class="text-tiny text-text-tertiary">1h ago</span>
+          </div>
+          <h3 class="text-h3 mt-3">com.example.health</h3>
+          <p class="text-small text-text-secondary mt-1">v0.9.1 · 45.8 MB · APK</p>
+          <div class="mt-4 flex items-center justify-between">
+            <span class="text-small text-text-tertiary">Score</span>
+            <span class="text-display text-severity-critical dark:text-severity-critical-dark">31</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ─────────── Table ─────────── #}
+  <section class="card">
+    <div class="card-header">
+      <h2 class="text-h3">Findings</h2>
+      <button class="btn btn-secondary btn-sm">{% icon "download" size=14 %} Export</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Severity</th>
+            <th class="text-left px-5 py-2.5 font-medium">Rule</th>
+            <th class="text-left px-5 py-2.5 font-medium">Location</th>
+            <th class="text-right px-5 py-2.5 font-medium">CWE</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in findings %}
+            <tr class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
+              <td class="px-5 py-3"><span class="badge badge-{{ f.severity }}">{{ f.severity }}</span></td>
+              <td class="px-5 py-3 text-text-primary">{{ f.rule }}</td>
+              <td class="px-5 py-3 font-mono text-mono text-text-secondary">{{ f.location }}</td>
+              <td class="px-5 py-3 text-right text-text-secondary">{{ f.cwe }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ─────────── Typography ─────────── #}
+  <section class="card">
+    <div class="card-header"><h2 class="text-h3">Typography</h2></div>
+    <div class="card-body space-y-2">
+      <p class="text-display">Display 48</p>
+      <p class="text-h1">Heading 1 · 30</p>
+      <p class="text-h2">Heading 2 · 24</p>
+      <p class="text-h3">Heading 3 · 20</p>
+      <p class="text-h4">Heading 4 · 16</p>
+      <p class="text-body">Body · 14 — the default reading size</p>
+      <p class="text-small text-text-secondary">Small · 13 — secondary metadata</p>
+      <p class="text-tiny text-text-tertiary">Tiny · 12 — labels, captions</p>
+      <p class="text-mono">font-mono code path/to/file.py:42</p>
+    </div>
+  </section>
+
+  {# ─────────── Skeleton + animation demo ─────────── #}
+  <section class="card">
+    <div class="card-header"><h2 class="text-h3">Loading states</h2></div>
+    <div class="card-body space-y-2">
+      <div class="skeleton h-4 w-1/3"></div>
+      <div class="skeleton h-4 w-2/3"></div>
+      <div class="skeleton h-4 w-1/2"></div>
+    </div>
+  </section>
+</div>
+{% endblock %}

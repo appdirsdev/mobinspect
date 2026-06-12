@@ -1,0 +1,34 @@
+{% load mi_icons %}
+{% comment %}
+  Reusable app+file information grid.
+  Vars: file_name, size, md5, sha1, sha256, package_name, main_activity,
+        target_sdk, min_sdk, max_sdk, version_name, version_code,
+        app_type (Android), and platform-specific extras through {% block info_extras %}.
+{% endcomment %}
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
+    <div class="card-body space-y-2 text-small">
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">File name</span><span class="font-mono text-mono text-text-primary truncate">{{ file_name }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">MD5</span><span class="font-mono text-mono text-text-secondary truncate">{{ md5 }}</span></div>
+      {% if sha1 %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">SHA1</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha1 }}</span></div>{% endif %}
+      {% if sha256 %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">SHA256</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha256 }}</span></div>{% endif %}
+      {% if app_type %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Type</span><span class="text-text-primary uppercase">{{ app_type }}</span></div>{% endif %}
+    </div>
+  </div>
+
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "info" size=16 %} App information</h2></div>
+    <div class="card-body space-y-2 text-small">
+      {% if app_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>{% endif %}
+      {% if package_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Package</span><span class="font-mono text-mono text-text-primary truncate">{{ package_name }}</span></div>{% endif %}
+      {% if main_activity %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Main activity</span><span class="font-mono text-mono text-text-secondary truncate">{{ main_activity }}</span></div>{% endif %}
+      {% if version_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Version</span><span class="text-text-primary">{{ version_name }} {% if version_code %}<span class="text-text-tertiary">({{ version_code }})</span>{% endif %}</span></div>{% endif %}
+      {% if min_sdk %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">SDK range</span><span class="text-text-primary">{{ min_sdk }} – {{ max_sdk|default:"—" }} (target {{ target_sdk|default:"?" }})</span></div>{% endif %}
+      {% block info_extras %}{% endblock %}
+    </div>
+  </div>
+
+</section>

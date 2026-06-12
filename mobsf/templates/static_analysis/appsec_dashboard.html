@@ -1,0 +1,207 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}AppSec — {{ app_name|default:file_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  @media print {
+    body { -webkit-print-color-adjust: exact; }
+    aside, header.h-topbar, footer { display: none !important; }
+  }
+  .pre-finding {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+  <div class="flex items-center gap-4 min-w-0">
+    <img
+      src="/download/{{ hash }}-icon.png"
+      onerror="this.src='{% static 'img/no_icon.png' %}'"
+      class="w-14 h-14 rounded-lg bg-surface-2 flex-shrink-0 object-contain"
+      alt=""
+    />
+    <div class="min-w-0">
+      <p class="text-tiny uppercase text-text-tertiary">AppSec scorecard</p>
+      <h1 class="text-h2 truncate">{{ app_name|default:file_name }} {% if version_name %}<span class="text-text-tertiary">v{{ version_name }}</span>{% endif %}</h1>
+      <p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ hash }}</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <button onclick="window.print()" class="btn btn-secondary btn-md">
+      {% icon "file-text" size=14 %} Print / PDF
+    </button>
+  </div>
+</header>
+
+{# ─────────── KPI cards ─────────── #}
+<section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+
+  {% if not efr01 %}
+    {# Security Score #}
+    <div class="card card-body" data-reveal>
+      <p class="text-tiny uppercase text-text-secondary">Security score</p>
+      <div class="mt-3 flex items-center justify-center">
+        <div class="relative">
+          <svg viewBox="0 0 120 120" class="w-32 h-32 -rotate-90">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="10" class="text-surface-2" />
+            <circle cx="60" cy="60" r="52" fill="none" stroke-width="10" stroke-linecap="round"
+              {% if security_score < 30 %}class="text-severity-critical dark:text-severity-critical-dark"{% elif security_score < 40 %}class="text-severity-medium dark:text-severity-medium-dark"{% elif security_score < 60 %}class="text-severity-low dark:text-severity-low-dark"{% else %}class="text-severity-passed dark:text-severity-passed-dark"{% endif %}
+              stroke="currentColor"
+              stroke-dasharray="{{ security_score|stringformat:'d' }}.0 100"
+              pathLength="100"
+            />
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span class="text-display tabular leading-none">{{ security_score }}</span>
+            <span class="text-tiny text-text-tertiary">/ 100</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Risk Grade #}
+    <div class="card card-body" data-reveal>
+      <p class="text-tiny uppercase text-text-secondary">Risk grade</p>
+      <div class="flex items-center justify-center gap-1.5 mt-6">
+        {% with grade_a=security_score|stringformat:'d' %}
+          {% if security_score < 30 %}
+            <span class="w-9 h-9 rounded-md bg-severity-passed/15 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark text-h4 font-bold flex items-center justify-center opacity-40">A</span>
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">B</span>
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">C</span>
+            <span class="w-12 h-12 rounded-md bg-severity-critical text-white text-h2 font-bold flex items-center justify-center shadow-elevation-2">F</span>
+          {% elif security_score < 40 %}
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">A</span>
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">B</span>
+            <span class="w-12 h-12 rounded-md bg-severity-medium text-white text-h2 font-bold flex items-center justify-center shadow-elevation-2">C</span>
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">F</span>
+          {% elif security_score < 60 %}
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">A</span>
+            <span class="w-12 h-12 rounded-md bg-severity-low text-white text-h2 font-bold flex items-center justify-center shadow-elevation-2">B</span>
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">C</span>
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">F</span>
+          {% else %}
+            <span class="w-12 h-12 rounded-md bg-severity-passed text-white text-h2 font-bold flex items-center justify-center shadow-elevation-2">A</span>
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">B</span>
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">C</span>
+            <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">F</span>
+          {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+
+    {# Severity distribution #}
+    <div class="card card-body" data-reveal>
+      <p class="text-tiny uppercase text-text-secondary">Severity distribution</p>
+      <div class="h-32 mt-2"><canvas id="severity_chart"></canvas></div>
+    </div>
+
+    {# Privacy / Trackers #}
+    <div class="card card-body" data-reveal>
+      <p class="text-tiny uppercase text-text-secondary">Privacy risk</p>
+      <div class="mt-3 flex flex-col items-center">
+        <span
+          class="inline-flex items-center justify-center w-24 h-24 rounded-full text-white text-display"
+          style="background-color: {% if total_trackers %}{% if trackers == 0 %}#16A34A{% elif trackers > 4 %}#DC2626{% else %}#475569{% endif %}{% else %}#94A3B8{% endif %};"
+        >{% if total_trackers %}{{ trackers }}{% else %}—{% endif %}</span>
+        <p class="text-small text-text-secondary mt-2">
+          {% if total_trackers %}User / device trackers{% else %}Not scanned{% endif %}
+        </p>
+      </div>
+    </div>
+  {% endif %}
+
+</section>
+
+{# ─────────── Findings buckets ─────────── #}
+<section class="card mb-6">
+  <div class="card-header">
+    <h2 class="text-h3">Findings summary</h2>
+  </div>
+  <div class="card-body grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div class="flex items-center gap-3">
+      <span class="w-9 h-9 rounded-md bg-severity-critical/10 text-severity-critical dark:bg-severity-critical-dark/15 dark:text-severity-critical-dark flex items-center justify-center">
+        {% icon "alert-triangle" size=18 %}
+      </span>
+      <div><p class="text-tiny uppercase text-text-tertiary">High</p><p class="text-h2 tabular">{{ high|length }}</p></div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="w-9 h-9 rounded-md bg-severity-medium/10 text-severity-medium dark:bg-severity-medium-dark/15 dark:text-severity-medium-dark flex items-center justify-center">
+        {% icon "alert-triangle" size=18 %}
+      </span>
+      <div><p class="text-tiny uppercase text-text-tertiary">Medium</p><p class="text-h2 tabular">{{ warning|length }}</p></div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="w-9 h-9 rounded-md bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark flex items-center justify-center">
+        {% icon "info" size=18 %}
+      </span>
+      <div><p class="text-tiny uppercase text-text-tertiary">Info</p><p class="text-h2 tabular">{{ info|length }}</p></div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="w-9 h-9 rounded-md bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex items-center justify-center">
+        {% icon "check" size=18 %}
+      </span>
+      <div><p class="text-tiny uppercase text-text-tertiary">Secure</p><p class="text-h2 tabular">{{ secure|length }}</p></div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="w-9 h-9 rounded-md bg-severity-unknown/15 text-severity-unknown dark:bg-severity-unknown-dark/15 dark:text-severity-unknown-dark flex items-center justify-center">
+        {% icon "search" size=18 %}
+      </span>
+      <div><p class="text-tiny uppercase text-text-tertiary">{% if efr01 %}Investigate{% else %}Hotspot{% endif %}</p><p class="text-h2 tabular">{{ hotspot|length }}</p></div>
+    </div>
+  </div>
+</section>
+
+{# ─────────── Findings list ─────────── #}
+<section class="space-y-3" x-data="{ open: '' }">
+  {% include "static_analysis/_finding_group.html" with items=high level="critical" label="HIGH" %}
+  {% include "static_analysis/_finding_group.html" with items=warning level="medium" label="MEDIUM" %}
+  {% include "static_analysis/_finding_group.html" with items=info level="low" label="INFO" %}
+  {% include "static_analysis/_finding_group.html" with items=secure level="passed" label="SECURE" %}
+  {% include "static_analysis/_finding_group.html" with items=hotspot level="unknown" label="HOTSPOT" %}
+</section>
+{% endblock %}
+
+{% block chart_js %}
+<script defer src="{% static 'mobinspect/vendor/chart.umd.min.js' %}"></script>
+<script defer src="{% static 'mobinspect/js/chart-theme.js' %}"></script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof Chart === 'undefined') return;
+    const ctx = document.getElementById('severity_chart');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['High', 'Medium', 'Info', 'Secure', 'Hotspot'],
+        datasets: [{
+          data: [{{ high|length }}, {{ warning|length }}, {{ info|length }}, {{ secure|length }}, {{ hotspot|length }}],
+          backgroundColor: ['#DC2626', '#D97706', '#2563EB', '#16A34A', '#64748B'],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: { display: true, position: 'right' },
+        },
+        animation: { duration: 320, easing: 'easeOutQuart' },
+      },
+    });
+  });
+</script>
+{% endblock %}

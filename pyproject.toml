@@ -1,0 +1,95 @@
+[tool.poetry]
+name = "mobinspect"
+version = "4.5.0"
+description = "MobInspect — Mobile Application Security Inspector. A fork of Mobile Security Framework (MobSF) with a modern UI, dynamic RBAC, and analytics on top of the original static, dynamic, and malware analyzers."
+keywords = ["mobinspect", "mobsf", "mobile security framework", "mobile security", "security tool", "static analysis", "dynamic analysis", "malware analysis", "rbac"]
+authors = ["MobInspect contributors", "Ajin Abraham <ajin@opensecurity.in>"]
+license = "GPL-3.0-only"
+readme = "README.md"
+repository = "https://github.com/MobSF/Mobile-Security-Framework-MobSF"
+documentation = "https://mobsf.github.io/docs/"
+packages = [{ include = "mobsf", format = ["sdist", "wheel"]}]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/MobSF/Mobile-Security-Framework-MobSF/issues"
+
+[tool.poetry.scripts]
+# Both names invoke the same entrypoint. `mobsf` is kept for backward
+# compatibility; `mobinspect` is preferred going forward.
+mobinspect = "mobsf.__main__:main"
+mobsf = "mobsf.__main__:main"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+django = ">=3.1.5"
+rsa = ">=4.7"
+requests = ">=2.25.1"
+bs4 = ">=0.0.1"
+colorlog = ">=4.7.2"
+macholib = ">=1.14"
+whitenoise = ">=6.8.2"
+waitress = {version = ">=3.0.1", markers = "sys_platform == 'win32'"}
+gunicorn = {version = ">=20.0.4", markers = "sys_platform != 'win32'"}
+psutil = ">=5.8.0"
+shelljob = ">=0.6.2"
+asn1crypto = ">=1.4.0"
+distro = ">=1.5.0"
+ip2location = "^8.10.4"
+pdfkit = ">=0.6.1"
+google-play-scraper = ">=0.1.2"
+apkid = "^3.0.0"
+frida = ">=17.0.0"
+frida-tools = "^14.3.0"
+tldextract = ">=5.1.3"
+openstep-parser = ">=2.0.1"
+svgutils = ">=0.3.4"
+arpy = ">=2.3.0"
+apksigtool = "^0.1.0"
+tzdata = "^2023.3"
+http-tools = ">=6.0.0"
+libsast = "^3.1.6"
+paramiko = "^3.3.1"
+six = ">=1.16.0"
+python3-saml = "^1.16.0"
+psycopg2-binary = "^2.9.10"
+lief = "^0.16.6"
+packaging = ">=24.2"
+django-ratelimit = "^4.1.0"
+django-q2 = "^1.7.4"
+defusedxml = "^0.7.1"
+bleach = "^6.2.0"
+bcrypt = "4.0.1" # Pinned to avoid warnings with mitmproxy 12
+
+[tool.poetry.group.dev.dependencies]
+# Test framework for the RBAC + Analytics suites (H17). We deliberately
+# pin pytest + pytest-django to versions known to work with Django 5 and
+# Python 3.12+; bump together when raising the Django floor.
+pytest = ">=8.2,<9"
+pytest-django = ">=4.8,<5"
+
+[tool.pytest.ini_options]
+# Pytest entrypoint configuration for the RBAC + Analytics test suite.
+# Keep DJANGO_SETTINGS_MODULE here (rather than in a sibling pytest.ini)
+# so a single source of truth governs both `poetry run pytest` and any
+# IDE invocation.
+DJANGO_SETTINGS_MODULE = "mobsf.MobSF.settings"
+python_files = ["test_*.py", "tests.py"]
+# Default test discovery roots — the audit suite (H17) lives under
+# mobsf/RBAC/tests/ and mobsf/Analytics/tests/. Adding the bare module
+# path lets `poetry run pytest` (no args) collect just the new suite.
+testpaths = ["mobsf/RBAC/tests", "mobsf/Analytics/tests"]
+# Silence noisy third-party warnings that drown out real test signal.
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

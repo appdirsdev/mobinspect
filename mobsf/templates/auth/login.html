@@ -1,0 +1,102 @@
+{% extends "base/auth.html" %}
+{% load mi_icons %}
+
+{% block content %}
+<div class="card shadow-elevation-3" data-reveal>
+  <div class="card-body p-8">
+    <div class="text-center mb-6">
+      <span class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-mobinspect-500 text-white shadow-elevation-2 mb-3">
+        {% icon "shield-check" size=28 %}
+      </span>
+      <h1 class="text-h2">Sign in to MobInspect</h1>
+      <p class="text-small text-text-secondary mt-1">
+        Mobile Application Security Inspector
+      </p>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div class="mb-4 px-3 py-2 rounded-md text-small bg-system-error/10 text-system-error border border-system-error/30">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    {% if allow_pwd %}
+      <form method="post" action="{% url 'login' %}?next={{ next }}" class="space-y-4">
+        {% csrf_token %}
+
+        <div>
+          <label class="label" for="id_username">Username</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+              {% icon "user" size=16 %}
+            </span>
+            <input
+              id="id_username" type="text" name="username"
+              class="input pl-9" autocomplete="username"
+              required autofocus
+            />
+          </div>
+          {% for err in form.username.errors %}
+            <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+          {% endfor %}
+        </div>
+
+        <div>
+          <label class="label" for="id_password">Password</label>
+          <div class="relative" x-data="{ show: false }">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+              {% icon "lock" size=16 %}
+            </span>
+            <input
+              id="id_password" :type="show ? 'text' : 'password'" name="password"
+              class="input pl-9 pr-10" autocomplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors"
+              @click="show = !show"
+              aria-label="Toggle password visibility"
+            >
+              <span x-show="!show">{% icon "eye" size=16 %}</span>
+              <span x-show="show" x-cloak>{% icon "eye-off" size=16 %}</span>
+            </button>
+          </div>
+          {% for err in form.password.errors %}
+            <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+          {% endfor %}
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg w-full">
+          Sign in
+        </button>
+      </form>
+    {% endif %}
+
+    {% if sso %}
+      {% if allow_pwd %}
+        <div class="my-6 flex items-center gap-3 text-tiny text-text-tertiary">
+          <span class="flex-1 border-t border-border-subtle"></span>
+          <span class="uppercase">or</span>
+          <span class="flex-1 border-t border-border-subtle"></span>
+        </div>
+      {% endif %}
+      <a href="{% url 'saml_login' %}?next={{ next }}" class="btn btn-secondary btn-lg w-full">
+        {% icon "key" size=16 %} Continue with SSO
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+<p class="text-center text-tiny text-text-tertiary mt-6">
+  Need an account? Contact your administrator.
+</p>
+
+<script defer>
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.MI && window.MI.motion) {
+      window.MI.motion.reveal('[data-reveal]');
+    }
+  });
+</script>
+{% endblock %}

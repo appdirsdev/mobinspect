@@ -1,0 +1,269 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}{{ app_name|default:file_name }} — Windows static analysis{% endblock %}
+
+{% block extra_head %}
+<style>
+  @media print {
+    @page { size: landscape; }
+    aside, header.h-topbar, footer, .btn, #scan_options { display: none !important; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ─── Page header ─── #}
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+  <div class="flex items-center gap-4 min-w-0">
+    <span class="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark flex-shrink-0">
+      {% icon "package" size=28 %}
+    </span>
+    <div class="min-w-0">
+      <p class="text-tiny uppercase text-text-tertiary">Static · Windows</p>
+      <h1 class="text-h2 truncate">{{ app_name|default:file_name }} {% if app_version %}<span class="text-text-tertiary">v{{ app_version }}</span>{% endif %}</h1>
+      <p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ md5 }}</p>
+    </div>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <a href="{% url 'static_analyzer_windows' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md">
+      {% icon "activity" size=14 %} Rescan
+    </a>
+    <a href="{% url 'download_binary' checksum=md5 %}" class="btn btn-secondary btn-md">
+      {% icon "download" size=14 %} APPX
+    </a>
+    <button type="button" class="btn btn-ghost btn-md" onclick="document.getElementById('mi-strings').showModal()">
+      {% icon "file-text" size=14 %} Strings
+    </button>
+    <button type="button" class="btn btn-ghost btn-md" onclick="document.getElementById('mi-logs').showModal()">
+      {% icon "file-text" size=14 %} Logs
+    </button>
+  </div>
+</header>
+
+{# ─── Information cards ─── #}
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "info" size=16 %} App information</h2></div>
+    <div class="card-body space-y-2 text-small">
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Publisher</span><span class="text-text-primary truncate">{{ publisher_name }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Version</span><span class="text-text-primary">{{ app_version }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Arch</span><span class="text-text-primary font-mono">{{ architecture }}</span></div>
+      {% if virus_total and virus_total.items|length > 9 %}
+        <div class="flex items-baseline gap-2 pt-2 border-t border-border-subtle">
+          <span class="text-text-tertiary w-24 flex-shrink-0">VirusTotal</span>
+          {% if virus_total.positives > 0 %}
+            <span class="badge badge-critical">{{ virus_total.positives }} / {{ virus_total.total }}</span>
+          {% else %}
+            <span class="badge badge-passed">{{ virus_total.positives }} / {{ virus_total.total }}</span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
+    <div class="card-body space-y-2 text-small">
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">File name</span><span class="font-mono text-mono text-text-primary truncate">{{ file_name }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">MD5</span><span class="font-mono text-mono text-text-secondary truncate">{{ md5 }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">SHA1</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha1 }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">SHA256</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha256 }}</span></div>
+    </div>
+  </div>
+
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "file-text" size=16 %} XML manifest</h2></div>
+    <div class="card-body space-y-2 text-small">
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Compiler</span><span class="text-text-primary">{{ compiler_version }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">VS version</span><span class="text-text-primary">{{ visual_studio_version }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">VS edition</span><span class="text-text-primary">{{ visual_studio_edition }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Target OS</span><span class="text-text-primary">{{ target_os }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">APPX DLL ver.</span><span class="text-text-primary">{{ appx_dll_version }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Proj GUID</span><span class="font-mono text-mono text-text-secondary truncate">{{ proj_guid }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Opti tool</span><span class="text-text-primary">{{ opti_tool }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Target run</span><span class="text-text-primary">{{ target_run }}</span></div>
+    </div>
+  </div>
+
+</section>
+
+{# ─── Binary analysis findings ─── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2">{% icon "shield-alert" size=18 %} APPX binary analysis</h2>
+    <span class="text-tiny text-text-tertiary">{{ binary_analysis|length|add:binary_warnings|length }} finding{{ binary_analysis|length|pluralize }}</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Rule</th>
+          <th class="text-left px-5 py-2.5 font-medium">Status</th>
+          <th class="text-left px-5 py-2.5 font-medium">Description</th>
+          <th class="text-left px-5 py-2.5 font-medium">Info</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in binary_analysis %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+            <td class="px-5 py-2.5 font-mono text-mono text-text-primary">{{ r.rule_id }}</td>
+            <td class="px-5 py-2.5">
+              {% if r.status == "Insecure" %}<span class="badge badge-critical">Insecure</span>
+              {% elif r.status == "Secure" %}<span class="badge badge-passed">Secure</span>
+              {% else %}<span class="badge badge-low">{{ r.status }}</span>{% endif %}
+            </td>
+            <td class="px-5 py-2.5 text-text-secondary">{{ r.desc }}</td>
+            <td class="px-5 py-2.5 text-text-secondary">{{ r.info }}</td>
+          </tr>
+        {% endfor %}
+        {% for w in binary_warnings %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+            <td class="px-5 py-2.5 font-mono text-mono text-text-primary">{{ w.rule_id }}</td>
+            <td class="px-5 py-2.5"><span class="badge badge-low">{{ w.status }}</span></td>
+            <td class="px-5 py-2.5 text-text-secondary">{{ w.desc }}</td>
+            <td class="px-5 py-2.5 text-text-secondary">{{ w.info }}</td>
+          </tr>
+        {% empty %}
+        {% endfor %}
+        {% if not binary_analysis and not binary_warnings %}
+          <tr><td colspan="4" class="px-5 py-8 text-center text-text-tertiary">No findings.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ─── Malware lookup links ─── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "search" size=18 %} Malware lookup</h2></div>
+  <div class="card-body grid grid-cols-2 md:grid-cols-4 gap-3">
+    <a href="https://www.virustotal.com/gui/file/{{ sha256 }}" target="_blank" rel="noopener"
+       class="card-hover p-3 rounded-md border border-border-subtle hover:border-mobinspect-500 text-small">
+      <p class="text-text-primary font-medium">VirusTotal</p>
+      <p class="text-tiny text-text-tertiary mt-1">{% icon "external-link" size=10 %} Open report</p>
+    </a>
+    <a href="https://tria.ge/s?q={{ sha256 }}" target="_blank" rel="noopener"
+       class="card-hover p-3 rounded-md border border-border-subtle hover:border-mobinspect-500 text-small">
+      <p class="text-text-primary font-medium">Triage</p>
+      <p class="text-tiny text-text-tertiary mt-1">{% icon "external-link" size=10 %} Open report</p>
+    </a>
+    <a href="https://metadefender.com/results/hash/{{ sha256 }}" target="_blank" rel="noopener"
+       class="card-hover p-3 rounded-md border border-border-subtle hover:border-mobinspect-500 text-small">
+      <p class="text-text-primary font-medium">MetaDefender</p>
+      <p class="text-tiny text-text-tertiary mt-1">{% icon "external-link" size=10 %} Open report</p>
+    </a>
+    <a href="https://www.hybrid-analysis.com/search?query={{ sha256 }}" target="_blank" rel="noopener"
+       class="card-hover p-3 rounded-md border border-border-subtle hover:border-mobinspect-500 text-small">
+      <p class="text-text-primary font-medium">Hybrid Analysis</p>
+      <p class="text-tiny text-text-tertiary mt-1">{% icon "external-link" size=10 %} Open report</p>
+    </a>
+  </div>
+</section>
+
+{# ─── VirusTotal results inline ─── #}
+{% if virus_total %}
+<section class="card mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield" size=18 %} VirusTotal scan</h2></div>
+  <div class="card-body">
+    {% if virus_total.items|length < 9 %}
+      <p class="text-text-secondary">{{ virus_total.verbose_msg }}</p>
+    {% else %}
+      <p class="text-text-primary">
+        <strong class="text-h3">{{ virus_total.positives }} / {{ virus_total.total }}</strong>
+        <span class="text-text-secondary">AVs flagged this file as malicious.</span>
+        <a href="{{ virus_total.permalink }}" target="_blank" rel="noopener" class="text-text-brand hover:underline ml-2">{% icon "external-link" size=12 %} Full report</a>
+      </p>
+      {% if virus_total.positives > 0 %}
+        <div class="mt-4 overflow-x-auto rounded-md border border-border-subtle">
+          <table class="w-full text-small">
+            <thead>
+              <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                <th class="text-left px-4 py-2 font-medium">AV engine</th>
+                <th class="text-left px-4 py-2 font-medium">Detection</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for av_name, av_result in virus_total.scans.items %}
+                {% if av_result.detected %}
+                  <tr class="border-b border-border-subtle">
+                    <td class="px-4 py-2 text-text-primary">{{ av_name }}</td>
+                    <td class="px-4 py-2"><span class="badge badge-critical">{{ av_result.result }}</span></td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{# ─── Files ─── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Files</h2></div>
+  <div class="card-body">
+    <ul class="font-mono text-mono text-text-secondary space-y-0.5 max-h-96 overflow-y-auto">
+      {% for file in files %}<li class="truncate" title="{{ file }}">{{ file }}</li>{% empty %}
+        <li class="text-text-tertiary italic">No files extracted.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+{# ─── Strings dialog ─── #}
+<dialog id="mi-strings" class="rounded-xl backdrop:bg-black/40 max-w-3xl w-full p-0 bg-surface-1 text-text-primary border border-border">
+  <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
+    <h3 class="text-h3">Strings</h3>
+    <button onclick="this.closest('dialog').close()" class="text-text-tertiary hover:text-text-primary">{% icon "x" size=18 %}</button>
+  </div>
+  <pre class="px-5 py-4 max-h-[70vh] overflow-auto m-0 font-mono text-mono whitespace-pre-wrap">{% for s in strings %}{{ s }}
+{% endfor %}</pre>
+</dialog>
+
+{# ─── Scan logs dialog ─── #}
+<dialog id="mi-logs" class="rounded-xl backdrop:bg-black/40 max-w-4xl w-full p-0 bg-surface-1 text-text-primary border border-border">
+  <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
+    <h3 class="text-h3">Scan logs</h3>
+    <button onclick="this.closest('dialog').close()" class="text-text-tertiary hover:text-text-primary">{% icon "x" size=18 %}</button>
+  </div>
+  <div class="overflow-x-auto max-h-[70vh]">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-4 py-2 font-medium">Timestamp</th>
+          <th class="text-left px-4 py-2 font-medium">Event</th>
+          <th class="text-left px-4 py-2 font-medium">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+          <tr class="border-b border-border-subtle">
+            <td class="px-4 py-2 font-mono text-mono text-text-secondary tabular whitespace-nowrap">{{ log.timestamp }}</td>
+            <td class="px-4 py-2 text-text-primary">{{ log.status }}</td>
+            <td class="px-4 py-2">
+              {% if not log.exception %}<span class="badge badge-passed">OK</span>
+              {% else %}<span class="badge badge-critical">{{ log.exception|truncatechars:80 }}</span>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Drop ?rescan=1 from the URL after a successful render
+  if (window.location.search.indexOf('rescan=') !== -1) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+</script>
+{% endblock %}

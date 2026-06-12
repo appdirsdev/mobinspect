@@ -1,0 +1,41 @@
+[Unit]
+Description=MobInspect Async Worker (django-q2 cluster)
+Documentation=https://django-q2.readthedocs.io/
+After=network-online.target mobinspect.service
+Wants=network-online.target
+PartOf=mobinspect.service
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/MobInspect
+Environment=HOME=/home/ubuntu
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Async analysis is opt-in. Both this worker and the main service must set
+# MOBSF_ASYNC_ANALYSIS=1 for queued tasks to flow end-to-end; leave the worker
+# enabled even when disabled so it picks up tasks the moment you flip the flag.
+Environment=MOBSF_ASYNC_ANALYSIS=1
+ExecStart=/home/ubuntu/.local/bin/poetry run python manage.py qcluster
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+# Resource ceilings — see deploy/RUNBOOK.md §6. Worker handles a single scan at
+# a time but unzips/parses large APKs, so cap RSS at 4G to keep the host healthy.
+# MemoryHigh is the soft throttle (kernel reclaims aggressively above it);
+# MemoryMax is the hard cgroup kill line. Without MemoryHigh a memory-hungry
+# parse jumps straight to OOM-kill instead of being throttled first.
+MemoryHigh=3G
+MemoryMax=4G
+TasksMax=2048
+# Sandboxing.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+# Worker writes scan artefacts under MOBINSPECT_HOME and reads code from the
+# checkout — both must remain writable under ProtectHome=read-only.
+ReadWritePaths=/home/ubuntu/MobInspect /home/ubuntu/.MobInspect
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,57 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}
+
+{% block page_title %}About{% endblock %}
+
+{% block content %}
+<header class="mb-6">
+  <h1 class="text-h1">About MobInspect</h1>
+  <p class="text-text-secondary mt-1">Mobile Application Security Inspector — an Appdirs project.</p>
+</header>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <section class="lg:col-span-2 space-y-6">
+    <div class="card" data-reveal>
+      <div class="card-body">
+        <h2 class="text-h3 mb-3 flex items-center gap-2">{% icon "shield" size=18 class="text-mobinspect-500" %} What it does</h2>
+        <p class="text-text-secondary leading-relaxed">
+          MobInspect is a security research platform for mobile applications on Android, iOS, and Windows Mobile.
+          The static analyzer supports APK, AAB, XAPK, IPA, APPX, and source-code archives. The dynamic analyzer
+          covers both Android emulators and iOS (Corellium VMs and jailbroken hardware), with Frida instrumentation,
+          live API monitoring, and network traffic capture.
+        </p>
+        <p class="text-text-secondary leading-relaxed mt-3">
+          MobInspect ships with a modern Tailwind UI, dynamic role-based access control, per-user revocable API keys,
+          and an analytics dashboard on top of a mature analyzer stack.
+        </p>
+      </div>
+    </div>
+
+    <div class="card" data-reveal>
+      <div class="card-body">
+        <h2 class="text-h3 mb-3 flex items-center gap-2">{% icon "circle-check" size=18 class="text-mobinspect-500" %} Use cases</h2>
+        <ul class="space-y-2 text-text-secondary">
+          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} Mobile application security assessments</li>
+          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} Penetration testing</li>
+          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} Malware and tracker analysis</li>
+          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} Privacy auditing</li>
+          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} CI/CD security gating via REST API</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <aside class="space-y-6">
+    <div class="card" data-reveal>
+      <div class="card-body">
+        <h3 class="text-h4 mb-2 flex items-center gap-2">{% icon "lock" size=16 class="text-mobinspect-500" %} License</h3>
+        <p class="text-small text-text-secondary">
+          GPL-3.0. Source must remain available; modifications stay GPL-3.0. The full license text and the cumulative author roster are recorded in <code>LICENSE.md</code> at the repository root; bundled third-party tool licenses live under <code>LICENSES/</code>.
+        </p>
+      </div>
+    </div>
+  </aside>
+
+</div>
+{% endblock %}

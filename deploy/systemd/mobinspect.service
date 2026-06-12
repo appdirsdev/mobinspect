@@ -1,0 +1,60 @@
+[Unit]
+Description=MobInspect Web Server (API + UI) — Django/gunicorn
+Documentation=file:///home/ubuntu/MobInspect/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/MobInspect
+Environment=HOME=/home/ubuntu
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Bind on all interfaces — the LAN reaches the UI at http://<host>:8001/.
+# DEBUG defaults to False (safe for LAN exposure). Toggle MOBSF_DEBUG=1 if you
+# need traceback pages while iterating.
+# Gunicorn tuning (see deploy/RUNBOOK.md for rationale):
+#   --workers 2                  : two processes so one stuck request can't take
+#                                  down the whole UI; cheap on a 6 vCPU box.
+#   --worker-class gthread       : threaded worker — Django views are I/O-bound
+#                                  (sqlite, adb, subprocess), threads beat sync.
+#   --threads 4                  : 4 in-flight requests per worker (8 total) is
+#                                  more than enough now that long scans run on
+#                                  the django-q2 worker (MOBSF_ASYNC_ANALYSIS=1).
+#   --max-requests 200
+#   --max-requests-jitter 50     : cycle each worker every ~200 reqs (±50) to
+#                                  defuse slow memory creep from PDF/report libs.
+#   --timeout 180                : 3 min cap on a single HTTP request. Scans are
+#                                  async now; anything still synchronous (login,
+#                                  list views, downloads) finishes well inside this.
+#   --graceful-timeout 30        : give in-flight requests 30s to drain on reload.
+ExecStart=/home/ubuntu/.local/bin/poetry run gunicorn \
+  --bind 0.0.0.0:8001 \
+  --workers 2 --worker-class gthread --threads 4 \
+  --max-requests 200 --max-requests-jitter 50 \
+  --timeout 180 --graceful-timeout 30 \
+  --access-logfile - --error-logfile - --capture-output --log-level info \
+  mobsf.MobSF.wsgi:application
+Restart=on-failure
+RestartSec=5
+# Long stop window so in-flight scans (esp. synchronous fallback paths) finish
+# draining instead of being SIGKILLed mid-write. SIGTERM gives gunicorn its
+# graceful-shutdown handler.
+KillSignal=SIGTERM
+TimeoutStopSec=600
+# Resource ceilings — see deploy/RUNBOOK.md §6.
+MemoryHigh=6G
+MemoryMax=8G
+TasksMax=4096
+LimitNOFILE=16384
+# Sandboxing — keep the gunicorn workers from clobbering the host.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+# Carve out the data + working dirs that must stay writable under ProtectHome.
+ReadWritePaths=/home/ubuntu/MobInspect /home/ubuntu/.MobInspect
+
+[Install]
+WantedBy=multi-user.target

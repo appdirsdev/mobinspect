@@ -1,0 +1,60 @@
+{% load mi_icons %}
+{% comment %}
+  Reusable three-way diff section for the compare view.
+  Vars:
+    title       — section heading
+    icon        — Lucide name
+    common      — iterable of common entries (will be rendered as badges)
+    only_first  — iterable of entries unique to app 1
+    only_second — iterable of entries unique to app 2
+    first_label — display label for app 1
+    second_label — display label for app 2
+{% endcomment %}
+<section class="card" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2">{% icon icon size=18 %} {{ title }}</h2>
+    <span class="text-tiny text-text-tertiary">
+      {{ common|length }} common · {{ only_first|length }} only A · {{ only_second|length }} only B
+    </span>
+  </div>
+  <div class="card-body grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    <div>
+      <h3 class="text-tiny uppercase text-text-secondary mb-2">Common</h3>
+      <div class="space-y-1 max-h-80 overflow-y-auto">
+        {% for item in common %}
+          <code class="block font-mono text-mono text-text-secondary px-2 py-1 rounded bg-surface-2/60 truncate" title="{{ item }}">{{ item }}</code>
+        {% empty %}
+          <p class="text-tiny text-text-tertiary italic">none</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <h3 class="text-tiny uppercase text-text-secondary mb-2 truncate" title="Only in {{ first_label }}">
+        Only in {{ first_label }}
+      </h3>
+      <div class="space-y-1 max-h-80 overflow-y-auto">
+        {% for item in only_first %}
+          <code class="block font-mono text-mono text-severity-low dark:text-severity-low-dark px-2 py-1 rounded bg-severity-low/5 truncate" title="{{ item }}">{{ item }}</code>
+        {% empty %}
+          <p class="text-tiny text-text-tertiary italic">none</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <h3 class="text-tiny uppercase text-text-secondary mb-2 truncate" title="Only in {{ second_label }}">
+        Only in {{ second_label }}
+      </h3>
+      <div class="space-y-1 max-h-80 overflow-y-auto">
+        {% for item in only_second %}
+          <code class="block font-mono text-mono text-severity-medium dark:text-severity-medium-dark px-2 py-1 rounded bg-severity-medium/5 truncate" title="{{ item }}">{{ item }}</code>
+        {% empty %}
+          <p class="text-tiny text-text-tertiary italic">none</p>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+</section>

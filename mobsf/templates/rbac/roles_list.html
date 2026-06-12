@@ -1,0 +1,83 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}{% load rbac %}
+
+{% block content %}
+<header class="flex items-center justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-h1">Roles</h1>
+    <p class="text-text-secondary mt-1">
+      Bundles of permissions assigned to users. System roles cannot be deleted.
+    </p>
+  </div>
+  {% can 'rbac.role.manage' %}
+    <a href="{% url 'rbac:role_create' %}" class="btn btn-primary btn-md">
+      {% icon "plus" size=14 %} New role
+    </a>
+  {% endcan %}
+</header>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for role in roles %}
+    <div class="card card-hover" data-reveal>
+      <div class="card-body">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span
+              class="inline-flex items-center justify-center w-8 h-8 rounded-md text-white shadow-elevation-1 flex-shrink-0"
+              style="background-color: {{ role.color }};"
+            >
+              {% icon role.icon size=16 %}
+            </span>
+            <h3 class="text-h3 truncate">{{ role.name }}</h3>
+          </div>
+          {% if role.is_system %}
+            <span class="badge badge-low" title="System role">SYSTEM</span>
+          {% endif %}
+        </div>
+
+        <p class="text-small text-text-secondary mt-3 line-clamp-2">
+          {{ role.description|default:"—" }}
+        </p>
+
+        <div class="mt-4 flex items-center gap-4 text-tiny text-text-tertiary">
+          <span class="flex items-center gap-1">
+            {% icon "shield" size=12 %}
+            {{ role.permissions.count }} permission{{ role.permissions.count|pluralize }}
+          </span>
+          <span class="flex items-center gap-1">
+            {% icon "users" size=12 %}
+            {{ role.assignments.count }} user{{ role.assignments.count|pluralize }}
+          </span>
+        </div>
+      </div>
+
+      {% can 'rbac.role.manage' %}
+        <div class="card-footer flex justify-end gap-2">
+          <a href="{% url 'rbac:role_edit' role.id %}" class="btn btn-ghost btn-sm">
+            {% icon "edit" size=14 %} Edit
+          </a>
+          {% if not role.is_system %}
+            <form method="post" action="{% url 'rbac:role_delete' role.id %}"
+                  onsubmit="return confirm('Delete role &quot;{{ role.name|escapejs }}&quot;? Users assigned to it will lose its permissions.');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-sm text-system-error">
+                {% icon "trash" size=14 %} Delete
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      {% endcan %}
+    </div>
+  {% empty %}
+    <div class="col-span-full">
+      <div class="card card-body text-center py-12">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-2 text-text-tertiary mx-auto">
+          {% icon "shield" size=24 %}
+        </div>
+        <h3 class="text-h3 mt-3">No roles defined</h3>
+        <p class="text-text-secondary mt-1">Seed migrations should have created the default four.</p>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

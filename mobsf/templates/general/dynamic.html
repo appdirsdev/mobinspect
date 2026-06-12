@@ -1,0 +1,74 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}
+
+{% block page_title %}Dynamic Analyzer{% endblock %}
+
+{% block content %}
+<header class="mb-8">
+  <h1 class="text-h1">Dynamic Analyzer</h1>
+  <p class="text-text-secondary mt-1">
+    Run instrumented analysis against a live device or emulator. Pick the platform you want to analyze.
+  </p>
+</header>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+
+  {# ─────────── Android ─────────── #}
+  <a href="{% url 'dynamic_android' %}" class="card card-hover group" data-reveal>
+    <div class="card-body p-8">
+      <div class="flex items-start justify-between gap-4">
+        <span class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark transition-transform duration-fast group-hover:scale-105">
+          {% icon "smartphone" size=28 %}
+        </span>
+        <span class="text-text-tertiary group-hover:text-text-brand transition-colors duration-fast">
+          {% icon "arrow-up-right" size=18 %}
+        </span>
+      </div>
+      <h2 class="text-h2 mt-5">Android</h2>
+      <p class="text-text-secondary mt-2">
+        Run on a Genymotion VM or Android Studio emulator. Frida instrumentation,
+        live API monitor, logcat, screenshot capture.
+      </p>
+      <ul class="mt-4 space-y-1.5 text-small text-text-secondary">
+        <li class="flex items-center gap-2">{% icon "check" size=14 %} APK / XAPK / APKS / AAB</li>
+        <li class="flex items-center gap-2">{% icon "check" size=14 %} ADB control + screen mirroring</li>
+        <li class="flex items-center gap-2">{% icon "check" size=14 %} TLS pinning bypass via Frida</li>
+      </ul>
+    </div>
+  </a>
+
+  {# ─────────── iOS ─────────── #}
+  <div class="card group" x-data="{ open: false }" data-reveal>
+    <div class="card-body p-8">
+      <div class="flex items-start justify-between gap-4">
+        <span class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-surface-3 text-text-secondary transition-transform duration-fast group-hover:scale-105">
+          {% icon "smartphone" size=28 %}
+        </span>
+      </div>
+      <h2 class="text-h2 mt-5">iOS</h2>
+      <p class="text-text-secondary mt-2">
+        Choose a Corellium-hosted virtual device or your own jailbroken hardware.
+      </p>
+
+      <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <a href="{% url 'dynamic_ios' %}" class="btn btn-secondary btn-md justify-start">
+          {% icon "zap" size=14 %} Corellium VM
+        </a>
+        <a href="{% url 'dynamic_ios_device' %}" class="btn btn-secondary btn-md justify-start">
+          {% icon "smartphone" size=14 %} Jailbroken device
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mt-8 text-small text-text-tertiary max-w-2xl">
+  <p class="flex items-start gap-2">
+    {% icon "info" size=14 class="mt-0.5 flex-shrink-0" %}
+    <span>Dynamic analysis requires a running emulator or jailbroken device. See the
+      <a href="https://mobsf.github.io/docs/" class="text-text-brand hover:underline" target="_blank" rel="noopener">setup docs</a>
+      for environment configuration.
+    </span>
+  </p>
+</div>
+{% endblock %}

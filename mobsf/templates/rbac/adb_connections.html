@@ -1,0 +1,257 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}{% load rbac %}
+
+{% comment %}
+  Integrations · ADB Connections
+  Wire a remote/network adb device for dynamic analysis through the dashboard
+  instead of the MOBSF_ANALYZER_IDENTIFIER env var. Mutating actions are
+  guarded server-side by @require_permission('settings.manage'); we mirror
+  that here with {% can 'settings.manage' %} so users without it never see the
+  buttons. host_port is validated server-side before any adb invocation.
+{% endcomment %}
+
+{% block content %}
+<header class="mb-6">
+  <div class="flex items-center gap-2.5">
+    <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
+      {% icon "smartphone" size=18 %}
+    </span>
+    <div>
+      <h1 class="text-h1">Dynamic Analysis · ADB Connections</h1>
+      <p class="text-text-secondary mt-1">
+        Add remote Android devices for dynamic analysis. The active connection
+        is used as the analyzer target; the
+        <code class="code">MOBSF_ANALYZER_IDENTIFIER</code> env var still takes
+        precedence as a fallback for headless setups.
+      </p>
+    </div>
+  </div>
+</header>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  {# ─── add form ─── #}
+  {% can 'settings.manage' %}
+  <div class="lg:col-span-1">
+    <div class="card">
+      <div class="card-header"><h2 class="text-h3">Add connection</h2></div>
+      <form method="post" action="{% url 'rbac:adb_connection_add' %}" class="card-body space-y-4">
+        {% csrf_token %}
+        <div>
+          <label class="label" for="id_label">Label</label>
+          <input id="id_label" name="label" type="text" maxlength="80" required
+                 class="input" placeholder="My Emulator" />
+        </div>
+        <div>
+          <label class="label" for="id_host_port">Device address</label>
+          <input id="id_host_port" name="host_port" type="text" maxlength="255" required
+                 class="input font-mono text-mono"
+                 placeholder="192.168.1.100:5555" />
+          <p class="text-tiny text-text-tertiary mt-1">
+            Format <code class="code">host:port</code> or
+            <code class="code">[ipv6]:port</code> (e.g.
+            <code class="code">192.168.1.100:5555</code>).
+          </p>
+        </div>
+        <div>
+          <label class="label" for="id_platform">Platform</label>
+          <select id="id_platform" name="platform" class="input">
+            <option value="android" selected>Android</option>
+            <option value="ios">iOS</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-md w-full">
+          {% icon "plus" size=14 %} Add connection
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endcan %}
+
+  {# ─── list ─── #}
+  <div class="{% if 'settings.manage'|can:request %}lg:col-span-2{% else %}lg:col-span-3{% endif %}">
+    <div class="card">
+      <div class="card-header"><h2 class="text-h3">Configured devices</h2></div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-small">
+          <thead>
+            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+              <th class="text-left px-5 py-2.5 font-medium">Label</th>
+              <th class="text-left px-5 py-2.5 font-medium">Host:Port</th>
+              <th class="text-left px-5 py-2.5 font-medium">Platform</th>
+              <th class="text-left px-5 py-2.5 font-medium">Active</th>
+              <th class="text-left px-5 py-2.5 font-medium">Status</th>
+              <th class="text-left px-5 py-2.5 font-medium">Last checked</th>
+              <th class="text-left px-5 py-2.5 font-medium">Added by</th>
+              <th class="px-5 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in connections %}
+              <tr id="adb-row-{{ c.id }}"
+                  class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
+                <td class="px-5 py-3 text-text-primary">{{ c.label }}</td>
+                <td class="px-5 py-3">
+                  <code class="font-mono text-mono text-text-secondary">{{ c.host_port }}</code>
+                </td>
+                <td class="px-5 py-3 text-text-secondary">{{ c.get_platform_display }}</td>
+                <td class="px-5 py-3">
+                  {% if c.is_active %}
+                    <span class="badge badge-passed">{% icon "check" size=12 %} Active</span>
+                  {% else %}
+                    <span class="text-text-tertiary">—</span>
+                  {% endif %}
+                </td>
+                <td class="px-5 py-3" data-cell="status">
+                  {% if c.last_status == 'connected' %}
+                    <span class="badge badge-passed">Connected</span>
+                  {% elif c.last_status == 'failed' %}
+                    <span class="badge badge-critical">Failed</span>
+                  {% elif c.last_status == 'timeout' %}
+                    <span class="badge badge-high">Timeout</span>
+                  {% else %}
+                    <span class="badge badge-unknown">Unknown</span>
+                  {% endif %}
+                </td>
+                <td class="px-5 py-3 text-text-secondary" data-cell="last-checked">
+                  {% if c.last_status_at %}{{ c.last_status_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+                </td>
+                <td class="px-5 py-3 text-text-secondary">
+                  {% if c.created_by %}{{ c.created_by.username }}{% else %}—{% endif %}
+                </td>
+                <td class="px-5 py-3 text-right whitespace-nowrap">
+                  {% can 'settings.manage' %}
+                    {% if not c.is_active %}
+                      <form method="post" action="{% url 'rbac:adb_connection_set_active' c.id %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost btn-sm" title="Use this device for dynamic analysis">
+                          {% icon "zap" size=14 %} Set active
+                        </button>
+                      </form>
+                    {% endif %}
+                    <button type="button"
+                            class="btn btn-ghost btn-sm js-adb-test"
+                            data-url="{% url 'rbac:adb_connection_test' c.id %}"
+                            data-row="adb-row-{{ c.id }}"
+                            title="Run adb connect + adb devices">
+                      {% icon "activity" size=14 %} <span class="js-adb-test-label">Test</span>
+                    </button>
+                    <form method="post" action="{% url 'rbac:adb_connection_remove' c.id %}"
+                          onsubmit="return confirm('Remove connection &quot;{{ c.label|escapejs }}&quot;?');"
+                          class="inline">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-ghost btn-sm text-system-error" title="Delete connection">
+                        {% icon "trash" size=14 %} Remove
+                      </button>
+                    </form>
+                  {% endcan %}
+                  {% if not 'settings.manage'|can:request %}
+                    <span class="text-text-tertiary">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="8" class="px-5 py-12 text-center">
+                  <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-2 text-text-tertiary mx-auto">
+                    {% icon "smartphone" size=24 %}
+                  </div>
+                  <h3 class="text-h3 mt-3">No connections configured</h3>
+                  <p class="text-text-secondary mt-1">
+                    Add a remote device on the left to make it available for dynamic analysis.
+                  </p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script defer>
+  // Progressive enhancement: the Test button POSTs to the test endpoint and
+  // patches the row's status / last-checked cells in place. The server
+  // enforces permissions and input validation; this is presentation only.
+  // The button is only rendered for users with settings.manage.
+  document.addEventListener('DOMContentLoaded', function () {
+    function toast(msg) {
+      var region = document.getElementById('mi-toasts');
+      if (!region) { return; }
+      var el = document.createElement('div');
+      el.className = 'card pointer-events-auto px-4 py-3 max-w-sm animate-fade-up shadow-elevation-3';
+      var p = document.createElement('p');
+      p.className = 'text-small';
+      p.textContent = msg;
+      el.appendChild(p);
+      region.appendChild(el);
+      setTimeout(function () { el.remove(); }, 6000);
+    }
+
+    function badge(status) {
+      var map = {
+        connected: ['badge badge-passed', 'Connected'],
+        failed:    ['badge badge-critical', 'Failed'],
+        timeout:   ['badge badge-high', 'Timeout'],
+      };
+      var spec = map[status] || ['badge badge-unknown', 'Unknown'];
+      var span = document.createElement('span');
+      span.className = spec[0];
+      span.textContent = spec[1];
+      return span;
+    }
+
+    function getCsrf() {
+      var input = document.querySelector('input[name=csrfmiddlewaretoken]');
+      return input ? input.value : '';
+    }
+
+    document.querySelectorAll('.js-adb-test').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var url = btn.getAttribute('data-url');
+        var row = document.getElementById(btn.getAttribute('data-row'));
+        var label = btn.querySelector('.js-adb-test-label');
+        var original = label ? label.textContent : 'Test';
+        if (label) { label.textContent = 'Testing…'; }
+        btn.disabled = true;
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': getCsrf(),
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          credentials: 'same-origin',
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (row) {
+              var statusCell = row.querySelector('[data-cell="status"]');
+              if (statusCell && data.status) {
+                statusCell.innerHTML = '';
+                statusCell.appendChild(badge(data.status));
+              }
+              var checkedCell = row.querySelector('[data-cell="last-checked"]');
+              if (checkedCell && data.last_status_at) {
+                checkedCell.textContent =
+                  data.last_status_at.replace('T', ' ').slice(0, 16);
+              }
+            }
+            toast((data.success ? 'Connected: ' : 'Test failed: ') +
+                  (data.message || ''));
+          })
+          .catch(function () {
+            toast('Test request failed.');
+          })
+          .finally(function () {
+            if (label) { label.textContent = original; }
+            btn.disabled = false;
+          });
+      });
+    });
+  });
+</script>
+{% endblock %}

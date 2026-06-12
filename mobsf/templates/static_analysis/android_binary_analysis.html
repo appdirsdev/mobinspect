@@ -1,0 +1,1453 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}{{ app_name|default:file_name }} — Android static analysis{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'others/css/spinner.css' %}" />
+<link rel="stylesheet" href="{% static 'datatables/css/datatables.combined.min.css' %}" />
+<link rel="stylesheet" href="{% static 'adminlte/plugins/sweetalert2/sweetalert2.min.css' %}" />
+<style>
+  /* Self-contained helpers — keeps the page correct even against a stale
+     Tailwind bundle (these few utilities aren't guaranteed to be compiled). */
+  [x-cloak] { display: none !important; }
+  .scroll-mt-24 { scroll-margin-top: 6rem; }
+  .modal-overlay { background: rgba(0, 0, 0, 0.5); }
+  .pre-finding {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  pre#pre-wrap, .pre-wrap { white-space: pre-wrap; word-wrap: break-word; }
+  /* Hide default <details> marker so our btn-styled summaries look clean */
+  summary.list-none::-webkit-details-marker { display: none; }
+  summary.list-none { list-style: none; }
+  /* Styling for the shared base/list.html + list_href.html includes */
+  .mi-list a { color: var(--text-brand, #2563EB); }
+  .mi-list a:hover { text-decoration: underline; }
+  .mi-list summary { cursor: pointer; font-weight: 500; color: var(--text-primary, #0f172a); }
+  @media print {
+    body { -webkit-print-color-adjust: exact; }
+    aside, header.h-topbar, footer { display: none !important; }
+    .btn, #scan_options { display: none !important; }
+  }
+</style>
+<script>
+  function dynamic_loader() {
+    var l = document.querySelector('.loading');
+    if (l) l.classList.remove('hidden');
+  }
+</script>
+{% endblock %}
+
+{% block content %}
+<div x-data="{ modal: '' }">
+
+{# ─── Page header (Tailwind redesign) ─── #}
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-4 min-w-0">
+    <img src="{% if icon_path %}/download/{{ icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+         onerror="this.src='{% static 'img/no_icon.png' %}'" alt=""
+         class="w-14 h-14 rounded-lg bg-surface-2 object-contain flex-shrink-0" />
+    <div class="min-w-0">
+      <p class="text-tiny uppercase text-text-tertiary">Static · Android</p>
+      <h1 class="text-h2 truncate">{{ app_name|default:file_name }}{% if version_name %} <span class="text-text-tertiary">v{{ version_name }}</span>{% endif %}</h1>
+      {% if package_name %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ package_name }}</p>{% endif %}
+      <p class="text-tiny text-text-tertiary mt-0.5 font-mono truncate">{{ md5 }}</p>
+    </div>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    {% if app_type not in 'so' %}
+      <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-primary btn-md">{% icon "shield-check" size=14 %} Scorecard</a>
+    {% endif %}
+    <a href="{% url 'static_analyzer' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md">{% icon "activity" size=14 %} Rescan</a>
+    {% if app_type not in 'jar,aar,so' %}
+      <a onclick="dynamic_loader()" href="{% url 'dynamic_analyzer' checksum=md5 %}" class="btn btn-secondary btn-md">{% icon "smartphone" size=14 %} Dynamic</a>
+    {% endif %}
+    <a href="{% url 'pdf' checksum=md5 %}" class="btn btn-ghost btn-md">{% icon "file-text" size=14 %} PDF</a>
+  </div>
+</header>
+
+{# ─── Scores & info (Tailwind redesign) ─── #}
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+  {% if app_type not in 'so' %}
+    <div class="card" data-reveal>
+      <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "check" size=16 %} App scores</h2></div>
+      <div class="card-body space-y-2 text-small">
+        {% if average_cvss %}
+          <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Avg CVSS</span><span class="text-text-primary font-medium">{{ average_cvss }}</span></div>
+        {% endif %}
+        <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Security score</span>
+          {% if appsec.security_score < 40 %}<span class="badge badge-critical">{{ appsec.security_score }}/100</span>
+          {% elif appsec.security_score == 100 %}<span class="badge badge-passed">{{ appsec.security_score }}/100</span>
+          {% else %}<span class="badge badge-medium">{{ appsec.security_score }}/100</span>{% endif %}
+        </div>
+        <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Trackers</span>
+          {% if trackers.detected_trackers > 0 %}<span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
+          {% else %}<span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>{% endif %}
+        </div>
+        {% if virus_total and virus_total.items|length > 9 %}
+          <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">VirusTotal</span>
+            {% if virus_total.positives > 0 %}<span class="badge badge-critical">{{ virus_total.positives }}/{{ virus_total.total }}</span>
+            {% else %}<span class="badge badge-passed">{{ virus_total.positives }}/{{ virus_total.total }}</span>{% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
+    <div class="card-body space-y-2 text-small">
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">File</span><span class="font-mono text-mono text-text-primary truncate" title="{{ file_name }}">{{ file_name }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">MD5</span><span class="font-mono text-mono text-text-secondary truncate">{{ md5 }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">SHA1</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha1 }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">SHA256</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha256 }}</span></div>
+    </div>
+  </div>
+
+  <div class="card" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "info" size=16 %} App information</h2></div>
+    <div class="card-body space-y-2 text-small">
+      {% if app_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>{% endif %}
+      {% if package_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Package</span><span class="font-mono text-mono text-text-primary truncate">{{ package_name }}</span></div>{% endif %}
+      {% if main_activity %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Main activity</span><span class="font-mono text-mono text-text-secondary truncate">{{ main_activity }}</span></div>{% endif %}
+      {% if version_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Version</span><span class="text-text-primary">{{ version_name }} {% if version_code %}<span class="text-text-tertiary">({{ version_code }})</span>{% endif %}</span></div>{% endif %}
+      {% if min_sdk %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">SDK</span><span class="text-text-primary">{{ min_sdk }} – {{ max_sdk|default:"—" }} (target {{ target_sdk|default:"?" }})</span></div>{% endif %}
+    </div>
+  </div>
+</section>
+
+{# ─── Scan options (Tailwind redesign) ─── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "sliders" size=18 %} Scan options</h2></div>
+  <div class="card-body flex flex-wrap items-center gap-2">
+    {% if app_type not in 'jar' %}
+      <a target="_blank" href="{% url 'manifest_view' checksum=md5 %}?type={{ app_type }}" class="btn btn-secondary btn-sm">{% icon "file-text" size=14 %} View Manifest</a>
+    {% endif %}
+    <a href="{% url 'tree_view' %}?md5={{ md5 }}&type=java" class="btn btn-secondary btn-sm">{% icon "layers" size=14 %} Source (Java)</a>
+    {% if app_type not in 'jar,aar' %}
+      <a href="{% url 'tree_view' %}?md5={{ md5 }}&type=smali" class="btn btn-secondary btn-sm">{% icon "layers" size=14 %} Source (Smali)</a>
+    {% endif %}
+    {% if app_type not in 'so' %}
+      <a id="supbtn" onclick="list_suppressions()" role="button" class="btn btn-ghost btn-sm" @click="modal = 'sup_list'" href="#">{% icon "eye-off" size=14 %} Suppressions</a>
+    {% endif %}
+    <button type="button" class="btn btn-ghost btn-sm" @click="modal = 'scan_logs'">{% icon "file-text" size=14 %} Scan logs</button>
+    <a href="{% url 'generate_downloads' %}?hash={{ md5 }}&file_type=java" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} Java</a>
+    {% if app_type not in 'jar,aar' %}
+      <a href="{% url 'generate_downloads' %}?hash={{ md5 }}&file_type=smali" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} Smali</a>
+    {% endif %}
+    <a href="{% url 'download_binary' checksum=md5 %}" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} {{ app_type|upper }}</a>
+  </div>
+
+  {# Scan logs modal (Alpine) #}
+  <div x-show="modal === 'scan_logs'" x-cloak @keydown.escape.window="modal = ''"
+       class="modal-overlay fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto"
+       x-transition.opacity>
+    <div class="card w-full max-w-4xl mt-12" @click.outside="modal = ''">
+      <div class="card-header flex items-center justify-between">
+        <h3 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Scan logs</h3>
+        <button type="button" class="btn btn-ghost btn-sm" @click="modal = ''" aria-label="Close">{% icon "x" size=16 %}</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-small">
+          <thead>
+            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+              <th class="text-left px-5 py-2.5 font-medium">Timestamp</th>
+              <th class="text-left px-5 py-2.5 font-medium">Event</th>
+              <th class="text-left px-5 py-2.5 font-medium">Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+              <tr class="border-b border-border-subtle align-top">
+                <td class="px-5 py-3 tabular text-text-tertiary whitespace-nowrap">{{log.timestamp}}</td>
+                <td class="px-5 py-3 text-text-primary">{{log.status}}</td>
+                <td class="px-5 py-3">
+                  {% if not log.exception %}
+                    <span class="text-severity-passed dark:text-severity-passed-dark">OK</span>
+                  {% else %}
+                    <span class="text-severity-critical dark:text-severity-critical-dark">{{log.exception}}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─── Deep analysis sections (Tailwind redesign) ─── #}
+
+{% if app_type not in 'so' %}
+<section id="certificate" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "lock" size=18 %} Signer certificate</h2></div>
+  <div class="card-body">
+    {% if certificate_analysis %}
+      <pre class="pre-finding text-text-secondary overflow-x-auto"><code>{{ certificate_analysis.certificate_info }}</code></pre>
+    {% else %}
+      <p class="text-small text-text-secondary">Failed to read Code Signing Certificate.</p>
+    {% endif %}
+  </div>
+</section>
+ <!-- ===========================end cert ================================== -->
+<section id="permissions" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield" size=18 %} Application permissions</h2></div>
+  <div class="overflow-x-auto">
+    <table id="table_permissions" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Permission</th>
+          <th class="text-left px-5 py-2.5 font-medium">Status</th>
+          <th class="text-left px-5 py-2.5 font-medium">Info</th>
+          <th class="text-left px-5 py-2.5 font-medium">Description</th>
+          <th class="text-left px-5 py-2.5 font-medium">Code mappings</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for perm,desc in permissions.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 font-mono text-mono text-text-primary">{{ perm }}</td>
+            <td class="px-5 py-3">
+              {% if desc.status == 'dangerous' %}
+                <span class="badge badge-critical">dangerous</span>
+              {% elif desc.status == 'normal' %}
+                <span class="badge badge-low">normal</span>
+              {% elif desc.status == 'signatureOrSystem' %}
+                <span class="badge badge-medium">SignatureOrSystem</span>
+              {% elif desc.status == 'signature' %}
+                <span class="badge badge-passed">signature</span>
+              {% elif desc.status == 'unknown' %}
+                <span class="badge badge-unknown">unknown</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary">{{ desc.info }}</td>
+            <td class="px-5 py-3 text-text-secondary">{{ desc.description }}</td>
+            <td class="px-5 py-3">
+              {% if perm in permission_mapping %}
+                <details class="group">
+                  <summary class="btn btn-ghost btn-sm cursor-pointer list-none">{% icon "file-text" size=14 %} Show files</summary>
+                  <div class="mt-2 space-y-1">
+                    {% for k, v in permission_mapping.items %}
+                      {% if k == perm %}
+                        {% for file_path, lines in v.items %}
+                          <div><a class="text-small text-text-brand hover:underline break-all" href="{% url "view_source" %}?file={{ file_path }}&amp;md5={{ md5 }}&amp;type={{app_type}}&amp;lines={{ lines }}">{{ file_path }}</a></div>
+                        {% endfor %}
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end permission ================================== -->
+<section id="android_api" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Android API</h2></div>
+  <div class="overflow-x-auto">
+    <table id="table_so" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">API</th>
+          <th class="text-left px-5 py-2.5 font-medium">Files</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rule, details in android_api.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-primary">{{ details.metadata.description }}</td>
+            <td class="px-5 py-3">
+              <details class="group">
+                <summary class="btn btn-ghost btn-sm cursor-pointer list-none">{% icon "file-text" size=14 %} Show files</summary>
+                <div class="mt-2 space-y-1">
+                  {% for file_path, lines in details.files.items %}
+                    <div><a class="text-small text-text-brand hover:underline break-all" href="{% url "view_source" %}?file={{ file_path }}&amp;md5={{ md5 }}&amp;type={{app_type}}&amp;lines={{ lines }}">{{ file_path }}</a></div>
+                  {% endfor %}
+                </div>
+              </details>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end api analysis ================================== -->
+<section id="browsable" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "external-link" size=18 %} Browsable activities</h2></div>
+  <div class="overflow-x-auto">
+    <table id="table_browsable" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Activity</th>
+          <th class="text-left px-5 py-2.5 font-medium">Intent</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for activity,intent_details in browsable_activities.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 font-mono text-mono text-text-primary break-all">{{activity}}</td>
+            <td class="px-5 py-3 text-text-secondary space-y-1">
+              {% if intent_details|key:"schemes" %}
+                <div><strong class="text-text-primary">Schemes</strong>:
+                {% for scheme in intent_details|key:"schemes" %}
+                  {{scheme}},
+                {% endfor %}
+                </div>
+              {% endif %}
+              {% if intent_details|key:"hosts" %}
+                <div><strong class="text-text-primary">Hosts:</strong> {% for host in intent_details|key:"hosts" %}
+                  {{host}},
+                {% endfor %}
+                </div>
+              {% endif %}
+              {% if intent_details|key:"ports" %}
+                <div><strong class="text-text-primary">Ports:</strong> {% for port in intent_details|key:"ports" %}
+                  {{port}},
+                {% endfor %}
+                </div>
+              {% endif %}
+              {% if intent_details|key:"mime_types" %}
+                <div><strong class="text-text-primary">Mime Types:</strong> {% for mime in intent_details|key:"mime_types" %}
+                  {{mime}},
+                {% endfor %}
+                </div>
+              {% endif %}
+              {% if intent_details|key:"paths" %}
+                <div><strong class="text-text-primary">Paths:</strong> {% for path in intent_details|key:"paths" %}
+                  {{path}},
+                {% endfor %}
+                </div>
+              {% endif %}
+              {% if intent_details|key:"path_prefixs" %}
+                <div><strong class="text-text-primary">Path Prefixes:</strong> {% for prefix in intent_details|key:"path_prefixs" %}
+                  {{prefix}},
+                {% endfor %}
+                </div>
+              {% endif %}
+              {% if intent_details|key:"path_patterns" %}
+                <div><strong class="text-text-primary">Path Patterns:</strong> {% for pattern in intent_details|key:"path_patterns" %}
+                  {{pattern}},
+                {% endfor %}
+                </div>
+              {% endif %}
+            {% endfor %}
+            </td>
+          </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end browsable activities ================================== -->
+<section id="network_security" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "activity" size=18 %} Network security</h2></div>
+  <div class="card-body">
+    {% if network_security and 'network_summary' in network_security and network_security.network_summary|length > 0  %}
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div class="rounded-lg bg-severity-critical/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark">High</p>
+          <p class="text-h2 tabular text-severity-critical dark:text-severity-critical-dark">{{ network_security.network_summary.high }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-medium/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark">Warning</p>
+          <p class="text-h2 tabular text-severity-medium dark:text-severity-medium-dark">{{ network_security.network_summary.warning }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-low/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark">Info</p>
+          <p class="text-h2 tabular text-severity-low dark:text-severity-low-dark">{{ network_security.network_summary.info }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-passed/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-passed dark:text-severity-passed-dark">Secure</p>
+          <p class="text-h2 tabular text-severity-passed dark:text-severity-passed-dark">{{ network_security.network_summary.secure }}</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  <div class="overflow-x-auto">
+    <table id="table_network" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">No</th>
+          <th class="text-left px-5 py-2.5 font-medium">Scope</th>
+          <th class="text-left px-5 py-2.5 font-medium">Severity</th>
+          <th class="text-left px-5 py-2.5 font-medium">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if network_security and 'network_findings' in network_security %}
+        {% for item in network_security.network_findings %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 tabular text-text-tertiary">{{ forloop.counter }}</td>
+            <td class="px-5 py-3 font-mono text-mono text-text-secondary break-all">
+              {% for url in item.scope %}
+                {{ url }}<br/>
+              {% endfor %}
+            </td>
+            <td class="px-5 py-3">
+              {% if item.severity == "high" %}
+                <span class="badge badge-critical">high</span>
+              {% elif item.severity == "secure" %}
+                <span class="badge badge-passed">secure</span>
+              {% elif item.severity == "info" %}
+                <span class="badge badge-low">info</span>
+              {% elif item.severity == "warning" %}
+                <span class="badge badge-medium">warning</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary">{{item.description }}</td>
+          </tr>
+        {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end network security ================================== -->
+
+
+<section id="certificate_analysis" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "lock" size=18 %} Certificate analysis</h2></div>
+  <div class="card-body">
+    {% if certificate_analysis and 'certificate_summary' in certificate_analysis and certificate_analysis.certificate_summary|length > 0  %}
+      <div class="grid grid-cols-3 gap-3 mb-5">
+        <div class="rounded-lg bg-severity-critical/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark">High</p>
+          <p class="text-h2 tabular text-severity-critical dark:text-severity-critical-dark">{{ certificate_analysis.certificate_summary.high }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-medium/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark">Warning</p>
+          <p class="text-h2 tabular text-severity-medium dark:text-severity-medium-dark">{{ certificate_analysis.certificate_summary.warning }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-low/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark">Info</p>
+          <p class="text-h2 tabular text-severity-low dark:text-severity-low-dark">{{ certificate_analysis.certificate_summary.info }}</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  <div class="overflow-x-auto">
+    <table id="table_cert" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Title</th>
+          <th class="text-left px-5 py-2.5 font-medium">Severity</th>
+          <th class="text-left px-5 py-2.5 font-medium">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if certificate_analysis and 'certificate_findings' in certificate_analysis %}
+          {% for find in certificate_analysis.certificate_findings %}
+            <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+              <td class="px-5 py-3 text-text-primary">{{ find.2 }}</td>
+              <td class="px-5 py-3">
+                {% if find.0 == 'high' %}
+                  <span class="badge badge-critical">high</span>
+                {% elif find.0  == 'secure' %}
+                  <span class="badge badge-passed">secure</span>
+                {% elif find.0  == 'warning' %}
+                  <span class="badge badge-medium">warning</span>
+                {% elif find.0  == 'info' %}
+                  <span class="badge badge-low">info</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3 text-text-secondary">{{ find.1 }}</td>
+            </tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end certificate analysis ================================== -->
+<section id="manifest" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Manifest analysis</h2></div>
+  <div class="card-body">
+    {% if manifest_analysis and 'manifest_summary' in manifest_analysis and manifest_analysis.manifest_summary|length > 0%}
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div class="rounded-lg bg-severity-critical/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark">High</p>
+          <p class="text-h2 tabular text-severity-critical dark:text-severity-critical-dark">{{ manifest_analysis.manifest_summary.high }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-medium/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark">Warning</p>
+          <p class="text-h2 tabular text-severity-medium dark:text-severity-medium-dark">{{ manifest_analysis.manifest_summary.warning }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-low/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark">Info</p>
+          <p class="text-h2 tabular text-severity-low dark:text-severity-low-dark">{{ manifest_analysis.manifest_summary.info }}</p>
+        </div>
+        <div class="rounded-lg bg-surface-2 px-4 py-3">
+          <p class="text-tiny uppercase text-text-tertiary">Suppressed</p>
+          <p class="text-h2 tabular text-text-tertiary">{{ manifest_analysis.manifest_summary.suppressed }}</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  <div class="overflow-x-auto">
+    <table id="table_manifest" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">No</th>
+          <th class="text-left px-5 py-2.5 font-medium">Issue</th>
+          <th class="text-left px-5 py-2.5 font-medium">Severity</th>
+          <th class="text-left px-5 py-2.5 font-medium">Description</th>
+          <th class="text-left px-5 py-2.5 font-medium">Options</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if manifest_analysis and 'manifest_findings' in manifest_analysis %}
+        {% for item in manifest_analysis.manifest_findings %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 tabular text-text-tertiary">{{ forloop.counter }}</td>
+            <td class="px-5 py-3 text-text-primary">{{item|key:"title"}}</td>
+            <td class="px-5 py-3">
+              {% if item|key:"severity" == "high" %}
+                <span class="badge badge-critical">high</span>
+              {% elif item|key:"severity" == "info" %}
+                <span class="badge badge-low">info</span>
+              {% elif item|key:"severity" == "warning" %}
+                <span class="badge badge-medium">warning</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary">{{item|key:"description"}}</td>
+            <td class="px-5 py-3">
+              <div class="relative" x-data="{ open: false }">
+                <button type="button" class="btn btn-ghost btn-sm" @click="open = !open" aria-label="Suppression options">
+                  {% icon "eye-off" size=14 %}
+                </button>
+                <div x-show="open" x-cloak @click.outside="open = false"
+                     x-transition:enter="transition ease-out duration-fast"
+                     x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+                     class="absolute right-0 z-10 mt-1 w-72 rounded-lg border border-border-subtle bg-surface-1 shadow-elevation-3 p-1">
+                  <a style="cursor:pointer;" class="block px-3 py-2 rounded-md text-small text-text-secondary hover:bg-surface-2/60" onclick="suppress('{{ item|key:"title" | android_component}}{{item|key:'rule' | escapejs }}', false, $(this.closest('tr')), true)">Suppression the rule <b class="text-text-primary">{{ item|key:"title" | android_component}}{{ item|key:'rule' }}</b> in <b class="text-text-primary">{{package_name}}</b></a>
+                </div>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end manifest analysis ================================== -->
+<section id="code_analysis" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Code analysis</h2></div>
+  <div class="card-body">
+    {% if code_analysis and 'summary' in code_analysis and code_analysis.summary|length > 0  %}
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+        <div class="rounded-lg bg-severity-critical/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark">High</p>
+          <p class="text-h2 tabular text-severity-critical dark:text-severity-critical-dark">{{ code_analysis.summary.high }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-medium/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark">Warning</p>
+          <p class="text-h2 tabular text-severity-medium dark:text-severity-medium-dark">{{ code_analysis.summary.warning }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-low/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark">Info</p>
+          <p class="text-h2 tabular text-severity-low dark:text-severity-low-dark">{{ code_analysis.summary.info }}</p>
+        </div>
+        <div class="rounded-lg bg-severity-passed/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-passed dark:text-severity-passed-dark">Secure</p>
+          <p class="text-h2 tabular text-severity-passed dark:text-severity-passed-dark">{{ code_analysis.summary.secure }}</p>
+        </div>
+        <div class="rounded-lg bg-surface-2 px-4 py-3">
+          <p class="text-tiny uppercase text-text-tertiary">Suppressed</p>
+          <p class="text-h2 tabular text-text-tertiary">{{ code_analysis.summary.suppressed }}</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  <div class="overflow-x-auto">
+    <table id="table_code" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">No</th>
+          <th class="text-left px-5 py-2.5 font-medium">Issue</th>
+          <th class="text-left px-5 py-2.5 font-medium">Severity</th>
+          <th class="text-left px-5 py-2.5 font-medium">Standards</th>
+          <th class="text-left px-5 py-2.5 font-medium">Files</th>
+          <th class="text-left px-5 py-2.5 font-medium">Options</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if code_analysis and 'findings' in code_analysis %}
+        {% for rule, details in code_analysis.findings.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 tabular text-text-tertiary">{{ forloop.counter }}</td>
+            <td class="px-5 py-3 text-text-primary">
+              {% if details.metadata|key:"ref" %}
+                <a class="text-text-brand hover:underline" href="{{details.metadata.ref}}" target="_blank" rel="noopener"> {{ details.metadata.description }}</a>
+              {% else %}
+                {{ details.metadata.description }}
+              {% endif %}
+            </td>
+            <td class="px-5 py-3">
+              {% if details.metadata.severity == "high" %}
+                <span class="badge badge-critical">high</span>
+                {% elif details.metadata.severity == "good" %}
+                <span class="badge badge-passed">secure</span>
+                {% elif details.metadata.severity == "warning" %}
+                <span class="badge badge-medium">warning</span>
+                {% elif details.metadata.severity == "info" %}
+                <span class="badge badge-low">info</span>
+                {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary space-y-0.5">
+              {% if average_cvss %}
+                <div><strong class="text-text-primary">CVSS V2:</strong>
+                {{ details.metadata.cvss }}
+                {% if details.metadata.cvss > 6 %}
+                  (high)
+                {% elif details.metadata.cvss == 0 %}
+                  (info)
+                {% elif details.metadata.cvss >= 4 %}
+                  (medium)
+                {% elif details.metadata.cvss < 4 %}
+                  (low)
+                {% endif %}
+                </div>
+              {% endif %}
+              {% if details.metadata.cwe %}<div><strong class="text-text-primary">CWE: </strong>{{ details.metadata.cwe }}</div>{% endif %}
+              {% if details.metadata|key:"owasp-mobile" %}<div><strong class="text-text-primary">OWASP Top 10: </strong>{{ details.metadata|key:"owasp-mobile" }}</div>{% endif %}
+              {% if details.metadata.masvs %}<div><strong class="text-text-primary">OWASP MASVS: </strong>{{ details.metadata.masvs }}</div>{% endif %}
+            </td>
+            <td class="px-5 py-3">
+              {% if details.files|length < 4 %}
+                <div class="space-y-1">
+                {% for file_path, lines in details.files.items %}
+                  <div><a class="text-small text-text-brand hover:underline break-all" href="{% url "view_source" %}?file={{ file_path }}&amp;md5={{ md5 }}&amp;type={{app_type}}&amp;lines={{ lines}}"> {{ file_path }}</a></div>
+                {% endfor %}
+                </div>
+              {% else %}
+                <details class="group">
+                  <summary class="btn btn-ghost btn-sm cursor-pointer list-none">{% icon "file-text" size=14 %} Show files</summary>
+                  <div class="mt-2 space-y-1">
+                    {% for file_path, lines in details.files.items %}
+                      <div><a class="text-small text-text-brand hover:underline break-all" href="{% url "view_source" %}?file={{ file_path }}&amp;md5={{ md5 }}&amp;type={{app_type}}&amp;lines={{ lines}}"> {{ file_path }}</a></div>
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3">
+              <div class="relative" x-data="{ open: false }">
+                <button type="button" class="btn btn-ghost btn-sm" @click="open = !open" aria-label="Suppression options">
+                  {% icon "eye-off" size=14 %}
+                </button>
+                <div x-show="open" x-cloak @click.outside="open = false"
+                     x-transition:enter="transition ease-out duration-fast"
+                     x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+                     class="absolute right-0 z-10 mt-1 w-80 rounded-lg border border-border-subtle bg-surface-1 shadow-elevation-3 p-1">
+                  <a style="cursor:pointer;" class="block px-3 py-2 rounded-md text-small text-text-secondary hover:bg-surface-2/60" onclick="suppress('{{rule | escapejs }}', false, $(this.closest('tr')))">Suppress the rule <b class="text-text-primary">{{ rule }}</b> in <b class="text-text-primary">{{package_name}}</b></a>
+                  <a style="cursor:pointer;" class="block px-3 py-2 rounded-md text-small text-text-secondary hover:bg-surface-2/60" onclick="suppress('{{rule | escapejs }}', true, $(this.closest('tr')))">Suppress the rule <b class="text-text-primary">{{ rule }}</b> in <b class="text-text-primary">{{package_name}}</b> only from these files</a>
+                </div>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end code analysis ================================== -->
+ {% endif %}
+<section id="binary_analysis" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "package" size=18 %} Shared library binary analysis</h2></div>
+  <div class="overflow-x-auto">
+    <table id="table_binary" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          {% if app_type not in 'so' %}
+            <th class="text-left px-5 py-2.5 font-medium">No</th>
+            <th class="text-left px-5 py-2.5 font-medium">Shared object</th>
+          {% endif %}
+          <th class="text-left px-5 py-2.5 font-medium">NX</th>
+          <th class="text-left px-5 py-2.5 font-medium">PIE</th>
+          <th class="text-left px-5 py-2.5 font-medium">Stack canary</th>
+          <th class="text-left px-5 py-2.5 font-medium">RELRO</th>
+          <th class="text-left px-5 py-2.5 font-medium">RPATH</th>
+          <th class="text-left px-5 py-2.5 font-medium">RUNPATH</th>
+          <th class="text-left px-5 py-2.5 font-medium">Fortify</th>
+          <th class="text-left px-5 py-2.5 font-medium">Symbols stripped</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if not binary_analysis %}
+          <tr><td colspan="9" class="px-5 py-4 text-small text-text-secondary">No Shared Objects found.</td></tr>
+        {% endif %}
+        {% for so in binary_analysis %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            {% if app_type not in 'so' %}
+            <td class="px-5 py-3 tabular text-text-tertiary">{{ forloop.counter }}</td>
+            <td class="px-5 py-3 font-mono text-mono text-text-primary break-all">{{so.name | relative_path}}<br/>
+              <a class="btn btn-ghost btn-sm mt-1" href="{% url 'scan_library' checksum=md5 %}?library={{ so.name }}" target="_blank" rel="noopener noreferrer">{% icon "search" size=14 %} Analyze</a>
+            </td>
+            {% endif %}
+            <td class="px-5 py-3"><b class="text-text-primary">{{so.nx.is_nx}}</b><br/>
+              <span class="badge badge-{% if so.nx.severity == 'high' %}critical{% elif so.nx.severity == 'warning' %}medium{% else %}low{% endif %}">{{so.nx.severity}}</span>
+              <br/><span class="text-text-secondary">{{so.nx.description}}</span></td>
+            <td class="px-5 py-3"><b class="text-text-primary">{{so.pie.is_pie}}</b><br/>
+              <span class="badge badge-{% if so.pie.severity == 'high' %}critical{% elif so.pie.severity == 'warning' %}medium{% else %}low{% endif %}">{{so.pie.severity}}</span>
+              <br/><span class="text-text-secondary">{{so.pie.description}}</span></td>
+            <td class="px-5 py-3"><b class="text-text-primary">{{so.stack_canary.has_canary}}</b><br/>
+              <span class="badge badge-{% if so.stack_canary.severity == 'high' %}critical{% elif so.stack_canary.severity == 'warning' %}medium{% else %}low{% endif %}">{{so.stack_canary.severity}}</span>
+              <br/><span class="text-text-secondary">{{so.stack_canary.description}}</span></td>
+            <td class="px-5 py-3"><b class="text-text-primary">{{so.relocation_readonly.relro}}</b><br/>
+              <span class="badge badge-{% if so.relocation_readonly.severity == 'high' %}critical{% elif so.relocation_readonly.severity == 'warning' %}medium{% else %}low{% endif %}">{{so.relocation_readonly.severity}}</span>
+              <br/><span class="text-text-secondary">{{so.relocation_readonly.description}}</span></td>
+            <td class="px-5 py-3"><b class="text-text-primary">{{so.rpath.rpath}}</b><br/>
+              <span class="badge badge-{% if so.rpath.severity == 'high' %}critical{% elif so.rpath.severity == 'warning' %}medium{% else %}low{% endif %}">{{so.rpath.severity}}</span>
+              <br/><span class="text-text-secondary">{{so.rpath.description}}</span></td>
+            <td class="px-5 py-3"><b class="text-text-primary">{{so.runpath.runpath}}</b><br/>
+              <span class="badge badge-{% if so.runpath.severity == 'high' %}critical{% elif so.runpath.severity == 'warning' %}medium{% else %}low{% endif %}">{{so.runpath.severity}}</span>
+              <br/><span class="text-text-secondary">{{so.runpath.description}}</span></td>
+            <td class="px-5 py-3"><b class="text-text-primary">{{so.fortify.is_fortified}}</b><br/>
+              <span class="badge badge-{% if so.fortify.severity == 'high' %}critical{% elif so.fortify.severity == 'warning' %}medium{% else %}low{% endif %}">{{so.fortify.severity}}</span>
+              <br/><span class="text-text-secondary">{{so.fortify.description}}</span></td>
+            <td class="px-5 py-3"><b class="text-text-primary">{{so.symbol.is_stripped}}</b><br/>
+              <span class="badge badge-{% if so.symbol.severity == 'high' %}critical{% elif so.symbol.severity == 'warning' %}medium{% else %}low{% endif %}">{{so.symbol.severity}}</span>
+              <br/><span class="text-text-secondary">{{so.symbol.description}}</span></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end binary analysis ================================== -->
+ {% if app_type not in 'so' %}
+<section id="niap_analysis" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield-check" size=18 %} NIAP analysis v1.3</h2></div>
+  <div class="overflow-x-auto">
+    <table id="table_file" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">No</th>
+          <th class="text-left px-5 py-2.5 font-medium">Identifier</th>
+          <th class="text-left px-5 py-2.5 font-medium">Requirement</th>
+          <th class="text-left px-5 py-2.5 font-medium">Feature</th>
+          <th class="text-left px-5 py-2.5 font-medium">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for iden, details in niap_analysis.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 tabular text-text-tertiary">{{ forloop.counter }}</td>
+            <td class="px-5 py-3">
+              <span class="badge {% if 'does not' in details.choice %} badge-medium {% elif 'not in accordance' in details.choice %} badge-critical {% else %} badge-low {% endif %}"> {{ iden }}</span>
+            </td>
+            <td class="px-5 py-3 text-text-secondary">{{ details.class }}</td>
+            <td class="px-5 py-3 text-text-primary">{{ details.description }}</td>
+            <td class="px-5 py-3 text-text-secondary">{{ details.choice }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<!-- ===========================end niap analysis ================================== -->
+<section id="file_analysis" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} File analysis</h2></div>
+  <div class="overflow-x-auto">
+    <table id="table_file" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">No</th>
+          <th class="text-left px-5 py-2.5 font-medium">Issue</th>
+          <th class="text-left px-5 py-2.5 font-medium">Files</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in file_analysis %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 tabular text-text-tertiary">{{ forloop.counter }}</td>
+            <td class="px-5 py-3 text-text-primary">{{ item|key:"finding" }}</td>
+            <td class="px-5 py-3 font-mono text-mono text-text-secondary break-all">
+              {% for cert_f in item|key:"files" %}
+                {{ cert_f }}<br />
+              {% endfor %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end file analysis ================================== -->
+ {% endif %}
+<section id="firebase" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Firebase database analysis</h2></div>
+  <div class="overflow-x-auto">
+    <table id="table_firebase" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Title</th>
+          <th class="text-left px-5 py-2.5 font-medium">Severity</th>
+          <th class="text-left px-5 py-2.5 font-medium">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for find in firebase_urls %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-primary break-all">{{ find.title }}</td>
+            <td class="px-5 py-3">
+              {% if find.severity == 'high' %}
+                <span class="badge badge-critical">high</span>
+              {% elif find.severity  == 'secure' %}
+                <span class="badge badge-passed">secure</span>
+              {% elif find.severity  == 'warning' %}
+                <span class="badge badge-medium">warning</span>
+              {% elif find.severity  == 'info' %}
+                <span class="badge badge-low">info</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary">{{ find.description }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+  <!-- ===========================end firebase db analysis ================================== -->
+ <!---Malware Analysis Section-->
+<section id="malware_lookup" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield-alert" size=18 %} Malware lookup</h2></div>
+  <div class="card-body grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <a href="https://www.virustotal.com/gui/file/{{ sha256 }}" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-lg border border-border-subtle px-4 py-3 hover:bg-surface-2/40 transition-colors duration-fast text-small text-text-primary">{% icon "external-link" size=16 %} VirusTotal Report</a>
+    <a href="https://tria.ge/s?q={{ sha256 }}" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-lg border border-border-subtle px-4 py-3 hover:bg-surface-2/40 transition-colors duration-fast text-small text-text-primary">{% icon "external-link" size=16 %} Triage Report</a>
+    <a href="https://metadefender.com/results/hash/{{ sha256 }}" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-lg border border-border-subtle px-4 py-3 hover:bg-surface-2/40 transition-colors duration-fast text-small text-text-primary">{% icon "external-link" size=16 %} MetaDefender Report</a>
+    <a href="https://www.hybrid-analysis.com/search?query={{ sha256 }}" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-lg border border-border-subtle px-4 py-3 hover:bg-surface-2/40 transition-colors duration-fast text-small text-text-primary">{% icon "external-link" size=16 %} Hybrid Analysis Report</a>
+  </div>
+</section>
+ <!-- ===========================end malware lookup ================================== -->
+ {% if app_type not in 'so' %}
+ <!---APKiD Analysis Section-->
+<section id="apkid" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "zap" size=18 %} APKiD analysis</h2></div>
+  <div class="overflow-x-auto">
+    <table id="table_apkid" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">DEX</th>
+          <th class="text-left px-5 py-2.5 font-medium">Detections</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if apkid and app_type not in 'jar,aar'%}
+          {% for file, details in apkid.items %}
+            <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+              <td class="px-5 py-3 font-mono text-mono text-text-primary break-all">{{file}}</td>
+              <td class="px-5 py-3">
+                <table class="w-full text-small border border-border-subtle rounded-lg overflow-hidden">
+                  <thead>
+                    <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                      <th class="text-left px-4 py-2 font-medium">Findings</th>
+                      <th class="text-left px-4 py-2 font-medium">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for detail, idens in details.items %}
+                      <tr class="border-b border-border-subtle align-top">
+                        <td class="px-4 py-2">
+                          {% if detail == "anti_vm" %}
+                          <span class="badge badge-medium">Anti-VM Code</span>
+                          {% elif detail == "anti_disassembly" %}
+                          <span class="badge badge-medium">Anti Disassembly Code</span>
+                          {% elif detail == "anti_debug" %}
+                          <span class="badge badge-medium">Anti Debug Code</span>
+                          {% elif detail == "compiler" %}
+                          <span class="badge badge-low">Compiler</span>
+                          {% elif detail == "abnormal" %}
+                          <span class="badge badge-medium">Abnormal Code</span>
+                          {% elif detail == "obfuscator" %}
+                          <span class="badge badge-medium">Obfuscator</span>
+                          {% elif detail == "protector" %}
+                          <span class="badge badge-low">Protector</span>
+                          {% elif detail == "packer" %}
+                          <span class="badge badge-critical">Packer Found</span>
+                          {% elif detail == "dropper" %}
+                          <span class="badge badge-critical">Dropper Found</span>
+                          {% elif detail == "manipulator" %}
+                          <span class="badge badge-medium">Manipulator Found</span>
+                          {% else %}
+                          <span class="badge badge-low">{{detail}}</span>
+                          {% endif %}
+                        </td>
+                        <td class="px-4 py-2 text-text-secondary"> {% for idn in idens %} {{ idn }}<br/> {% endfor %}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="2" class="px-5 py-4 text-center text-small text-text-secondary"><strong>APKiD not enabled.</strong></td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+ <!-- ===========================end apkid analysis ================================== -->
+<section id="behaviour" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "activity" size=18 %} Behaviour analysis</h2></div>
+  <div class="overflow-x-auto">
+    <table id="table_code" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Rule ID</th>
+          <th class="text-left px-5 py-2.5 font-medium">Behaviour</th>
+          <th class="text-left px-5 py-2.5 font-medium">Label</th>
+          <th class="text-left px-5 py-2.5 font-medium">Files</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rule, details in behaviour.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 font-mono text-mono text-text-primary">{{ rule }}</td>
+            <td class="px-5 py-3 text-text-primary">{{ details.metadata.description }}</td>
+            <td class="px-5 py-3"> {% for lbl in details.metadata.label %}
+              <span class="badge badge-medium">{{ lbl }}</span>
+            {% endfor %}
+            </td>
+            <td class="px-5 py-3">
+              {% if details.files|length < 4 %}
+                <div class="space-y-1">
+                {% for file_path, lines in details.files.items %}
+                  <div><a class="text-small text-text-brand hover:underline break-all" href="{% url "view_source" %}?file={{ file_path }}&amp;md5={{ md5 }}&amp;type={{app_type}}&amp;lines={{ lines }}"> {{ file_path }}</a></div>
+                {% endfor %}
+                </div>
+              {% else %}
+                <details class="group">
+                  <summary class="btn btn-ghost btn-sm cursor-pointer list-none">{% icon "file-text" size=14 %} Show files</summary>
+                  <div class="mt-2 space-y-1">
+                    {% for file_path, lines in details.files.items %}
+                      <div><a class="text-small text-text-brand hover:underline break-all" href="{% url "view_source" %}?file={{ file_path }}&amp;md5={{ md5 }}&amp;type={{app_type}}&amp;lines={{ lines }}"> {{ file_path }}</a></div>
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<!-- ===========================end behaviour analysis ================================== -->
+{% endif %}
+{% if virus_total %}
+<section id="virus_total" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield-alert" size=18 %} VirusTotal scan</h2></div>
+  <div class="card-body">
+    {% if virus_total.items|length < 9 %} {% comment %} Basic check to determine if the response is a msg or a result {% endcomment %}
+      <p class="text-small text-text-secondary"><strong class="text-text-primary">{{ virus_total.verbose_msg }}</strong></p>
+    {% else %}
+      <p class="text-small text-text-secondary flex flex-wrap items-center gap-3"><strong class="text-text-primary">{{ virus_total.positives }} / {{ virus_total.total }} AVs found this file Malicious!</strong> <a class="text-text-brand hover:underline inline-flex items-center gap-1" href="{{ virus_total.permalink }}" target="_blank" rel="noopener">{% icon "external-link" size=14 %} Full Report</a></p>
+    {% endif %}
+  </div>
+  {% if virus_total.items|length < 9 %}
+  {% else %}
+    {% if virus_total.positives > 0 %}
+      <div class="overflow-x-auto">
+        <table id="table_vt" class="w-full text-small">
+          <thead>
+            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+              <th class="text-left px-5 py-2.5 font-medium">AV</th>
+              <th class="text-left px-5 py-2.5 font-medium">Detection</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for av_name,av_result in virus_total.scans.items %}
+              {% if av_result.detected == True %}
+                <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+                  <td class="px-5 py-3 text-text-primary">{{ av_name }}</td>
+                  <td class="px-5 py-3"><span class="badge badge-critical">{{ av_result.result }}</span></td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}{% comment %} if results.positive > 0 {% endcomment %}
+  {% endif %}{% comment %} if this is the upload msg or a result {% endcomment %}
+</section>
+<!-- ===========================end virus total ================================== -->
+{% endif %}
+<section id="malware_permissions" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield-alert" size=18 %} Abused permissions</h2></div>
+  <div class="card-body">
+    {% if malware_permissions %}
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <strong class="text-text-primary">Top Malware Permissions</strong>
+            <span class="text-small text-text-secondary"><b class="text-text-primary">{{ malware_permissions.top_malware_permissions | length}}</b>/{{malware_permissions.total_malware_permissions}}</span>
+          </div>
+          <div class="h-2 rounded-full bg-surface-2 overflow-hidden">
+            <div class="h-full bg-severity-critical" style="width: {% widthratio malware_permissions.top_malware_permissions|length malware_permissions.total_malware_permissions 100 %}%;" aria-valuemin="0" aria-valuenow="{{ malware_permissions.top_malware_permissions | length}}" aria-valuemax="{{malware_permissions.total_malware_permissions}}"></div>
+          </div>
+          <p class="text-small text-text-secondary mt-2 break-words">{{ malware_permissions.top_malware_permissions | join:", "}}</p>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <strong class="text-text-primary">Other Common Permissions</strong>
+            <span class="text-small text-text-secondary"><b class="text-text-primary">{{ malware_permissions.other_abused_permissions | length}}</b>/{{ malware_permissions.total_other_permissions}}</span>
+          </div>
+          <div class="h-2 rounded-full bg-surface-2 overflow-hidden">
+            <div class="h-full bg-severity-medium" style="width: {% widthratio malware_permissions.other_abused_permissions|length malware_permissions.total_other_permissions 100 %}%;" aria-valuemin="0" aria-valuenow="{{ malware_permissions.other_abused_permissions | length}}" aria-valuemax="{{ malware_permissions.total_other_permissions}}"></div>
+          </div>
+          <p class="text-small text-text-secondary mt-2 break-words">{{ malware_permissions.other_abused_permissions | join:", "}}</p>
+        </div>
+      </div>
+      <hr class="my-4 border-border-subtle">
+      <p class="text-small text-text-secondary">
+        <strong class="text-text-primary">Malware Permissions</strong> are the top permissions that are widely abused by known malware.
+        <br/>
+        <strong class="text-text-primary">Other Common Permissions</strong> are permissions that are commonly abused by known malware.
+      </p>
+    {% endif %}
+  </div>
+</section>
+ <!-- ===========================end malware permissions  ================================== -->
+<style>
+  #chartdiv {
+  width: 100%;
+  height: 500px;
+  overflow: hidden;
+}
+</style>
+<section id="serverlocations" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "activity" size=18 %} Server locations</h2></div>
+  <div class="card-body">
+    <div id="chartdiv"></div>
+  </div>
+  {% if domains %}
+    <div class="card-body pt-0">
+      <p class="text-small text-text-secondary mb-3">This app may communicate with the following OFAC sanctioned list of countries.</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="table_ofac" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Domain</th>
+            <th class="text-left px-5 py-2.5 font-medium">Country/Region</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for domain, details in domains.items %}
+          {% if details|key:"ofac" == True %}
+            <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+              <td class="px-5 py-3 font-mono text-mono text-text-primary break-all">{{domain}}</td>
+              <td class="px-5 py-3 text-text-secondary space-y-0.5">
+                <div><strong class="text-text-primary">IP: </strong>{{details|key:"geolocation"|key:"ip"}}</div>
+                <div><strong class="text-text-primary">Country: </strong>{{details|key:"geolocation"|key:"country_long"}}</div>
+                <div><strong class="text-text-primary">Region: </strong>{{details|key:"geolocation"|key:"region"}}</div>
+                <div><strong class="text-text-primary">City: </strong>{{details|key:"geolocation"|key:"city"}}</div>
+              </td>
+            </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+
+ <!-- ===========================end server locations ================================== -->
+<section id="malware_check" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "search" size=18 %} Domain malware check</h2></div>
+  <div class="overflow-x-auto">
+    {% if domains %}
+    <table id="table_malware" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Domain</th>
+          <th class="text-left px-5 py-2.5 font-medium">Status</th>
+          <th class="text-left px-5 py-2.5 font-medium">Geolocation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for domain, details in domains.items %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top"><td class="px-5 py-3 font-mono text-mono text-text-primary break-all">{{domain}}</td><td class="px-5 py-3">
+            {% if details|key:"bad" == "yes" %}
+              <span class="badge badge-critical">malware</span><br/>
+              <pre class="pre-finding text-text-secondary mt-2">
+              <strong>URL: </strong>{{details|key:"domain_or_url"}}
+              <strong>IP: </strong><span class="badge badge-critical">{{details|key:"ip"}}</span>
+              <strong>Description: </strong>{{details|key:"desc"}}
+              </pre>
+            {% else %}
+              <span class="badge badge-passed">ok</span><br/>
+            {% endif %}
+            </td>
+            <td class="px-5 py-3 text-text-secondary space-y-0.5">
+              {% if details|key:"geolocation" %}
+                <div><strong class="text-text-primary">IP: </strong>{{details|key:"geolocation"|key:"ip"}}</div>
+                <div><strong class="text-text-primary">Country: </strong>{{details|key:"geolocation"|key:"country_long"}}</div>
+                <div><strong class="text-text-primary">Region: </strong>{{details|key:"geolocation"|key:"region"}}</div>
+                <div><strong class="text-text-primary">City: </strong>{{details|key:"geolocation"|key:"city"}}</div>
+                <div><strong class="text-text-primary">Latitude: </strong>{{details|key:"geolocation"|key:"latitude"}}</div>
+                <div><strong class="text-text-primary">Longitude: </strong>{{details|key:"geolocation"|key:"longitude"}}</div>
+                <div><strong class="text-text-primary">View: </strong><a class="text-text-brand hover:underline" target="_blank" href="http://maps.google.com/maps?q={{details|key:"geolocation"|key:"latitude"}},{{details|key:"geolocation"|key:"longitude"}}">Google Map</a></div>
+              {% else %}
+                No Geolocation information available.
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</section>
+ <!-- ===========================end domain malware check ================================== -->
+<section id="urls" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "external-link" size=18 %} URLs</h2></div>
+  <div class="overflow-x-auto">
+    {% if urls %}
+    <table id="table_urls" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">URL</th>
+          <th class="text-left px-5 py-2.5 font-medium">File</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for urldict in urls %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 font-mono text-mono text-text-secondary break-all">
+              {% for u in urldict|key:"urls" %}
+                {{ u }} <br/>
+              {% endfor %}
+            </td>
+            <td class="px-5 py-3">
+              <a class="text-small text-text-brand hover:underline break-all" href="{% url "view_source" %}?file={{urldict|key:"path"}}&amp;md5={{ md5}}&amp;type={{app_type}}">{{urldict|key:"path"}}</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</section>
+ <!-- ===========================end urls ================================== -->
+<section id="emails" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Emails</h2></div>
+  <div class="overflow-x-auto">
+    {% if emails %}
+    <table id="table_emails" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Email</th>
+          <th class="text-left px-5 py-2.5 font-medium">File</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for email_dict in emails %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 font-mono text-mono text-text-secondary break-all">
+              {% for e in email_dict|key:"emails" %}
+                {{ e }} <br/>
+              {% endfor %}
+            </td>
+            <td class="px-5 py-3">
+              <a class="text-small text-text-brand hover:underline break-all" href="{% url "view_source" %}?file={{email_dict|key:"path"}}&amp;md5={{ md5}}&amp;type={{app_type}}">{{email_dict|key:"path"}}</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</section>
+ <!-- ===========================end emails ================================== -->
+{% if app_type not in 'so' %}
+<section id="trackers" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "eye" size=18 %} Trackers</h2></div>
+  <div class="overflow-x-auto">
+    {% if trackers %}
+    <table id="table_trackers" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Tracker name</th>
+          <th class="text-left px-5 py-2.5 font-medium">Categories</th>
+          <th class="text-left px-5 py-2.5 font-medium">URL</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for trk in trackers|key:"trackers" %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast align-top">
+            <td class="px-5 py-3 text-text-primary">{{trk.name}}</td>
+            <td class="px-5 py-3 text-text-secondary">{{trk.categories}}</td>
+            <td class="px-5 py-3"><a class="text-small text-text-brand hover:underline break-all" target="_blank" href="{{trk.url}}" rel="noopener noreferrer">{{trk.url}}</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</section>
+ <!-- ===========================end trackers ================================== -->
+ {% endif %}
+<section id="secrets" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "key" size=18 %} Possible hardcoded secrets</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% include 'base/list.html' with list=secrets type="secrets" limit=100 %}
+  </div>
+</section>
+  <!-- ===========================end secrets ================================== -->
+<section id="strings" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Strings</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% if app_type not in 'so' %}
+      <p class="text-text-primary font-medium mb-2">From APK Resource</p>
+      {% include 'base/list.html' with list=strings.strings_apk_res type="strings" limit=100 %}
+      <p class="text-text-primary font-medium mt-4 mb-2">From Code</p>
+      {% include 'base/list.html' with list=strings.strings_code type="strings" limit=100 %}
+    {% endif %}
+    <p class="text-text-primary font-medium mt-4 mb-2">From Shared Objects</p>
+    {% for key, val in strings.items %}
+      {% if key == 'strings_so' %}
+        {% for ls in val %}
+          {% for k,v in ls.items %}
+          <p class="mt-3 mb-1"><strong><i class="text-text-primary">{{ k }}</i></strong></p>
+          <div>
+            {% include 'base/list.html' with list=v type="strings" limit=5 %}
+          </div>
+          {% endfor %}
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+ <!-- ===========================end strings ================================== -->
+ {% if app_type in 'so' %}
+<section id="symbols" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Symbols</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% include 'base/list.html' with list=file_analysis type="symbols" limit=50 %}
+  </div>
+</section>
+ <!-- ===========================end symbols (only for shared object) ================================== -->
+ {% endif %}
+ {% if app_type not in 'so' %}
+<section id="activities" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "layers" size=18 %} Activities</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% include 'base/list_href.html' with list=activities type="activities" limit=50 %}
+  </div>
+</section>
+ <!-- ===========================end activities ================================== -->
+<section id="services" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "settings" size=18 %} Services</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% include 'base/list_href.html' with list=services type="services" limit=50 %}
+  </div>
+</section>
+ <!-- ===========================end services ================================== -->
+<section id="receivers" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "bell" size=18 %} Receivers</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% include 'base/list_href.html' with list=receivers type="receivers" limit=50 %}
+  </div>
+</section>
+ <!-- ===========================end receivers ================================== -->
+<section id="providers" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Providers</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% include 'base/list_href.html' with list=providers type="providers" limit=50 %}
+  </div>
+</section>
+ <!-- ===========================end providers ================================== -->
+<section id="libraries" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "package" size=18 %} Libraries</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% include 'base/list.html' with list=libraries type="libraries" limit=100 %}
+  </div>
+</section>
+ <!-- ===========================end libraries ================================== -->
+<section id="sbom" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "package" size=18 %} SBOM</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% if sbom %}
+      {% include 'base/list.html' with list=sbom.sbom_versioned type="Versioned Packages" limit=100 %}
+      {% include 'base/list.html' with list=sbom.sbom_packages type="Packages" limit=100 %}
+    {% endif %}
+  </div>
+</section>
+  <!-- ===========================end sbom ================================== -->
+<section id="files" class="card mb-6 scroll-mt-24" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Files</h2></div>
+  <div class="card-body mi-list text-small text-text-secondary">
+    {% include 'base/list.html' with list=files type="files" limit=200 %}
+  </div>
+</section>
+ <!-- ===========================end files ================================== -->
+ {% endif %}
+<!-- end of contents -->
+
+{# ===========================  Suppression rules modal (Alpine) ================================== #}
+<div x-show="modal === 'sup_list'" x-cloak class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" @keydown.escape.window="modal = ''">
+  <div class="fixed inset-0 bg-black/50" @click="modal = ''"></div>
+  <div class="relative card w-full max-w-4xl my-12" x-transition>
+    <div class="card-header flex items-center justify-between">
+      <h2 class="text-h3">Suppression rules</h2>
+      <button type="button" class="btn btn-ghost btn-sm" @click="modal = ''" aria-label="Close">{% icon "x" size=16 %}</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="sup_table" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Suppression type</th>
+            <th class="text-left px-5 py-2.5 font-medium">By rule ID</th>
+            <th class="text-left px-5 py-2.5 font-medium">By files</th>
+          </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>{# end x-data modal wrapper #}
+{% endblock %}
+<!--end new UI-->
+{% block extra_js %}
+<!-- DataTables -->
+<script src="{% static "datatables/js/pdfmake.min.js" %}"></script>
+<script src="{% static "datatables/js/vfs_fonts.js" %}"></script>
+<script src="{% static "datatables/js/datatables.combined.min.js" %}"></script>
+<script src="{% static "others/js/datatables_init.js" %}"></script>
+<script src="{% static "amcharts/core.js" %}"></script>
+<script src="{% static "amcharts/maps.js" %}"></script>
+<script src="{% static "amcharts/worldIndiaLow.js" %}"></script>
+<script src="{% static "amcharts/animated.js" %}"></script>
+<script>
+  var list_suppressions_url = '{% url 'list_suppressions' %}';
+  var suppress_by_files_url = '{% url 'suppress_by_files' %}';
+  var suppress_by_rule_url = '{% url 'suppress_by_rule' %}';
+  var delete_suppression_url = '{% url 'delete_suppression' %}';
+</script>
+<!-- SweetAlert2 — live dependency of suppression.js (Swal.fire) -->
+<script src="{% static 'adminlte/plugins/sweetalert2/sweetalert2.min.js' %}"></script>
+<script src="{% static "others/js/suppression.js" %}"></script>
+<style>
+  .left-col {
+    float: left;
+    width: 25%;
+}
+ 
+.center-col {
+    float: left;
+    width: 75%;
+}
+ 
+.right-col {
+    float: left;
+    width: 25%;
+}
+
+</style>
+<script>
+
+  // Remove rescan parameter
+  window.history.replaceState({}, '', window.location.pathname);
+
+  // Globals
+  const csrf = '{{ csrf_token }}'
+  const pkg = '{{ package_name }}'
+  const hash = '{{md5}}'
+
+</script>
+
+
+<script>
+// Themes begin
+am4core.useTheme(am4themes_animated);
+// Themes end
+
+// Create map instance
+var chart = am4core.create("chartdiv", am4maps.MapChart);
+
+// Set map definition
+chart.geodata = am4geodata_worldIndiaLow;
+
+// Set projection
+chart.projection = new am4maps.projections.Miller();
+
+// Create map polygon series
+var polygonSeries = chart.series.push(new am4maps.MapPolygonSeries());
+
+// Exclude Antartica
+polygonSeries.exclude = ["AQ"];
+
+// Make map load polygon (like country names) data from GeoJSON
+polygonSeries.useGeodata = true;
+
+// Configure series
+var polygonTemplate = polygonSeries.mapPolygons.template;
+polygonTemplate.tooltipText = "{name}";
+polygonTemplate.polygon.fillOpacity = 0.6;
+
+// Create hover state and set alternative fill color
+var hs = polygonTemplate.states.create("hover");
+hs.properties.fill = chart.colors.getIndex(0);
+
+// Add image series
+var imageSeries = chart.series.push(new am4maps.MapImageSeries());
+imageSeries.mapImages.template.propertyFields.longitude = "longitude";
+imageSeries.mapImages.template.propertyFields.latitude = "latitude";
+imageSeries.mapImages.template.tooltipText = "{title}";
+imageSeries.mapImages.template.propertyFields.url = "url";
+
+var circle = imageSeries.mapImages.template.createChild(am4core.Circle);
+circle.radius = 3;
+circle.propertyFields.fill = "color";
+
+var circle2 = imageSeries.mapImages.template.createChild(am4core.Circle);
+circle2.radius = 3;
+circle2.propertyFields.fill = "color";
+
+
+circle2.events.on("inited", function(event){
+  animateBullet(event.target);
+})
+
+function animateBullet(circle) {
+    var animation = circle.animate([{ property: "scale", from: 1, to: 5 }, { property: "opacity", from: 1, to: 0 }], 1000, am4core.ease.circleOut);
+    animation.events.on("animationended", function(event){
+      animateBullet(event.target.object);
+    })
+}
+
+var colorSet = new am4core.ColorSet();
+imageSeries.data = [
+{% if domains %}
+  {% for domain, details in domains.items %}
+    {% if details|key:"geolocation" %}
+    {
+      'title': '{{details|key:"geolocation"|key:"country_long"}}/{{details|key:"geolocation"|key:"region"}}',
+      'latitude': {{details|key:"geolocation"|key:"latitude"}},
+      'longitude': {{details|key:"geolocation"|key:"longitude"}},
+      'color':colorSet.next()
+    },
+    {% endif %}
+  {% endfor %}
+{% endif %}
+];
+</script>
+
+{% endblock %}

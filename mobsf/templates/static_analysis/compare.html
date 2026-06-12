@@ -1,0 +1,236 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}Compare — {{ first_app.name_ver }} vs {{ second_app.name_ver }}{% endblock %}
+
+{% block content %}
+<header class="mb-6">
+  <p class="text-tiny uppercase text-text-tertiary">Static · Compare</p>
+  <h1 class="text-h2 mt-1">App diff</h1>
+  <p class="text-text-secondary mt-1">
+    Side-by-side comparison of <strong>{{ first_app.name_ver }}</strong> and <strong>{{ second_app.name_ver }}</strong>.
+  </p>
+</header>
+
+{# ─── App pair header ─── #}
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <div class="card" data-reveal>
+    <div class="card-body flex items-center gap-4">
+      <img src="{% if first_app.icon_path %}/download/{{ first_app.icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+           alt="" class="w-16 h-16 rounded-lg bg-surface-2 object-contain flex-shrink-0" />
+      <div class="min-w-0 flex-1">
+        <p class="text-tiny uppercase text-text-tertiary">App A</p>
+        <p class="text-h4 truncate">{{ first_app.name_ver }}</p>
+        <p class="text-tiny text-text-tertiary truncate font-mono">{{ first_app.md5 }}</p>
+        <p class="text-tiny text-text-secondary mt-1">{{ first_app.size }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="card" data-reveal>
+    <div class="card-body flex items-center gap-4">
+      <img src="{% if second_app.icon_path %}/download/{{ second_app.icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+           alt="" class="w-16 h-16 rounded-lg bg-surface-2 object-contain flex-shrink-0" />
+      <div class="min-w-0 flex-1">
+        <p class="text-tiny uppercase text-text-tertiary">App B</p>
+        <p class="text-h4 truncate">{{ second_app.name_ver }}</p>
+        <p class="text-tiny text-text-tertiary truncate font-mono">{{ second_app.md5 }}</p>
+        <p class="text-tiny text-text-secondary mt-1">{{ second_app.size }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─── App information table ─── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "info" size=18 %} App information</h2></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium w-32"></th>
+          <th class="text-left px-5 py-2.5 font-medium">{{ first_app.name_ver }}</th>
+          <th class="text-left px-5 py-2.5 font-medium">{{ second_app.name_ver }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+          <td class="px-5 py-2.5"><span class="badge badge-low">File name</span></td>
+          <td class="px-5 py-2.5 font-mono text-mono">{{ first_app.file_name }}</td>
+          <td class="px-5 py-2.5 font-mono text-mono">{{ second_app.file_name }}</td>
+        </tr>
+        <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+          <td class="px-5 py-2.5"><span class="badge badge-low">MD5</span></td>
+          <td class="px-5 py-2.5 font-mono text-mono">{{ first_app.md5 }}</td>
+          <td class="px-5 py-2.5 font-mono text-mono">{{ second_app.md5 }}</td>
+        </tr>
+        <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+          <td class="px-5 py-2.5"><span class="badge badge-low">Size</span></td>
+          <td class="px-5 py-2.5">{{ first_app.size }}</td>
+          <td class="px-5 py-2.5">{{ second_app.size }}</td>
+        </tr>
+        <tr class="hover:bg-surface-2/40">
+          <td class="px-5 py-2.5"><span class="badge badge-low">Certificate</span></td>
+          <td class="px-5 py-2.5 text-text-secondary">{{ first_app.cert_subject|default:"—" }}</td>
+          <td class="px-5 py-2.5 text-text-secondary">{{ second_app.cert_subject|default:"—" }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ─── Component counts ─── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "package" size=18 %} Components</h2></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium"></th>
+          <th class="text-right px-5 py-2.5 font-medium">Activities</th>
+          <th class="text-right px-5 py-2.5 font-medium">Exp. act.</th>
+          <th class="text-right px-5 py-2.5 font-medium">Services</th>
+          <th class="text-right px-5 py-2.5 font-medium">Exp. svc.</th>
+          <th class="text-right px-5 py-2.5 font-medium">Receivers</th>
+          <th class="text-right px-5 py-2.5 font-medium">Exp. recv.</th>
+          <th class="text-right px-5 py-2.5 font-medium">Providers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b border-border-subtle">
+          <td class="px-5 py-2.5 font-medium text-text-primary">{{ first_app.name_ver }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ first_app.activities|length }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ first_app.exported_count.exported_activities }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ first_app.services|length }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ first_app.exported_count.exported_services }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ first_app.receivers|length }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ first_app.exported_count.exported_receivers }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ first_app.providers|length }}</td>
+        </tr>
+        <tr>
+          <td class="px-5 py-2.5 font-medium text-text-primary">{{ second_app.name_ver }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ second_app.activities|length }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ second_app.exported_count.exported_activities }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ second_app.services|length }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ second_app.exported_count.exported_services }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ second_app.receivers|length }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ second_app.exported_count.exported_receivers }}</td>
+          <td class="px-5 py-2.5 text-right tabular">{{ second_app.providers|length }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ─── Permissions diff ─── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2">{% icon "shield" size=18 %} Permissions</h2>
+    <span class="text-tiny text-text-tertiary">
+      {{ permissions.common|length }} common · {{ permissions.only_first|length }} only A · {{ permissions.only_second|length }} only B
+    </span>
+  </div>
+  <div class="card-body space-y-6">
+    {% if permissions.common %}
+      <div>
+        <h3 class="text-tiny uppercase text-text-secondary mb-2">Common</h3>
+        <div class="overflow-x-auto rounded-md border border-border-subtle">
+          <table class="w-full text-small">
+            <thead>
+              <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                <th class="text-left px-4 py-2 font-medium">Permission</th>
+                <th class="text-left px-4 py-2 font-medium">Status</th>
+                <th class="text-left px-4 py-2 font-medium">Info</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for perm, desc in permissions.common %}
+                <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+                  <td class="px-4 py-2 font-mono text-mono">{{ perm }}</td>
+                  <td class="px-4 py-2">
+                    {% if desc.status == 'dangerous' %}<span class="badge badge-critical">Dangerous</span>
+                    {% elif desc.status == 'normal' %}<span class="badge badge-low">Normal</span>
+                    {% elif desc.status == 'signatureOrSystem' %}<span class="badge badge-medium">SystemOrSig</span>
+                    {% elif desc.status == 'signature' %}<span class="badge badge-passed">Signature</span>
+                    {% else %}<span class="badge badge-unknown">Unknown</span>{% endif %}
+                  </td>
+                  <td class="px-4 py-2 text-text-secondary">{{ desc.info }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if permissions.only_first %}
+      <div>
+        <h3 class="text-tiny uppercase text-severity-low dark:text-severity-low-dark mb-2">Only in {{ first_app.name_ver }}</h3>
+        <div class="overflow-x-auto rounded-md border border-border-subtle">
+          <table class="w-full text-small">
+            <thead>
+              <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                <th class="text-left px-4 py-2 font-medium">Permission</th>
+                <th class="text-left px-4 py-2 font-medium">Status</th>
+                <th class="text-left px-4 py-2 font-medium">Info</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for perm, desc in permissions.only_first %}
+                <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+                  <td class="px-4 py-2 font-mono text-mono">{{ perm }}</td>
+                  <td class="px-4 py-2">
+                    {% if desc.status == 'dangerous' %}<span class="badge badge-critical">Dangerous</span>
+                    {% elif desc.status == 'normal' %}<span class="badge badge-low">Normal</span>
+                    {% elif desc.status == 'signatureOrSystem' %}<span class="badge badge-medium">SystemOrSig</span>
+                    {% elif desc.status == 'signature' %}<span class="badge badge-passed">Signature</span>
+                    {% else %}<span class="badge badge-unknown">Unknown</span>{% endif %}
+                  </td>
+                  <td class="px-4 py-2 text-text-secondary">{{ desc.info }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if permissions.only_second %}
+      <div>
+        <h3 class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark mb-2">Only in {{ second_app.name_ver }}</h3>
+        <div class="overflow-x-auto rounded-md border border-border-subtle">
+          <table class="w-full text-small">
+            <thead>
+              <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                <th class="text-left px-4 py-2 font-medium">Permission</th>
+                <th class="text-left px-4 py-2 font-medium">Status</th>
+                <th class="text-left px-4 py-2 font-medium">Info</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for perm, desc in permissions.only_second %}
+                <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+                  <td class="px-4 py-2 font-mono text-mono">{{ perm }}</td>
+                  <td class="px-4 py-2">
+                    {% if desc.status == 'dangerous' %}<span class="badge badge-critical">Dangerous</span>
+                    {% elif desc.status == 'normal' %}<span class="badge badge-low">Normal</span>
+                    {% elif desc.status == 'signatureOrSystem' %}<span class="badge badge-medium">SystemOrSig</span>
+                    {% elif desc.status == 'signature' %}<span class="badge badge-passed">Signature</span>
+                    {% else %}<span class="badge badge-unknown">Unknown</span>{% endif %}
+                  </td>
+                  <td class="px-4 py-2 text-text-secondary">{{ desc.info }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{# ─── URL / API / Browsable / APKID three-way diffs ─── #}
+{% include 'static_analysis/_compare_section.html' with title="Hardcoded URLs"      icon="external-link" common=urls.common                 only_first=urls.only_first                 only_second=urls.only_second                 first_label=first_app.name_ver second_label=second_app.name_ver %}
+{% include 'static_analysis/_compare_section.html' with title="Android API calls"   icon="zap"           common=android_api.common          only_first=android_api.only_first          only_second=android_api.only_second          first_label=first_app.name_ver second_label=second_app.name_ver %}
+{% include 'static_analysis/_compare_section.html' with title="Browsable activities" icon="layers"        common=common_browsable_activities only_first=browsable_activities.only_first only_second=browsable_activities.only_second first_label=first_app.name_ver second_label=second_app.name_ver %}
+{% include 'static_analysis/_compare_section.html' with title="APKiD detections"    icon="search"        common=apkid.common                only_first=apkid.only_first                only_second=apkid.only_second                first_label=first_app.name_ver second_label=second_app.name_ver %}
+{% endblock %}

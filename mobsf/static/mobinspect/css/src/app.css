@@ -1,0 +1,239 @@
+/*
+ * MobInspect — main stylesheet
+ *
+ * Compiled output: mobsf/static/mobinspect/css/dist/app.css
+ * Build:          ./scripts/tailwind-build.sh
+ * Watch:          ./scripts/tailwind-watch.sh
+ *
+ * Design tokens live in tailwind.config.js.
+ * Theme variables are defined below in @layer base.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────── @layer base */
+@layer base {
+  /* Theme tokens. Toggled by [data-theme] on <html>.
+   * Colors expressed as "R G B" so Tailwind can apply alpha via <alpha-value>.
+   * RGB triplets — see docs/design/tokens.json for the canonical hex list. */
+
+  :root,
+  [data-theme='light'] {
+    --surface-0: 255 255 255;
+    --surface-1: 248 250 252;
+    --surface-2: 241 245 249;
+    --surface-3: 226 232 240;
+    --surface-4: 203 213 225;
+
+    --border-subtle:  226 232 240;
+    --border-default: 203 213 225;
+    --border-strong:  148 163 184;
+
+    --text-primary:   15  23  42;
+    --text-secondary: 71  85  105;
+    --text-tertiary: 148 163 184;
+    --text-inverse:  248 250 252;
+    --text-brand:    29  78 216;
+  }
+
+  [data-theme='dark'] {
+    --surface-0:  11  15  26;
+    --surface-1:  17  24  39;
+    --surface-2:  31  41  55;
+    --surface-3:  55  65  81;
+    --surface-4:  75  85  99;
+
+    --border-subtle:  31  41  55;
+    --border-default: 55  65  81;
+    --border-strong: 107 114 128;
+
+    --text-primary:   241 245 249;
+    --text-secondary: 148 163 184;
+    --text-tertiary:  100 116 139;
+    --text-inverse:    15  23  42;
+    --text-brand:      59 130 246;
+  }
+
+  /* Resets */
+  html {
+    background-color: rgb(var(--surface-0));
+    color: rgb(var(--text-primary));
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply font-sans text-body;
+    background-color: rgb(var(--surface-0));
+    color: rgb(var(--text-primary));
+  }
+
+  /* Tabular figures in tables — alignment matters for security data. */
+  table, .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Visible focus ring on every interactive element. */
+  *:focus-visible {
+    outline: 2px solid theme('colors.mobinspect.500');
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Honor reduced motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 80ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 80ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Scrollbars — subtle in dark, default in light. */
+  [data-theme='dark'] {
+    color-scheme: dark;
+  }
+  [data-theme='light'] {
+    color-scheme: light;
+  }
+
+  /* Self-hosted fonts.
+   * Files live at mobsf/static/mobinspect/fonts/.
+   * If you replace them, regenerate font-display: swap declarations. */
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('../../fonts/Inter-Variable.woff2') format('woff2-variations');
+  }
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url('../../fonts/JetBrainsMono-Variable.woff2') format('woff2-variations');
+  }
+}
+
+/* ────────────────────────────────────────────── @layer components */
+@layer components {
+  /* Buttons — variants per docs/design/component-inventory.md */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md
+           font-medium transition-colors duration-fast ease-out
+           disabled:pointer-events-none disabled:opacity-50
+           focus-visible:ring-2 focus-visible:ring-mobinspect-500 focus-visible:ring-offset-2;
+    --tw-ring-offset-color: rgb(var(--surface-0));
+  }
+  .btn-sm { @apply h-8 px-3 text-small; }
+  .btn-md { @apply h-9 px-4 text-body; }
+  .btn-lg { @apply h-11 px-5 text-body; }
+
+  .btn-primary {
+    @apply bg-mobinspect-500 text-white hover:bg-mobinspect-600 active:bg-mobinspect-700;
+  }
+  .btn-secondary {
+    @apply bg-surface-2 text-text-primary border border-border
+           hover:bg-surface-3;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-text-primary hover:bg-surface-2;
+  }
+  .btn-danger {
+    @apply bg-system-error text-white hover:opacity-90;
+  }
+  .btn-link {
+    @apply bg-transparent text-text-brand hover:underline px-0;
+  }
+
+  /* Inputs */
+  .input {
+    @apply h-9 w-full rounded-md border border-border bg-surface-1
+           px-3 text-body text-text-primary placeholder:text-text-tertiary
+           transition-colors duration-fast
+           focus:border-mobinspect-500 focus:outline-none focus:ring-2 focus:ring-mobinspect-500/30
+           disabled:opacity-50;
+  }
+  .label {
+    @apply block text-small font-medium text-text-secondary mb-1.5;
+  }
+
+  /* Cards */
+  .card {
+    @apply rounded-lg border border-border-subtle bg-surface-1 shadow-elevation-1
+           transition-shadow duration-base;
+  }
+  .card-hover {
+    @apply hover:shadow-elevation-2 hover:-translate-y-px transition-all duration-fast ease-out;
+  }
+  .card-header {
+    @apply flex items-center justify-between gap-4 px-5 py-4 border-b border-border-subtle;
+  }
+  .card-body {
+    @apply px-5 py-4;
+  }
+  .card-footer {
+    @apply px-5 py-3 border-t border-border-subtle bg-surface-2/50;
+  }
+
+  /* Severity badges — semantic only */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5
+           text-tiny font-medium uppercase;
+  }
+  .badge-critical {
+    @apply bg-severity-critical/10 text-severity-critical
+           dark:bg-severity-critical-dark/15 dark:text-severity-critical-dark;
+  }
+  .badge-high {
+    @apply bg-severity-high/10 text-severity-high
+           dark:bg-severity-high-dark/15 dark:text-severity-high-dark;
+  }
+  .badge-medium {
+    @apply bg-severity-medium/10 text-severity-medium
+           dark:bg-severity-medium-dark/15 dark:text-severity-medium-dark;
+  }
+  .badge-low {
+    @apply bg-severity-low/10 text-severity-low
+           dark:bg-severity-low-dark/15 dark:text-severity-low-dark;
+  }
+  .badge-passed {
+    @apply bg-severity-passed/10 text-severity-passed
+           dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark;
+  }
+  .badge-unknown {
+    @apply bg-severity-unknown/15 text-severity-unknown
+           dark:bg-severity-unknown-dark/15 dark:text-severity-unknown-dark;
+  }
+
+  /* Code block + inline kbd */
+  .code {
+    @apply font-mono text-mono bg-surface-2 rounded px-1.5 py-0.5;
+  }
+  .kbd {
+    @apply inline-flex items-center justify-center min-w-[20px] h-5 px-1.5
+           rounded border border-border bg-surface-2
+           font-mono text-tiny text-text-secondary;
+  }
+
+  /* Skeleton shimmer */
+  .skeleton {
+    @apply bg-gradient-to-r from-surface-2 via-surface-3 to-surface-2
+           bg-[length:200%_100%] animate-shimmer rounded;
+  }
+}
+
+/* ───────────────────────────────────────────────────── @layer utilities */
+@layer utilities {
+  /* Dot separator: <span>1</span><span class="dot-sep"></span><span>2</span> */
+  .dot-sep::before {
+    content: '·';
+    @apply mx-1.5 text-text-tertiary;
+  }
+}

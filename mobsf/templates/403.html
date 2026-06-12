@@ -1,0 +1,25 @@
+{% extends "base/auth.html" %}
+{% load mi_icons %}
+{% block page_title %}Forbidden{% endblock %}
+
+{% block content %}
+<div class="text-center" data-reveal>
+  <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-system-error/15 text-system-error mb-4">
+    {% icon "shield-alert" size=28 %}
+  </div>
+  <h1 class="text-display">403</h1>
+  <p class="text-h3 mt-2">Forbidden</p>
+  <p class="text-text-secondary mt-2 max-w-sm mx-auto">
+    Your account doesn't have permission to access this page.
+    {% if request.user.is_authenticated %}Talk to an administrator if you believe this is an error.{% endif %}
+  </p>
+  <div class="mt-6 flex items-center justify-center gap-2">
+    <a href="/" class="btn btn-primary btn-md">{% icon "chevron-left" size=14 %} Back to home</a>
+    {% if request.user.is_authenticated %}
+      <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}<button class="btn btn-ghost btn-md">Sign out</button></form>
+    {% else %}
+      <a href="{% url 'login' %}" class="btn btn-ghost btn-md">Sign in</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

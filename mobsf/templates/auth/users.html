@@ -1,0 +1,156 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}{% load rbac %}
+
+{% block page_title %}Users{% endblock %}
+
+{% block content %}
+<header class="flex items-center justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-h1">Users</h1>
+    <p class="text-text-secondary mt-1">Members of this MobInspect instance and their assigned roles.</p>
+  </div>
+  {% can 'admin.user.create' %}
+    <a href="{% url 'create_user' %}" class="btn btn-primary btn-md">
+      {% icon "plus" size=14 %} Add user
+    </a>
+  {% endcan %}
+</header>
+
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">User</th>
+          <th class="text-left px-5 py-2.5 font-medium">Email</th>
+          <th class="text-left px-5 py-2.5 font-medium">Roles</th>
+          <th class="text-left px-5 py-2.5 font-medium">Status</th>
+          <th class="text-right px-5 py-2.5 font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+            <td class="px-5 py-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="w-8 h-8 rounded-full bg-mobinspect-500/15 text-mobinspect-500 flex items-center justify-center font-medium text-small flex-shrink-0">
+                  {{ u.username|slice:":1"|upper }}
+                </span>
+                <div class="min-w-0">
+                  <p class="font-medium text-text-primary truncate">{{ u.username }}</p>
+                </div>
+              </div>
+            </td>
+            <td class="px-5 py-3 text-text-secondary truncate max-w-xs">{{ u.email|default:"—" }}</td>
+            <td class="px-5 py-3">
+              <div class="flex flex-wrap gap-1">
+                {% for ra in u.role_assignments.all %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-tiny font-medium"
+                        style="background-color: {{ ra.role.color }}1A; color: {{ ra.role.color }};">
+                    {% icon ra.role.icon size=10 %} {{ ra.role.name }}
+                  </span>
+                {% empty %}
+                  {% if u.is_staff %}
+                    <span class="badge badge-critical">Admin (legacy)</span>
+                  {% else %}
+                    <span class="badge badge-unknown">No role</span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </td>
+            <td class="px-5 py-3">
+              {% if u.is_active %}
+                <span class="badge badge-passed">Active</span>
+              {% else %}
+                <span class="badge badge-unknown">Disabled</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-right">
+              <div class="inline-flex items-center gap-1">
+                {% can 'rbac.role.manage' %}
+                  <button
+                    type="button" class="btn btn-ghost btn-sm"
+                    title="Assign role"
+                    onclick="document.getElementById('assign-row-{{ u.id }}').classList.toggle('hidden')"
+                  >
+                    {% icon "key" size=14 %} Roles
+                  </button>
+                {% endcan %}
+                {% can 'admin.user.delete' %}
+                  {% if not u.is_staff %}
+                    <button
+                      type="button" data-username="{{ u.username }}"
+                      class="btn btn-ghost btn-sm text-system-error mi-delete-user"
+                      title="Delete"
+                    >
+                      {% icon "trash" size=14 %}
+                    </button>
+                  {% endif %}
+                {% endcan %}
+              </div>
+            </td>
+          </tr>
+          {% can 'rbac.role.manage' %}
+            <tr id="assign-row-{{ u.id }}" class="hidden bg-surface-2/30">
+              <td colspan="5" class="px-5 py-4">
+                <h4 class="text-tiny uppercase text-text-secondary mb-3">Manage roles for {{ u.username }}</h4>
+                <div class="flex flex-wrap gap-2">
+                  {% for r in all_roles %}
+                    {% with assigned=u.role_assignments.all|stringformat:"s" %}
+                      <form method="post" action="{% if r.id in u.role_ids %}{% url 'rbac:role_unassign' r.id u.id %}{% else %}{% url 'rbac:role_assign' r.id %}{% endif %}" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                        <input type="hidden" name="role_id" value="{{ r.id }}">
+                        <button
+                          type="submit"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-tiny font-medium border transition-colors duration-fast"
+                          style="{% if r.id in u.role_ids %}background-color: {{ r.color }}1A; color: {{ r.color }}; border-color: {{ r.color }}40;{% else %}border-color: rgb(var(--border-subtle)); color: rgb(var(--text-secondary));{% endif %}"
+                        >
+                          {% icon r.icon size=12 %}
+                          {{ r.name }}
+                          {% if r.id in u.role_ids %}
+                            {% icon "x" size=10 %}
+                          {% else %}
+                            {% icon "plus" size=10 %}
+                          {% endif %}
+                        </button>
+                      </form>
+                    {% endwith %}
+                  {% endfor %}
+                </div>
+              </td>
+            </tr>
+          {% endcan %}
+        {% empty %}
+          <tr><td colspan="5" class="px-5 py-12 text-center text-text-tertiary">No users.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('click', function (ev) {
+    const btn = ev.target.closest('.mi-delete-user');
+    if (!btn) return;
+    const username = btn.getAttribute('data-username');
+    if (!username) return;
+    if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
+
+    const csrf = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+    const token = csrf ? csrf.split('=')[1] : '';
+
+    const fd = new FormData();
+    fd.append('username', username);
+    fd.append('csrfmiddlewaretoken', token);
+
+    fetch('{% url "delete_user" %}', {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: { 'X-CSRFToken': token },
+    }).then(r => r.json()).then(j => {
+      if (j.deleted === 'yes') location.reload();
+      else alert('Delete failed.');
+    }).catch(() => alert('Delete failed.'));
+  });
+</script>
+{% endblock %}

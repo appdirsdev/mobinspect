@@ -1,0 +1,189 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}{% load rbac %}
+
+{% block page_title %}Home{% endblock %}
+
+{% block content %}
+<div class="space-y-8" data-reveal>
+
+  <header>
+    <h1 class="text-h1">Welcome back{% if request.user.is_authenticated %}, {{ request.user.username }}{% endif %}.</h1>
+    <p class="text-text-secondary mt-1">Drag a binary onto the upload zone, or pick a file to start.</p>
+  </header>
+
+  {# ─────────── Upload zone ─────────── #}
+  <section
+    x-data="upload()"
+    @dragover.prevent="dragging = true"
+    @dragleave.prevent="dragging = false"
+    @drop.prevent="onDrop($event)"
+  >
+    <form
+      id="upload_form"
+      method="post"
+      enctype="multipart/form-data"
+      class="card p-0"
+      :class="dragging ? 'border-mobinspect-500 ring-2 ring-mobinspect-500/30' : ''"
+    >
+      {% csrf_token %}
+      <label
+        for="uploadFile"
+        class="flex flex-col items-center justify-center text-center px-6 py-16 cursor-pointer rounded-lg transition-colors duration-fast"
+      >
+        <span class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-mobinspect-500/10 text-mobinspect-500 mb-4 transition-transform duration-fast" :class="dragging ? 'scale-110' : ''">
+          {% icon "upload-cloud" size=28 %}
+        </span>
+        <span class="text-h3" x-text="dragging ? 'Drop to upload' : 'Drag &amp; drop or click to upload'"></span>
+        <span class="text-small text-text-secondary mt-2">
+          APK · AAB · XAPK · IPA · APPX · ZIP source
+        </span>
+        <input type="file" id="uploadFile" name="file" class="sr-only" accept="{{ upload_accept }}" multiple
+               @change="onPick($event)" />
+        <span class="mt-6 inline-flex">
+          <span class="btn btn-primary btn-md" :class="uploading ? 'opacity-50 pointer-events-none' : ''">
+            <span x-show="!uploading">{% icon "upload" size=14 %} Choose file</span>
+            <span x-show="uploading" x-cloak>Uploading…</span>
+          </span>
+        </span>
+      </label>
+
+      <div x-show="status" x-cloak class="px-6 pb-6">
+        <div class="flex items-center gap-3 text-small">
+          <span class="w-full bg-surface-2 rounded-full h-1.5 overflow-hidden">
+            <span class="block h-full bg-mobinspect-500 transition-[width] duration-fast" :style="`width: ${progress}%`"></span>
+          </span>
+          <span class="text-text-secondary tabular" x-text="`${progress}%`"></span>
+        </div>
+        <p class="text-small text-text-secondary mt-2" x-text="status"></p>
+      </div>
+    </form>
+  </section>
+
+  {# ─────────── Quick actions ─────────── #}
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <a href="{% url 'recent' %}" class="card card-hover">
+      <div class="card-body flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-mobinspect-500/10 text-mobinspect-500 flex-shrink-0">
+          {% icon "layers" size=20 %}
+        </span>
+        <div class="min-w-0">
+          <h3 class="text-h4">Recent scans</h3>
+          <p class="text-small text-text-secondary mt-1">Browse your scan history.</p>
+        </div>
+      </div>
+    </a>
+    <a href="{% url 'dynamic' %}" class="card card-hover">
+      <div class="card-body flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark flex-shrink-0">
+          {% icon "smartphone" size=20 %}
+        </span>
+        <div class="min-w-0">
+          <h3 class="text-h4">Dynamic analyzer</h3>
+          <p class="text-small text-text-secondary mt-1">Run a runtime scan on a connected device.</p>
+        </div>
+      </div>
+    </a>
+    <a href="{% url 'api_docs' %}" class="card card-hover">
+      <div class="card-body flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
+          {% icon "file-text" size=20 %}
+        </span>
+        <div class="min-w-0">
+          <h3 class="text-h4">REST API</h3>
+          <p class="text-small text-text-secondary mt-1">Reference for CI/CD integrations.</p>
+        </div>
+      </div>
+    </a>
+  </section>
+
+  {# ─────────── Recent activity (real RecentScansDB rows; omitted when empty) ─────────── #}
+  {% if recent %}
+  <section class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3">Recent activity</h2>
+      <a href="{% url 'recent' %}" class="text-small text-text-brand hover:underline inline-flex items-center gap-1">View all {% icon "arrow-up-right" size=14 %}</a>
+    </div>
+    <ul class="divide-y divide-border-subtle">
+      {% for r in recent %}
+        <li>
+          <a href="/{{ r.ANALYZER }}/{{ r.MD5 }}/"
+             class="px-5 py-3 flex items-center gap-3 hover:bg-surface-2/40 transition-colors duration-fast">
+            <span class="w-8 h-8 rounded-md bg-surface-2 flex items-center justify-center text-text-tertiary flex-shrink-0">
+              {% icon "package" size=14 %}
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="text-small font-medium text-text-primary truncate">{{ r.APP_NAME|default:r.FILE_NAME|default:"Unnamed scan" }}</p>
+              <p class="text-tiny text-text-tertiary truncate font-mono">{% if r.PACKAGE_NAME %}{{ r.PACKAGE_NAME }} · {% endif %}{{ r.MD5|slice:":12" }}…</p>
+            </div>
+            {% if r.SCAN_TYPE %}
+              <span class="badge badge-unknown flex-shrink-0">{{ r.SCAN_TYPE }}</span>
+            {% endif %}
+            <span class="text-tiny text-text-tertiary tabular whitespace-nowrap flex-shrink-0">{{ r.TIMESTAMP|timesince }} ago</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+</div>
+
+<script>
+  // Direct XHR upload — same endpoint and response shape as upstream MobSF
+  // (POST /, returns JSON {status, hash, analyzer, [description]}). On
+  // success we redirect to the analyzer route for the new scan.
+  function upload() {
+    return {
+      dragging: false,
+      uploading: false,
+      progress: 0,
+      status: '',
+      onPick(ev) {
+        const files = ev.target.files;
+        if (files && files.length) this.send(files[0]);
+      },
+      onDrop(ev) {
+        this.dragging = false;
+        const files = ev.dataTransfer.files;
+        if (files && files.length) this.send(files[0]);
+      },
+      send(file) {
+        if (this.uploading) return;
+        this.uploading = true;
+        this.progress = 0;
+        this.status = 'Uploading ' + file.name + '…';
+
+        const fd = new FormData();
+        fd.append('file', file);
+        const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            this.progress = Math.round((e.loaded / e.total) * 100);
+          }
+        });
+        xhr.addEventListener('load', () => {
+          let res;
+          try { res = JSON.parse(xhr.responseText); }
+          catch (e) { this.status = 'Server returned invalid response.'; this.uploading = false; return; }
+          if (res.status === 'success' && res.hash && res.analyzer) {
+            this.status = 'Scan started — redirecting…';
+            window.location.href = '/' + res.analyzer + '/' + res.hash + '/';
+          } else {
+            this.status = res.description || 'Upload failed.';
+            this.uploading = false;
+          }
+        });
+        xhr.addEventListener('error', () => {
+          this.status = 'Network error during upload.';
+          this.uploading = false;
+        });
+        xhr.open('POST', '{% url "upload" %}', true);
+        xhr.setRequestHeader('X-CSRFToken', csrf);
+        xhr.send(fd);
+      },
+    };
+  }
+</script>
+{% endblock %}

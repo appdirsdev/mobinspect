@@ -1,0 +1,205 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}
+
+{% block content %}
+<header class="mb-6">
+  <a href="{% url 'rbac:roles_list' %}" class="text-small text-text-secondary hover:text-text-primary inline-flex items-center gap-1">
+    {% icon "chevron-left" size=14 %} All roles
+  </a>
+  <h1 class="text-h1 mt-2">{% if is_create %}New role{% else %}Edit role{% endif %}</h1>
+</header>
+
+{# Pass selected codenames to JS as a parseable JSON script tag #}
+{{ selected_codes|json_script:"initial_selected" }}
+
+<form method="post" x-data="roleForm()">
+  {% csrf_token %}
+  <input type="hidden" name="permission_codenames" :value="selected.join(',')">
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    {# ─── identity ─── #}
+    <section class="lg:col-span-1 space-y-4">
+      <div class="card">
+        <div class="card-header"><h2 class="text-h3">Identity</h2></div>
+        <div class="card-body space-y-4">
+
+          <div>
+            <label class="label" for="id_name">Name</label>
+            <input
+              id="id_name" name="name" maxlength="80" required
+              class="input"
+              value="{{ form.name.value|default:'' }}"
+              {% if role and role.is_system %}readonly title="System role name is locked"{% endif %}
+              x-model="name"
+            />
+            {% if role and role.is_system %}
+              <p class="text-tiny text-text-tertiary mt-1">System role name is locked.</p>
+            {% endif %}
+            {% for e in form.name.errors %}<p class="text-tiny text-system-error mt-1">{{ e }}</p>{% endfor %}
+          </div>
+
+          <div>
+            <label class="label" for="id_description">Description</label>
+            <textarea id="id_description" name="description" rows="3" class="input">{{ form.description.value|default:'' }}</textarea>
+          </div>
+
+          <div>
+            <label class="label" for="id_color">Color</label>
+            <div class="flex items-center gap-2">
+              <input
+                id="id_color" type="color"
+                value="{{ form.color.value|default:'#64748B' }}"
+                class="h-9 w-12 rounded-md border border-border bg-surface-1 cursor-pointer"
+                x-model="color"
+                @input="document.getElementById('id_color_text').value = $event.target.value"
+              />
+              <input
+                id="id_color_text" name="color"
+                value="{{ form.color.value|default:'#64748B' }}"
+                class="input flex-1 font-mono"
+                pattern="^#[0-9A-Fa-f]{6}$"
+                @input="if($event.target.checkValidity()) { color = $event.target.value; document.getElementById('id_color').value = color; }"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="label">Icon</label>
+            <div class="grid grid-cols-6 gap-1">
+              {% for ic in icon_options %}
+                <button
+                  type="button"
+                  class="aspect-square flex items-center justify-center rounded-md border transition-all duration-fast"
+                  :class="icon === '{{ ic }}'
+                    ? 'border-mobinspect-500 bg-mobinspect-500/10 text-mobinspect-500'
+                    : 'border-border-subtle text-text-secondary hover:bg-surface-2'"
+                  @click="icon = '{{ ic }}'; document.getElementById('id_icon').value = '{{ ic }}'"
+                  title="{{ ic }}"
+                >
+                  {% icon ic size=16 %}
+                </button>
+              {% endfor %}
+            </div>
+            <input id="id_icon" type="hidden" name="icon" value="{{ form.icon.value|default:'shield' }}">
+          </div>
+
+          <div class="pt-3 border-t border-border-subtle">
+            <p class="text-tiny text-text-tertiary mb-2">Preview</p>
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border border-border-subtle bg-surface-2">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded text-white"
+                    :style="`background-color: ${color}`">
+                {# Simple visual block — full icon swap would need a tag per option. #}
+              </span>
+              <span class="text-small font-medium" x-text="name || 'Unnamed role'"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ─── permissions matrix ─── #}
+    <section class="lg:col-span-2">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="text-h3">Permissions</h2>
+          <span class="text-small text-text-tertiary">
+            <span x-text="selected.length"></span> selected
+          </span>
+        </div>
+
+        <div class="px-5 pt-4">
+          <input
+            type="search"
+            placeholder="Filter by name or codename…"
+            class="input"
+            x-model="filter"
+          />
+        </div>
+
+        <div class="card-body space-y-6">
+          {% for category, perms in grouped_perms.items %}
+            <div data-category="{{ category }}">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-tiny uppercase font-medium text-text-secondary">{{ category }}</h3>
+                <button
+                  type="button"
+                  class="text-tiny text-text-brand hover:underline"
+                  @click="toggleCategory([{% for p in perms %}'{{ p.codename }}'{% if not forloop.last %},{% endif %}{% endfor %}])"
+                >
+                  toggle all
+                </button>
+              </div>
+              <div class="space-y-1">
+                {% for p in perms %}
+                  <label
+                    class="flex items-start gap-3 px-3 py-2 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
+                    x-show="matches('{{ p.codename }}', '{{ p.name|escapejs }}')"
+                  >
+                    <input
+                      type="checkbox" class="mt-1"
+                      :checked="selected.includes('{{ p.codename }}')"
+                      @change="toggle('{{ p.codename }}')"
+                    />
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <code class="font-mono text-mono text-mobinspect-500 dark:text-mobinspect-400">{{ p.codename }}</code>
+                        {% if p.is_dangerous %}
+                          <span class="badge badge-critical">{% icon "alert-triangle" size=10 %} Dangerous</span>
+                        {% endif %}
+                      </div>
+                      <p class="text-small text-text-secondary mt-0.5">{{ p.description|default:p.name }}</p>
+                    </div>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end gap-2">
+        <a href="{% url 'rbac:roles_list' %}" class="btn btn-ghost btn-md">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-md">{% icon "check" size=14 %} Save role</button>
+      </div>
+    </section>
+  </div>
+</form>
+
+<script>
+  function roleForm() {
+    var initial = [];
+    try {
+      initial = JSON.parse(document.getElementById('initial_selected').textContent || '[]');
+    } catch (e) { initial = []; }
+    return {
+      name: document.getElementById('id_name').value,
+      color: document.getElementById('id_color').value,
+      icon: document.getElementById('id_icon').value,
+      filter: '',
+      selected: initial,
+      toggle: function (code) {
+        var i = this.selected.indexOf(code);
+        if (i === -1) this.selected.push(code);
+        else this.selected.splice(i, 1);
+      },
+      toggleCategory: function (codes) {
+        var allOn = codes.every(function (c) { return this.selected.indexOf(c) !== -1; }, this);
+        if (allOn) {
+          this.selected = this.selected.filter(function (c) { return codes.indexOf(c) === -1; });
+        } else {
+          codes.forEach(function (c) {
+            if (this.selected.indexOf(c) === -1) this.selected.push(c);
+          }, this);
+        }
+      },
+      matches: function (code, name) {
+        if (!this.filter) return true;
+        var f = this.filter.toLowerCase();
+        return code.toLowerCase().indexOf(f) !== -1 ||
+               name.toLowerCase().indexOf(f) !== -1;
+      },
+    };
+  }
+</script>
+{% endblock %}

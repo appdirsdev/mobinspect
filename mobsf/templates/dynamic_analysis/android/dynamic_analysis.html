@@ -1,0 +1,389 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}Android Dynamic Analyzer{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Loading overlay used across dynamic-analysis flows. */
+  .loading {
+    position: fixed; inset: 0; z-index: 60;
+    display: flex; align-items: center; justify-content: center;
+    background: rgb(var(--surface-0) / 0.6); backdrop-filter: blur(4px);
+  }
+  .loading.hidden { display: none; }
+  .loading .ring {
+    width: 56px; height: 56px;
+    border: 4px solid rgb(var(--border-default));
+    border-top-color: rgb(var(--text-brand));
+    border-radius: 9999px;
+    animation: mi-spin 0.9s linear infinite;
+  }
+  @keyframes mi-spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ─────────────────── Page header ─────────────────── #}
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-4 min-w-0">
+    <span class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
+      {% icon "smartphone" size=24 %}
+    </span>
+    <div class="min-w-0">
+      <p class="text-tiny uppercase text-text-tertiary">Dynamic · Android</p>
+      <h1 class="text-h2">Android Dynamic Analyzer</h1>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="{% url 'dynamic' %}" class="btn btn-ghost btn-md">
+      {% icon "chevron-left" size=14 %} All platforms
+    </a>
+  </div>
+</header>
+
+{# ─────────────────── Runtime status ─────────────────── #}
+{% if not identifier %}
+  <section class="card mb-6 border-severity-critical/30" data-reveal>
+    <div class="card-body flex items-start gap-4">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-severity-critical/10 text-severity-critical dark:bg-severity-critical-dark/15 dark:text-severity-critical-dark flex-shrink-0">
+        {% icon "alert-triangle" size=20 %}
+      </span>
+      <div class="min-w-0">
+        <h2 class="text-h3">Android runtime not found</h2>
+        <p class="text-text-secondary mt-1">
+          MobInspect cannot find an Android instance identifier. Make sure an emulator
+          or device is running, then refresh this page.
+        </p>
+        <p class="text-small text-text-tertiary mt-3">
+          If the issue persists, set <code class="font-mono text-mono text-text-secondary">ANALYZER_IDENTIFIER</code> in
+          <code class="font-mono text-mono text-text-secondary">{{ settings_loc }}</code>
+          or via the environment variable
+          <code class="font-mono text-mono text-text-secondary">MOBSF_ANALYZER_IDENTIFIER</code>.
+        </p>
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+  {# ── Capabilities card ── #}
+  <div class="card lg:col-span-2" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2">{% icon "info" size=18 %} Supported runtimes</h2>
+    </div>
+    <div class="card-body space-y-2 text-small text-text-secondary">
+      <p class="flex items-start gap-2">{% icon "check" size=14 class="mt-0.5 text-severity-passed dark:text-severity-passed-dark" %}
+        <span><strong class="text-text-primary">Genymotion Android VM</strong> · 4.1 – 11.0 (arm64, x86, x86_64 up to API 30)</span></p>
+      <p class="flex items-start gap-2">{% icon "check" size=14 class="mt-0.5 text-severity-passed dark:text-severity-passed-dark" %}
+        <span><strong class="text-text-primary">Android Emulator AVD</strong> (non-production) · 5.0 – 11.0 (arm, arm64, x86, x86_64 up to API 30)</span></p>
+      <p class="flex items-start gap-2">{% icon "check" size=14 class="mt-0.5 text-severity-passed dark:text-severity-passed-dark" %}
+        <span><strong class="text-text-primary">Corellium Android VM</strong> (userdebug) · 7.1.2 – 11.0 (arm64 up to API 30)</span></p>
+
+      {% if android_version %}
+        <div class="pt-3 mt-3 border-t border-border-subtle space-y-1">
+          <p class="text-small">
+            Detected Android <strong class="text-text-primary">{{ android_version }}</strong>
+            · SDK API <strong class="text-text-primary">{{ android_sdk }}</strong>
+          </p>
+          <p class="text-tiny text-text-tertiary">Android ≥ 9.0 recommended</p>
+          {% if android_sdk|floatformat > android_supported|floatformat %}
+            <div class="mt-3 px-3 py-2 rounded-md text-small bg-system-error/10 text-system-error border border-system-error/30">
+              {% icon "alert-triangle" size=14 %}
+              Android version / SDK above MobInspect's supported range. Some instrumentation may fail.
+            </div>
+          {% endif %}
+          {% if android_version < 5 %}
+            <p class="text-tiny text-text-tertiary mt-2">
+              Xposed Framework is used for instrumentation. You must prepare the runtime and reboot before dynamic analysis.
+              {% if android_version < 4.4 %}
+                <br>For Android 4.1–4.3, set the VM proxy to
+                <code class="font-mono text-mono">{% if proxy_ip %}{{ proxy_ip }}{% else %}&lt;Host IP&gt;{% endif %}:{{ proxy_port }}</code>.
+              {% endif %}
+            </p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Runtime status / Prepare-runtime card ── #}
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2">{% icon "zap" size=18 %} Runtime</h2>
+    </div>
+    <div class="card-body space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full {% if identifier %}bg-severity-passed dark:bg-severity-passed-dark animate-pulse{% else %}bg-severity-unknown{% endif %}"></span>
+        <span class="text-small {% if identifier %}text-severity-passed dark:text-severity-passed-dark{% else %}text-text-tertiary{% endif %} font-medium">
+          {% if identifier %}Connected{% else %}Disconnected{% endif %}
+        </span>
+      </div>
+      <div>
+        <p class="text-tiny uppercase text-text-tertiary mb-1">Instance</p>
+        <p class="font-mono text-mono text-text-primary truncate" title="{{ identifier }}">
+          {{ identifier|default:"—" }}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="btn btn-primary btn-md w-full {% if not identifier %}opacity-50 pointer-events-none{% endif %}"
+        onclick="document.getElementById('mi-mobsfy').showModal()"
+        {% if not identifier %}disabled{% endif %}
+      >
+        {% icon "zap" size=14 %} Prepare runtime
+      </button>
+      <p class="text-tiny text-text-tertiary text-center">
+        Sets up Frida server and MobInspect agents on the device.
+      </p>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Apps on device ─────────────────── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2">{% icon "smartphone" size=18 %} Apps on device</h2>
+    <span class="text-tiny text-text-tertiary">
+      {% if device_packages %}{{ device_packages|length }} package{{ device_packages|length|pluralize }}{% else %}none{% endif %}
+    </span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">App</th>
+          <th class="text-left px-5 py-2.5 font-medium">APK location on device</th>
+          <th class="text-right px-5 py-2.5 font-medium">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if device_packages %}
+          {% for hash, det in device_packages.items %}
+            <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <img src="/download/{{ hash }}-icon.png"
+                       onerror="this.onerror=null;this.src='{% static 'img/no_icon.png' %}'"
+                       alt="" class="w-10 h-10 rounded-md bg-surface-2 object-contain flex-shrink-0" />
+                  <div class="min-w-0">
+                    <p class="font-medium text-text-primary truncate" title="{{ det.0 }}">{{ det.0 }}</p>
+                    <p class="text-tiny text-text-tertiary font-mono truncate">{{ hash }}</p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-5 py-3 font-mono text-mono text-text-secondary truncate max-w-md" title="{{ det.1 }}">{{ det.1 }}</td>
+              <td class="px-5 py-3 text-right">
+                <div class="inline-flex flex-wrap gap-1 justify-end">
+                  <a class="btn btn-primary btn-sm {% if not identifier %}opacity-50 pointer-events-none{% endif %}"
+                     onclick="dynamic_loader()"
+                     href="{% url 'dynamic_analyzer' checksum=hash %}?re_install=0&install=0">
+                    {% icon "zap" size=12 %} Analyze
+                  </a>
+                  <a class="btn btn-secondary btn-sm {% if not identifier %}opacity-50 pointer-events-none{% endif %}"
+                     onclick="dynamic_loader()"
+                     href="{% url 'static_scan' checksum=hash %}">
+                    {% icon "download" size=12 %} Pull + static
+                  </a>
+                  <a class="btn btn-ghost btn-sm" href="{% url 'dynamic_report' checksum=hash %}">
+                    {% icon "eye" size=12 %} Report
+                  </a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="3" class="px-5 py-12 text-center">
+              <div class="text-text-tertiary">
+                {% if identifier %}
+                  <p class="text-text-secondary">No third-party apps detected on the device.</p>
+                  <p class="text-tiny mt-1">Install an APK on the device to see it here.</p>
+                {% else %}
+                  <p class="text-text-secondary">Connect a device to enumerate installed apps.</p>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ─────────────────── Apps available (uploaded) ─────────────────── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2">{% icon "package" size=18 %} Apps available</h2>
+    <span class="text-tiny text-text-tertiary">
+      {% if apps %}{{ apps|length }} uploaded{% else %}none uploaded{% endif %}
+    </span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">App</th>
+          <th class="text-left px-5 py-2.5 font-medium">File</th>
+          <th class="text-left px-5 py-2.5 font-medium">Package</th>
+          <th class="text-right px-5 py-2.5 font-medium">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if apps %}
+          {% for e in apps %}
+            <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <img src="{% if e.ICON_PATH %}/download/{{ e.ICON_PATH }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+                       alt="" class="w-10 h-10 rounded-md bg-surface-2 object-contain flex-shrink-0" />
+                  <div class="min-w-0">
+                    <p class="font-medium text-text-primary truncate" title="{{ e.APP_NAME }}">
+                      {{ e.APP_NAME }}{% if e.VERSION_NAME %} <span class="text-text-tertiary">v{{ e.VERSION_NAME }}</span>{% endif %}
+                    </p>
+                    <p class="text-tiny text-text-tertiary font-mono truncate">{{ e.MD5|slice:":12" }}…</p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-5 py-3 text-text-secondary truncate max-w-xs" title="{{ e.FILE_NAME }}">{{ e.FILE_NAME }}</td>
+              <td class="px-5 py-3 font-mono text-mono text-text-secondary truncate max-w-xs">{{ e.PACKAGE_NAME }}</td>
+              <td class="px-5 py-3 text-right">
+                <div class="inline-flex flex-wrap gap-1 justify-end">
+                  <a class="btn btn-primary btn-sm {% if not identifier %}opacity-50 pointer-events-none{% endif %}"
+                     onclick="dynamic_loader()"
+                     href="{% url 'dynamic_analyzer' checksum=e.MD5 %}">
+                    {% icon "zap" size=12 %} Install + Analyze
+                  </a>
+                  <a class="btn btn-secondary btn-sm {% if not identifier %}opacity-50 pointer-events-none{% endif %}"
+                     onclick="dynamic_loader()"
+                     href="{% url 'dynamic_analyzer' checksum=e.MD5 %}?re_install=0">
+                    {% icon "zap" size=12 %} Analyze (no reinstall)
+                  </a>
+                  <a class="btn btn-ghost btn-sm {% if not e.DYNAMIC_REPORT_EXISTS %}opacity-50 pointer-events-none{% endif %}"
+                     href="{% url 'dynamic_report' checksum=e.MD5 %}">
+                    {% icon "eye" size=12 %} Report
+                  </a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="4" class="px-5 py-12 text-center">
+              <div class="text-text-tertiary">
+                <p class="text-text-secondary">No apps uploaded yet.</p>
+                <p class="text-tiny mt-1">
+                  <a href="{% url 'home' %}" class="text-text-brand hover:underline">Upload an APK</a>
+                  to make it available here.
+                </p>
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ─────────────────── Prepare-runtime modal ─────────────────── #}
+<dialog id="mi-mobsfy"
+        class="rounded-xl backdrop:bg-black/40 max-w-2xl w-full p-0 bg-surface-1 text-text-primary border border-border-subtle shadow-elevation-3">
+  <form method="dialog" class="flex flex-col">
+    <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
+      <h3 class="text-h3 flex items-center gap-2">{% icon "zap" size=18 %} Prepare Android runtime</h3>
+      <button type="submit" class="text-text-tertiary hover:text-text-primary">{% icon "x" size=18 %}</button>
+    </div>
+  </form>
+
+  <div class="px-5 py-4 space-y-4">
+    <p class="text-small text-text-secondary">
+      Provisions Frida server and MobInspect agents on the connected device.
+      This is a one-time setup — re-run after a factory reset.
+    </p>
+
+    <div>
+      <label class="label" for="mi-identifier">IP &amp; Port / Identifier</label>
+      <input id="mi-identifier" type="text" class="input font-mono text-mono"
+             value="{{ identifier }}" autocomplete="off" />
+    </div>
+
+    <div>
+      <label class="label">Status</label>
+      <pre id="mi-stat"
+           class="px-3 py-2 m-0 rounded-md bg-surface-2 border border-border-subtle font-mono text-mono text-text-secondary h-56 overflow-auto whitespace-pre-wrap"></pre>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-border-subtle">
+    <form method="dialog" class="contents">
+      <button type="submit" class="btn btn-ghost btn-md">Close</button>
+    </form>
+    <button id="mi-mobsfy-btn" type="button" class="btn btn-primary btn-md">
+      {% icon "zap" size=14 %} Prepare runtime
+    </button>
+  </div>
+</dialog>
+
+{# ─────────────────── Loading overlay ─────────────────── #}
+<div class="loading hidden" aria-live="polite" aria-label="Loading">
+  <div class="ring"></div>
+</div>
+
+<script>
+  // Public helper used by inline anchor onclick handlers across dynamic pages.
+  function dynamic_loader() {
+    var el = document.querySelector('.loading');
+    if (el) el.classList.remove('hidden');
+  }
+
+  // Prepare-runtime AJAX — uses fetch() instead of jQuery; same endpoint + payload
+  // shape as upstream so the legacy view continues to work.
+  (function () {
+    var btn = document.getElementById('mi-mobsfy-btn');
+    if (!btn) return;
+    var stat = document.getElementById('mi-stat');
+    var idInput = document.getElementById('mi-identifier');
+    var fired = false;
+
+    function append(line) {
+      stat.textContent += (stat.textContent ? '\n' : '') + line;
+      stat.scrollTop = stat.scrollHeight;
+    }
+
+    btn.addEventListener('click', function () {
+      if (fired) return;
+      fired = true;
+      btn.disabled = true; btn.classList.add('opacity-50');
+
+      append('Preparing Android runtime…');
+
+      var fd = new FormData();
+      fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+      fd.append('identifier', idInput.value);
+
+      fetch('{% url "mobsfy" %}', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (json) {
+          if (json.status === 'ok') {
+            append('Successfully created MobInspect Dynamic Analysis environment.');
+            if (json.android_version < 5) {
+              append('• Download & install Xposed Framework');
+              append('• Restart the device');
+              append('• Enable all Xposed modules');
+              append('• Restart the device once more');
+            } else {
+              append('MobInspect agents and Frida server installed.');
+            }
+          } else {
+            append(json.message || 'Failed.');
+          }
+        })
+        .catch(function (err) {
+          append('ERROR: ' + (err && err.message ? err.message : err));
+        });
+    });
+  })();
+</script>
+{% endblock %}

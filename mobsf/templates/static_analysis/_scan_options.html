@@ -1,0 +1,18 @@
+{% load mi_icons %}
+{% comment %}
+  Reusable scan-options card. Each link is conditional on its url variable being passed.
+  Vars: appsec_url, rescan_url, manifest_url, source_url, suppressions_url, view_pdf_url, etc.
+{% endcomment %}
+<section class="card mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "sliders" size=18 %} Scan options</h2></div>
+  <div class="card-body flex flex-wrap items-center gap-2">
+    {% if rescan_url %}<a href="{{ rescan_url }}" class="btn btn-secondary btn-sm">{% icon "activity" size=14 %} Rescan</a>{% endif %}
+    {% if appsec_url %}<a href="{{ appsec_url }}" class="btn btn-secondary btn-sm">{% icon "shield-check" size=14 %} Scorecard</a>{% endif %}
+    {% if manifest_url %}<a href="{{ manifest_url }}" class="btn btn-secondary btn-sm">{% icon "file-text" size=14 %} Manifest</a>{% endif %}
+    {% if source_url %}<a href="{{ source_url }}" class="btn btn-secondary btn-sm">{% icon "layers" size=14 %} Source tree</a>{% endif %}
+    {% if suppressions_url %}<button onclick="document.getElementById('mi-suppressions') && document.getElementById('mi-suppressions').showModal()" class="btn btn-ghost btn-sm">{% icon "eye-off" size=14 %} Suppressions</button>{% endif %}
+    {% if pdf_url %}<a href="{{ pdf_url }}" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} PDF</a>{% endif %}
+    {% if json_url %}<a href="{{ json_url }}" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} JSON</a>{% endif %}
+    {% if download_url %}<a href="{{ download_url }}" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} Binary</a>{% endif %}
+  </div>
+</section>

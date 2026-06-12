@@ -1,0 +1,173 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}Scans{% endblock %}
+
+{% block content %}
+<header class="flex items-center justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-h1">Scans</h1>
+    <p class="text-text-secondary mt-1">
+      All static analysis scans, newest first.
+      {% if async_scans %}
+        <a href="{% url 'list_tasks' %}" class="text-text-brand hover:underline">View scan queue →</a>
+      {% endif %}
+    </p>
+  </div>
+  <a href="{% url 'home' %}" class="btn btn-primary btn-md">{% icon "plus" size=14 %} New scan</a>
+</header>
+
+<div class="card" data-reveal>
+  <div class="overflow-x-auto">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">App</th>
+          <th class="text-left px-5 py-2.5 font-medium">File</th>
+          <th class="text-left px-5 py-2.5 font-medium">Type</th>
+          <th class="text-left px-5 py-2.5 font-medium">Hash</th>
+          <th class="text-left px-5 py-2.5 font-medium">Date</th>
+          <th class="text-right px-5 py-2.5 font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+            <td class="px-5 py-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <img
+                  src="{% if e.ICON_PATH %}/download/{{ e.ICON_PATH }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+                  alt=""
+                  class="w-10 h-10 rounded-md flex-shrink-0 bg-surface-2 object-contain"
+                />
+                <div class="min-w-0">
+                  {% if e.PACKAGE_NAME or e.APP_NAME %}
+                    <p class="font-medium text-text-primary truncate">
+                      {{ e.APP_NAME }}{% if e.VERSION_NAME %} <span class="text-text-tertiary">v{{ e.VERSION_NAME }}</span>{% endif %}
+                    </p>
+                    {% if e.PACKAGE_NAME %}
+                      <p class="text-tiny text-text-tertiary truncate font-mono">{{ e.PACKAGE_NAME }}</p>
+                    {% endif %}
+                  {% else %}
+                    <span class="badge badge-medium">Scan incomplete</span>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+            <td class="px-5 py-3 text-text-secondary truncate max-w-xs" title="{{ e.FILE_NAME }}">{{ e.FILE_NAME }}</td>
+            <td class="px-5 py-3">
+              {% with name=e.FILE_NAME %}
+                {% if name|slice:"-4:" == ".apk" or name|slice:"-5:" == ".xapk" or name|slice:"-5:" == ".apks" or name|slice:"-4:" == ".aab" %}
+                  <span class="badge badge-passed">Android</span>
+                {% elif name|slice:"-4:" == ".jar" %}
+                  <span class="badge badge-low">JAR</span>
+                {% elif name|slice:"-4:" == ".ipa" or name|slice:"-6:" == ".dylib" %}
+                  <span class="badge badge-low">iOS</span>
+                {% elif name|slice:"-3:" == ".so" %}
+                  <span class="badge badge-medium">SO</span>
+                {% elif name|slice:"-5:" == ".appx" %}
+                  <span class="badge badge-low">Windows</span>
+                {% elif name|slice:"-4:" == ".zip" %}
+                  <span class="badge badge-unknown">ZIP</span>
+                {% else %}
+                  <span class="badge badge-unknown">—</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+            <td class="px-5 py-3 font-mono text-mono text-text-secondary">{{ e.MD5|slice:":12" }}…</td>
+            <td class="px-5 py-3 text-text-secondary tabular whitespace-nowrap">{{ e.TIMESTAMP }}</td>
+            <td class="px-5 py-3 text-right">
+              {% if e.PACKAGE_NAME or e.APP_NAME %}
+                <div class="inline-flex items-center gap-1">
+                  {% if e.FILE_NAME|slice:"-6:" != '.dylib' and e.FILE_NAME|slice:"-5:" != '.appx' and e.FILE_NAME|slice:"-3:" != '.so' and e.FILE_NAME|slice:"-2:" != '.a' %}
+                    <a href="{% url 'appsec_dashboard' checksum=e.MD5 %}" class="btn btn-ghost btn-sm" title="MobInspect Scorecard">
+                      {% icon "shield-check" size=14 %}
+                    </a>
+                  {% endif %}
+                  <a href="/{{ e.ANALYZER }}/{{ e.MD5 }}/" class="btn btn-secondary btn-sm">
+                    {% icon "eye" size=14 %} Report
+                  </a>
+                  <a href="{% url 'pdf' checksum=e.MD5 %}" class="btn btn-ghost btn-sm" title="Download PDF">
+                    {% icon "file-text" size=14 %}
+                  </a>
+                  <a href="{% url 'download_binary' checksum=e.MD5 %}" class="btn btn-ghost btn-sm" title="Download binary">
+                    {% icon "download" size=14 %}
+                  </a>
+                  <a href="/{{ e.ANALYZER }}/{{ e.MD5 }}/?rescan=1" class="btn btn-ghost btn-sm" title="Re-scan">
+                    {% icon "activity" size=14 %}
+                  </a>
+                  <button type="button" data-md5="{{ e.MD5 }}" class="btn btn-ghost btn-sm text-system-error mi-delete-scan" title="Delete">
+                    {% icon "trash" size=14 %}
+                  </button>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="px-5 py-16">
+              <div class="text-center max-w-sm mx-auto">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-2 text-text-tertiary mb-3">
+                  {% icon "upload-cloud" size=24 %}
+                </div>
+                <h3 class="text-h3">No scans yet</h3>
+                <p class="text-text-secondary mt-1">Upload an APK, IPA, or AAB to get started.</p>
+                <a href="{% url 'home' %}" class="btn btn-primary btn-md mt-4">{% icon "plus" size=14 %} New scan</a>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="card-footer flex items-center justify-between">
+      <span class="text-tiny text-text-tertiary">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} scan{{ page_obj.paginator.count|pluralize }}
+      </span>
+      <div class="flex gap-1">
+        {% if page_obj.has_previous %}
+          <a href="{% url 'scans_paginated' page_size=page_obj.page_size page_number=page_obj.previous_page_number %}" class="btn btn-secondary btn-sm">
+            {% icon "chevron-left" size=14 %} Prev
+          </a>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a href="{% url 'scans_paginated' page_size=page_obj.page_size page_number=page_obj.next_page_number %}" class="btn btn-secondary btn-sm">
+            Next {% icon "chevron-right" size=14 %}
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+  // Delete-scan handler — same endpoint and POST shape as the legacy
+  // sweetalert flow, with native confirm() replacing the modal.
+  document.addEventListener('click', function (ev) {
+    const btn = ev.target.closest('.mi-delete-scan');
+    if (!btn) return;
+    const md5 = btn.getAttribute('data-md5');
+    if (!md5) return;
+    if (!confirm('Delete this scan? This cannot be undone.')) return;
+
+    const csrf = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+    const token = csrf ? csrf.split('=')[1] : '';
+
+    const fd = new FormData();
+    fd.append('md5', md5);
+    fd.append('csrfmiddlewaretoken', token);
+
+    fetch('/delete_scan/', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': token },
+    }).then(r => r.json()).then(j => {
+      if (j && j.deleted === 'yes') location.reload();
+      else alert('Delete failed: ' + ((j && j.deleted) || 'unknown reason'));
+    }).catch(() => alert('Delete failed: network error.'));
+  });
+</script>
+{% endblock %}

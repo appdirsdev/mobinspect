@@ -1,0 +1,56 @@
+{% extends "base/app.html" %}{% load static %}
+{% comment %}
+  Compatibility wrapper for templates whose inner markup still uses
+  AdminLTE / Bootstrap 4 utility classes (col-lg-*, card-body, btn-primary,
+  modal, datatables, etc.). They get the new MobInspect chrome (sidebar,
+  topbar, theme, brand) while keeping the old CSS+JS available so the
+  existing analyzer/report markup and inline JS continue to render.
+
+  Block compatibility shim:
+    extra_css      → legacy block name; we re-render it inside extra_head
+    extra_scripts  → legacy block name; we re-render it inside extra_js
+
+  Migrating an existing template to this base is a 2-line change:
+    {% extends "base/base_layout.html" %} → {% extends "base/legacy_app.html" %}
+    {% block sidebar_option %}…{% endblock %} → (delete; sidebar lives in app.html now)
+{% endcomment %}
+
+{% block extra_head %}
+  {# Legacy CSS — only loaded for templates that still use AdminLTE markup. #}
+  <link rel="stylesheet" href="{% static 'adminlte/plugins/fontawesome-free/css/all.min.css' %}">
+  <link rel="stylesheet" href="{% static 'adminlte/dashboard/css/adminlte.min.css' %}">
+  <link rel="stylesheet" href="{% static 'adminlte/plugins/overlayScrollbars/css/OverlayScrollbars.min.css' %}">
+  <style>
+    /* Reset AdminLTE body class side-effects so it sits cleanly inside
+       the new flex chrome from base/app.html. */
+    body.hold-transition { transition: none; }
+    /* Keep the inline content area scrollable (matches main wrapper). */
+    .content-wrapper { background: transparent !important; min-height: auto !important; }
+    /* AdminLTE forces .main-footer; we hide it because base/app.html ships its own. */
+    .main-footer, .main-sidebar:not(.mi-keep), .main-header, .control-sidebar { display: none !important; }
+  </style>
+  {% block extra_css %}{% endblock %}
+{% endblock %}
+
+{% block extra_js %}
+  {# Legacy JS — jQuery + Bootstrap + AdminLTE — only for templates that need it. #}
+  <script src="{% static 'adminlte/plugins/jquery.min.js' %}"></script>
+  <script src="{% static 'adminlte/plugins/jquery-ui.min.js' %}"></script>
+  <script>
+    if (window.jQuery && jQuery.widget && jQuery.ui && jQuery.ui.button) {
+      jQuery.widget.bridge('uibutton', jQuery.ui.button);
+    }
+    // Filter datatables warnings out of the alert() stream the way upstream did.
+    window.alert = (function () {
+      var nativeAlert = window.alert;
+      return function (m) {
+        window.alert = nativeAlert;
+        return ('' + m).indexOf('DataTables warning') === 0 ? console.warn(m) : nativeAlert(m);
+      };
+    })();
+  </script>
+  <script src="{% static 'adminlte/plugins/bootstrap/bootstrap.bundle.min.js' %}"></script>
+  <script src="{% static 'adminlte/plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js' %}"></script>
+  <script src="{% static 'adminlte/dashboard/js/adminlte.min.js' %}"></script>
+  {% block extra_scripts %}{% endblock %}
+{% endblock %}

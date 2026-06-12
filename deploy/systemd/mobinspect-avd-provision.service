@@ -1,0 +1,32 @@
+[Unit]
+Description=MobInspect AVD provisioning (writable /system for dynamic analysis)
+Documentation=file:///home/ubuntu/MobInspect/deploy/scripts/avd-provision.sh
+# Run after the emulator service is up. The script waits for boot_completed
+# itself, so a loose ordering is enough.
+After=mobinspect-avd.service
+Wants=mobinspect-avd.service
+# Only meaningful where the emulator can run at all.
+ConditionPathExists=/dev/kvm
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=ubuntu
+Group=ubuntu
+Environment=HOME=/home/ubuntu
+Environment=ANDROID_HOME=/home/ubuntu/android-sdk
+Environment=ANDROID_AVD_HOME=/home/ubuntu/.android/avd
+Environment=ANALYZER_IDENTIFIER=emulator-5554
+Environment=PATH=/home/ubuntu/android-sdk/platform-tools:/home/ubuntu/android-sdk/emulator:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# The provisioner may need to bounce mobinspect-avd.service during its
+# overlay-wipe recovery path, so it shells out to sudo systemctl. Grant exactly
+# that via /etc/sudoers.d (see deploy/RUNBOOK.md) or run the unit as root.
+ExecStart=/home/ubuntu/MobInspect/deploy/scripts/avd-provision.sh
+# Don't fail the boot target if provisioning can't complete (e.g. host that
+# wedges the AVD reboot) — dynamic analysis simply stays unavailable; static
+# analysis is unaffected.
+SuccessExitStatus=0 1
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

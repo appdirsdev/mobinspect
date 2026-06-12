@@ -1,0 +1,168 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}Scan queue{% endblock %}
+
+{% block extra_head %}
+<style>
+  .loader {
+    border: 2px solid rgb(var(--surface-2));
+    border-top: 2px solid rgb(var(--text-brand));
+    border-radius: 50%;
+    width: 12px; height: 12px;
+    animation: mi-spin 1s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  @keyframes mi-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="flex items-center justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-h1">Scan queue</h1>
+    <p class="text-text-secondary mt-1">
+      Live status of asynchronous scans. Completed reports surface in
+      <a href="{% url 'recent' %}" class="text-text-brand hover:underline">Scans</a>.
+    </p>
+  </div>
+  <div class="flex items-center gap-2 text-tiny text-text-tertiary">
+    <span class="inline-block w-2 h-2 rounded-full bg-mobinspect-500 animate-pulse"></span>
+    Auto-refresh · 5s
+  </div>
+</header>
+
+<div class="card">
+  <div class="overflow-x-auto">
+    <table id="tasks-table" class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Scan task</th>
+          <th class="text-left px-5 py-2.5 font-medium">Filename</th>
+          <th class="text-left px-5 py-2.5 font-medium">Timeline</th>
+          <th class="text-left px-5 py-2.5 font-medium">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {# Rows populated dynamically via JS #}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tasksTableBody = document.querySelector('#tasks-table tbody');
+
+  async function fetchTasks() {
+    const response = await fetch("{% url 'list_tasks' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+    });
+    if (!response.ok) { console.error('Failed to fetch tasks.'); return []; }
+    return await response.json();
+  }
+
+  function fmtDate(s) { return s ? new Date(s).toLocaleString() : '—'; }
+
+  function statusBadge(task) {
+    if (!task.completed_at) {
+      return '<span class="badge badge-medium">Running <span class="loader ml-1"></span></span>';
+    }
+    if (task.status === 'Success') return '<span class="badge badge-passed">Success</span>';
+    if (task.status === 'Failed')  return '<span class="badge badge-critical">Failed</span>';
+    return '<span class="badge badge-unknown">' + (task.status || 'Unknown') + '</span>';
+  }
+
+  function buildTableRow(task) {
+    const tr = document.createElement('tr');
+    tr.className = 'border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast';
+    tr.setAttribute('data-task-id', task.task_id);
+
+    tr.innerHTML = `
+      <td class="px-5 py-3 align-top">
+        <p class="text-tiny text-text-tertiary">Task</p>
+        <p class="font-mono text-mono text-text-primary truncate max-w-[14rem]" title="${task.task_id}">${task.task_id}</p>
+        <p class="text-tiny text-text-tertiary mt-2">Checksum</p>
+        <p class="font-mono text-mono text-text-secondary truncate max-w-[14rem]" title="${task.checksum}">${task.checksum}</p>
+      </td>
+      <td class="px-5 py-3 align-top text-text-primary truncate max-w-xs" title="${task.file_name || ''}">${task.file_name || ''}</td>
+      <td class="px-5 py-3 align-top tabular text-text-secondary" id="timeline-${task.task_id}">
+        <p><span class="text-tiny text-text-tertiary uppercase">Queued</span><br>${fmtDate(task.created_at)}</p>
+        <p class="mt-2"><span class="text-tiny text-text-tertiary uppercase">Started</span><br>${fmtDate(task.started_at)}</p>
+        <p class="mt-2"><span class="text-tiny text-text-tertiary uppercase">Completed</span><br>${fmtDate(task.completed_at)}</p>
+      </td>
+      <td class="px-5 py-3 align-top" id="status-${task.task_id}">
+        ${statusBadge(task)}
+        ${task.app_name ? `<p class="text-small font-medium mt-2">${task.app_name}</p>` : ''}
+        ${task.completed_at && task.status === 'Success' ?
+          `<a href="/search?query=${encodeURIComponent(task.checksum)}" class="btn btn-ghost btn-sm mt-2">
+            View report →
+          </a>` : ''}
+      </td>
+    `;
+    return tr;
+  }
+
+  function emptyRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td colspan="4" class="px-5 py-16">
+        <div class="text-center max-w-sm mx-auto">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-2 text-text-tertiary mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <h3 class="text-h3">No tasks in queue</h3>
+          <p class="text-text-secondary mt-1">Asynchronous scans will appear here while running.</p>
+        </div>
+      </td>`;
+    return tr;
+  }
+
+  async function renderTable() {
+    const tasks = await fetchTasks();
+    tasksTableBody.innerHTML = '';
+    if (tasks.length === 0) tasksTableBody.appendChild(emptyRow());
+    else tasks.forEach(t => tasksTableBody.appendChild(buildTableRow(t)));
+  }
+
+  async function updateTaskStatuses() {
+    const tasks = await fetchTasks();
+    const existing = new Set(Array.from(
+      document.querySelectorAll('#tasks-table tbody tr[data-task-id]')
+    ).map(r => r.getAttribute('data-task-id')));
+    tasks.forEach(task => {
+      const status = document.getElementById('status-' + task.task_id);
+      const timeline = document.getElementById('timeline-' + task.task_id);
+      if (status && timeline) {
+        status.innerHTML = statusBadge(task) +
+          (task.app_name ? `<p class="text-small font-medium mt-2">${task.app_name}</p>` : '') +
+          (task.completed_at && task.status === 'Success' ?
+            `<a href="/search?query=${encodeURIComponent(task.checksum)}" class="btn btn-ghost btn-sm mt-2">View report →</a>` : '');
+        timeline.innerHTML =
+          `<p><span class="text-tiny text-text-tertiary uppercase">Queued</span><br>${fmtDate(task.created_at)}</p>` +
+          `<p class="mt-2"><span class="text-tiny text-text-tertiary uppercase">Started</span><br>${fmtDate(task.started_at)}</p>` +
+          `<p class="mt-2"><span class="text-tiny text-text-tertiary uppercase">Completed</span><br>${fmtDate(task.completed_at)}</p>`;
+      } else if (!existing.has(task.task_id)) {
+        tasksTableBody.prepend(buildTableRow(task));
+      }
+    });
+  }
+
+  renderTable();
+  setInterval(updateTaskStatuses, 5000);
+
+  // Optional Q-param notices — kept simple, no sweetalert dependency
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get('q');
+  if (q === 'completed') {
+    alert('Scan recently completed — results are in Recent Scans.');
+  } else if (q === 'queued') {
+    alert('This scan task is already in the queue.');
+  }
+});
+</script>
+{% endblock %}

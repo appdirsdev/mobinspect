@@ -1,0 +1,89 @@
+[Unit]
+Description=MobInspect Android Emulator (headless AVD via Android SDK)
+Documentation=https://developer.android.com/studio/run/emulator-commandline
+After=network-online.target
+Wants=network-online.target
+# Skip cleanly on hosts without KVM
+ConditionPathExists=/dev/kvm
+
+[Service]
+Type=exec
+User=ubuntu
+Group=kvm
+SupplementaryGroups=kvm
+# Sandboxing — keep the emulator boxed in. ReadWritePaths lists exactly the
+# host paths the emulator needs to mutate (AVD state + MobInspect data dir).
+# Anything else under /home is read-only thanks to ProtectHome=.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/ubuntu/.android /home/ubuntu/.MobInspect
+ProtectHome=read-only
+# The emulator writes its registration / jwks state under $XDG_RUNTIME_DIR
+# (default /run/user/<uid>). Under ProtectSystem=strict that path is read-only
+# inside the unit's mount namespace, so the emulator aborts FATAL with
+# "Unable to create .../avd/running ...: Read-only file system" /
+# "Failed to create jwk directory". RuntimeDirectory= gives the unit a
+# guaranteed-writable, auto-managed /run/avd (exempt from ProtectSystem), and
+# we point XDG_RUNTIME_DIR at it so the emulator has somewhere to write.
+RuntimeDirectory=avd
+RuntimeDirectoryMode=0700
+Environment=XDG_RUNTIME_DIR=/run/avd
+ProtectKernelTunables=true
+ProtectControlGroups=true
+# Resource ceilings — see deploy/RUNBOOK.md §6.
+MemoryHigh=4G
+MemoryMax=6G
+# Device access — KVM is mandatory; /dev/net/tun is needed for the emulator's
+# user-mode networking bridge.
+DeviceAllow=/dev/kvm rw
+DeviceAllow=/dev/net/tun rw
+WorkingDirectory=/home/ubuntu
+Environment=HOME=/home/ubuntu
+Environment=ANDROID_HOME=/home/ubuntu/android-sdk
+Environment=ANDROID_AVD_HOME=/home/ubuntu/.android/avd
+Environment=PATH=/home/ubuntu/android-sdk/cmdline-tools/latest/bin:/home/ubuntu/android-sdk/platform-tools:/home/ubuntu/android-sdk/emulator:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Headless, software GPU, no audio, no snapshot (clean boot each restart).
+#
+# -writable-system is REQUIRED for MobInspect's dynamic analysis: mobsfy_init
+# does `adb remount` to push the Frida server + Burp CA into /system. Without
+# this flag the vbmeta partition is read-only and `adb disable-verity` fails
+# with "Error writing to partition 'vbmeta'".
+#
+# Do NOT add -read-only — it discards changes on shutdown including the
+# disable-verity flag set during AVD bootstrap.
+#
+# AVD must be created with system-images;android-30;google_apis;x86_64.
+# Newer images (API 31+) trip ANDROID_API_SUPPORTED=30 in
+# mobsf/DynamicAnalyzer/views/android/environment.py:40.
+#
+# --- Stale-lock crash-loop guard (ExecStartPre) ---
+# When the emulator is killed uncleanly (OOM kill, host reboot, `kill -9`,
+# Restart=on-failure mid-boot) it leaves lock files behind in the .avd
+# directory (hardware-qemu.ini.lock, multiinstance.lock, snapshot.lock*, and
+# scratch *.tmp* / *.lock.lock files). On the next start qemu sees those locks,
+# refuses to attach to the AVD, and exits FATAL:
+#   "Running multiple emulators with the same AVD is an experimental feature.
+#    Please use -read-only ..."
+# Because we deliberately do NOT use -read-only (see below), the unit can never
+# recover on its own: every Restart=on-failure hits the same stale locks, so
+# NRestarts climbs forever and the AVD stays down.
+#
+# The two ExecStartPre lines below break that loop. They run BEFORE ExecStart
+# and are prefixed with '-' so a non-zero exit (e.g. nothing to kill / no lock
+# files present on a clean start) is ignored and never blocks the boot:
+#   1. pkill any orphaned qemu process still bound to this AVD.
+#   2. delete the stale lock + scratch files so qemu can re-acquire the AVD.
+ExecStartPre=-/usr/bin/pkill -9 -f "qemu-system-x86_64.*MobInspect_AVD"
+ExecStartPre=-/bin/bash -c 'rm -f /home/ubuntu/.android/avd/MobInspect_AVD.avd/*.lock /home/ubuntu/.android/avd/MobInspect_AVD.avd/*.lock.lock /home/ubuntu/.android/avd/MobInspect_AVD.avd/snapshot.lock* /home/ubuntu/.android/avd/MobInspect_AVD.avd/*.tmp* 2>/dev/null || true'
+ExecStart=/home/ubuntu/android-sdk/emulator/emulator @MobInspect_AVD \
+  -no-window -no-audio -no-boot-anim -no-snapshot \
+  -gpu swiftshader_indirect \
+  -writable-system
+Restart=on-failure
+RestartSec=15
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

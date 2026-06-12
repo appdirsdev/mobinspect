@@ -1,0 +1,113 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}
+
+{% block content %}
+<header class="mb-6">
+  <h1 class="text-h1">API keys</h1>
+  <p class="text-text-secondary mt-1">
+    Per-user keys for programmatic access. Each key inherits your role permissions.
+  </p>
+</header>
+
+{% if just_created and plaintext %}
+  <div class="card mb-6 border-severity-passed dark:border-severity-passed-dark" data-reveal>
+    <div class="card-body">
+      <div class="flex items-center gap-2 mb-2 text-severity-passed dark:text-severity-passed-dark">
+        {% icon "circle-check" size=18 %}
+        <strong>Key "{{ just_created.name }}" created.</strong>
+      </div>
+      <p class="text-small text-text-secondary">
+        Copy the key now — it will not be shown again.
+      </p>
+      <div class="mt-3 flex items-center gap-2">
+        <input
+          readonly
+          value="{{ plaintext }}"
+          class="input font-mono text-mono select-all"
+          onclick="this.select(); document.execCommand('copy');"
+        />
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  {# ─── create form ─── #}
+  <div class="lg:col-span-1">
+    <div class="card">
+      <div class="card-header"><h2 class="text-h3">Create new key</h2></div>
+      <form method="post" class="card-body space-y-4">
+        {% csrf_token %}
+        <div>
+          <label class="label" for="id_name">Name</label>
+          {{ form.name }}
+          {% for e in form.name.errors %}<p class="text-tiny text-system-error mt-1">{{ e }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="label" for="id_expires_in_days">Expires in (days)</label>
+          {{ form.expires_in_days }}
+          <p class="text-tiny text-text-tertiary mt-1">Leave blank for no expiry.</p>
+        </div>
+        <button type="submit" class="btn btn-primary btn-md w-full">
+          {% icon "key" size=14 %} Generate
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {# ─── list ─── #}
+  <div class="lg:col-span-2">
+    <div class="card">
+      <div class="card-header"><h2 class="text-h3">Your keys</h2></div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-small">
+          <thead>
+            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+              <th class="text-left px-5 py-2.5 font-medium">Name</th>
+              <th class="text-left px-5 py-2.5 font-medium">Prefix</th>
+              <th class="text-left px-5 py-2.5 font-medium">Last used</th>
+              <th class="text-left px-5 py-2.5 font-medium">Status</th>
+              <th class="px-5 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for k in keys %}
+              <tr class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
+                <td class="px-5 py-3 text-text-primary">{{ k.name }}</td>
+                <td class="px-5 py-3"><code class="font-mono text-mono text-text-secondary">mi_{{ k.prefix }}…</code></td>
+                <td class="px-5 py-3 text-text-secondary">
+                  {% if k.last_used_at %}{{ k.last_used_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+                </td>
+                <td class="px-5 py-3">
+                  {% if k.revoked_at %}
+                    <span class="badge badge-unknown">Revoked</span>
+                  {% elif not k.is_active %}
+                    <span class="badge badge-medium">Expired</span>
+                  {% else %}
+                    <span class="badge badge-passed">Active</span>
+                  {% endif %}
+                </td>
+                <td class="px-5 py-3 text-right">
+                  {% if k.is_active %}
+                    <form method="post" action="{% url 'rbac:api_key_revoke' k.id %}"
+                          onsubmit="return confirm('Revoke this key? Cannot be undone.');"
+                          class="inline">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-ghost btn-sm text-system-error">
+                        {% icon "x" size=14 %} Revoke
+                      </button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="px-5 py-8 text-center text-text-tertiary">No API keys yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
