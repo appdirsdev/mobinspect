@@ -80,6 +80,9 @@ pytest-django = ">=4.8,<5"
 # IDE invocation.
 DJANGO_SETTINGS_MODULE = "mobsf.MobSF.settings"
 python_files = ["test_*.py", "tests.py"]
+# importlib mode lets same-named test modules (e.g. an android and an ios
+# test_cov_view_source.py) coexist without __init__.py packages.
+addopts = "--import-mode=importlib"
 # Default test discovery roots — the audit suite (H17) lives under
 # mobsf/RBAC/tests/ and mobsf/Analytics/tests/. Adding the bare module
 # path lets `poetry run pytest` (no args) collect just the new suite.
