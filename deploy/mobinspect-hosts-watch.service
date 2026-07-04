@@ -1,0 +1,6 @@
+[Unit]
+Description=MobInspect - refresh ALLOWED_HOSTS if the VM IP changed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mobinspect-hosts-refresh --apply

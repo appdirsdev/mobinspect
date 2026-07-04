@@ -398,6 +398,13 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,   # Don't propagate to other handlers
         },
+        'django.template': {
+            'handlers': ['console', 'logfile'],
+            # DEBUG logs harmless VariableDoesNotExist lookups (e.g. the
+            # optional 'title' context var in base/app.html), so raise to INFO.
+            'level': 'INFO',
+            'propagate': False,   # Don't propagate to other handlers
+        },
         'mobsf.MobSF': {
             'handlers': ['console', 'logfile'],
             'level': 'DEBUG',

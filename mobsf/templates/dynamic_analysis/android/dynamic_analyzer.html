@@ -1,7 +1,10 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
 
-{% extends "base/legacy_app.html" %}
-{% load static %}
-{% block extra_css %}
+{% block page_title %}Dynamic Analyzer — {{ package }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'adminlte/plugins/fontawesome-free/css/all.min.css' %}">
 <link rel="stylesheet" href="{% static "others/css/terminal.css" %}" type="text/css">
 <link rel="stylesheet" href="{% static "others/css/devices.min.css" %}" type="text/css">
 <link rel="stylesheet" href="{% static "codemirror/codemirror.css" %}" type="text/css">
@@ -9,562 +12,377 @@
 <link rel="stylesheet" href="{% static "codemirror/lint.css" %}" type="text/css">
 <link rel="stylesheet" href="{% static "others/css/spinner.css" %}">
 <style>
-     #stat {
-        width: 100%;
-        height: {% if android_version < 5 %} 630px; {% else %} 170px; {% endif %}
-        -moz-border-bottom-colors: none;
-        -moz-border-left-colors: none;
-        -moz-border-right-colors: none;
-        -moz-border-top-colors: none;
-        background: none repeat scroll 0 0 rgba(0, 0, 0, 0.07);
-        border-color: -moz-use-text-color #FFFFFF #FFFFFF -moz-use-text-color;
-        border-image: none;
-        border-radius: 6px 6px 6px 6px;
-        border-style: none solid solid none;
-        border-width: medium 1px 1px medium;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12) inset;
-        color: #555555;
-        font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
-        font-size: 1em;
-        line-height: 1.4em;
-        padding: 5px 8px;
-        transition: background-color 0.2s ease 0s;
-    }
-    #stat:focus {
-        background: none repeat scroll 0 0 #FFFFFF;
-        outline-width: 0;
-    }
-    .highlight { border: solid 2px #1e6dff;}
-    
-    #code-editor{
-      transform: scale(1.25) !important;
-      transform-origin: top left;
-      width: 80%;
-      height: auto;
-      overflow: auto;
-      max-height: 600px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 10px;
-      background: #f8f9fa;
-      margin-bottom: 150px;
-      position: relative;
-      z-index: 1;
-      scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* Internet Explorer 10+ */
-    }
-    
-    #code-editor::-webkit-scrollbar {
-      display: none; /* Chrome, Safari, Opera */
-    }
-    .CodeMirror {
-        height: 610px;
-        font-size: 11px;
-        border: 1px solid #eee;
-      }
+  /* Hide Alpine-cloaked elements until Alpine boots (base/app.html loads
+     Alpine deferred and app.css ships no [x-cloak] rule). */
+  [x-cloak] { display: none !important; }
+  /* Status console */
+  #stat {
+    width: 100%;
+    height: {% if android_version < 5 %} 630px; {% else %} 170px; {% endif %}
+    border-radius: 0.5rem;
+    background: rgb(var(--surface-2));
+    border: 1px solid rgb(var(--border-subtle));
+    color: rgb(var(--text-secondary));
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    line-height: 1.4em;
+    padding: 8px 10px;
+    resize: vertical;
+  }
+  #stat:focus { outline: 2px solid rgb(var(--text-brand) / 0.4); outline-offset: -1px; }
 
-    .frida-pre {
-      font-family: "courier new", courier, monospace;
-      font-size: 11px;
-    }
+  .highlight { outline: 2px solid rgb(var(--text-brand)); border-radius: 0.375rem; }
 
-    #start_activity{
-        margin-top: 5px;
-    }
-    #start_activity_form{
-        margin-top: 10px;
-    }
+  #code-editor {
+    width: 100%;
+    height: auto;
+    overflow: auto;
+    max-height: 600px;
+    border: 1px solid rgb(var(--border-subtle));
+    border-radius: 0.5rem;
+    background: rgb(var(--surface-2));
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  #code-editor::-webkit-scrollbar { display: none; }
+  .CodeMirror { height: 560px; font-size: 12px; border-radius: 0.5rem; }
 
+  .frida-pre {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Dark-mode friendly phone frame background */
+  .marvel-device .screen { background-color: #000; }
+
+  /* Tab buttons */
+  .mi-tab { position: relative; }
+  .mi-tab[aria-selected="true"] { color: rgb(var(--text-primary)); }
+  .mi-tab[aria-selected="true"]::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px;
+    height: 2px; background: rgb(var(--text-brand)); border-radius: 2px;
+  }
 </style>
-
 {% endblock %}
 
 {% block content %}
 
-<script src="{% static "adminlte/plugins/jquery.min.js" %}"></script>
+{# ─────────────────── Page header ─────────────────── #}
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-4 min-w-0">
+    <span class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
+      {% icon "activity" size=24 %}
+    </span>
+    <div class="min-w-0">
+      <p class="text-tiny uppercase text-text-tertiary">Dynamic · Android · Live analyzer</p>
+      <h1 class="text-h2 truncate" title="{{ package }}">{{ package }}</h1>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="{% url 'dynamic' %}" class="btn btn-ghost btn-md">
+      {% icon "chevron-left" size=14 %} All platforms
+    </a>
+    <button id="stop" type="button" class="btn btn-primary btn-md">
+      {% icon "file-text" size=14 %} Generate Report
+    </button>
+  </div>
+</header>
 
-<div class="content-wrapper">
-  <div class="content-header">
-    <div class="container-fluid">
-      <div class="row mb-2">
-        <div id="mobsf_header" align="center" style="padding-left: 20px;">
-            <h2><strong>Dynamic Analyzer </strong>- {{ package }}</h2>
+{# ─────────────────── Action toolbar ─────────────────── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-body">
+    <div id="but" class="flex flex-wrap gap-2">
+      <a href="#" id="screen" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-mobile-alt"></i> Show Screen</a>
+      <a href="#" id="rootca" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-certificate"></i> Remove Root CA</a>
+      {% if android_version >= 5 %}
+      <a href="#" id="proxy" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-eye-slash"></i> Unset HTTP(S) Proxy</a>
+      <a href="#" id="tls_test" class="btn btn-secondary btn-sm" role="button" onclick="document.getElementById('tls_modal').showModal();return false;"><i class="fa fa-lock"></i> TLS/SSL Security Tester</a>
+      {% endif %}
+      <a href="#" id="expactt" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-language"></i> Exported Activity Tester</a>
+      <a href="#" id="actt" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-rocket"></i> Activity Tester</a>
+      {% if android_version >= 5 %}
+      <a href="#" id="deps" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-running"></i> Get Dependencies</a>
+      {% endif %}
+      <a href="#" id="ss" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-camera"></i> Take a Screenshot</a>
+      <a href="#" id="logstream" class="btn btn-secondary btn-sm"><i class="fa fa-water"></i> Logcat Stream</a>
+      <a href="{% url 'live_api' %}?hash={{ hash }}&amp;package={{ package }}" id="apimon" target="_blank" class="btn btn-secondary btn-sm" style='display: none'><i class="fa fa-search"></i> Live API Monitor</a>
+    </div>
+  </div>
+</section>
+
+<section class="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-6">
+
+  {# ── Device screen ── #}
+  <div class="card xl:col-span-3" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2">{% icon "smartphone" size=18 %} Device</h2>
+    </div>
+    <div class="card-body">
+      <div class="flex justify-center">
+        <div class="marvel-device htc-one">
+          <div class="top-bar"></div>
+          <div class="camera"></div>
+          <div class="sensor"></div>
+          <div class="speaker"></div>
+          <div class="screen" id="container" tabindex="0" style="outline: none;">
+            <img width="320" height="580" src="{% url 'download' %}screen/screen.png" id="my" onerror="$('#my').attr('src','/static/img/loading.jpg')" style="background-color:black;">
+          </div>
         </div>
+      </div>
+      <div class="flex gap-2 mt-4">
+        <input class="input flex-1" id="android_text" type="text" placeholder="Text Input">
+        <button id="android_text_btn" class="btn btn-primary btn-sm">
+          <i class="far fa-paper-plane"></i>
+        </button>
       </div>
     </div>
   </div>
-   <div class="container-fluid">
 
-   
-   <div class="row">
-          <div class="col-md-12">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                 <div id="but" align="center">
-                  <a href="#" id="screen" class="btn btn-primary" role="button"><i class="fa fa-mobile-alt"></i> Show Screen</a>
-                  <a href="#" id="rootca" class="btn btn-primary" role="button"><i class="fa fa-certificate"></i> Remove Root CA</a>
-                  {% if android_version >= 5 %}
-                  <a href="#" id="proxy" class="btn btn-primary" role="button"><i class="fas fa-eye-slash"></i> Unset HTTP(S) Proxy</a>
-                  <a href="#" id="tls_test" class="btn btn-primary" role="button"  data-toggle="modal" data-target="#tls_modal"><i class="fa fa-lock"></i> TLS/SSL Security Tester</a>
-                  {% endif %}
-                  <a href="#" id="expactt" class="btn btn-primary" role="button"><i class="fa fa-language"></i> Exported Activity Tester</a>
-                  <a href="#" id="actt" class="btn btn-primary" role="button"><i class="fa fa-rocket"></i> Activity Tester</a>
-                  {% if android_version >= 5 %}
-                  <a href="#" id="deps" class="btn btn-primary" role="button"><i class="fas fa-running"></i> Get Dependencies</a>
-                  {% endif %}
-                  <a href="#" id="ss" class="btn btn-primary" role="button"><i class="fa fa-camera"></i> Take a Screenshot</a>
-                  <a href="#" id="logstream" class="btn btn-primary"><i class="fa fa-water"></i> Logcat Stream</a>
-                  <a href="{% url 'live_api' %}?hash={{ hash }}&amp;package={{ package }}" id="apimon" target="_blank" class="btn btn-primary" style='display: none'><i class="fa fa-search"></i> Live API Monitor</a>
-                  <a href="#" id="stop" class="btn btn-info" role="button" ><i class="fa fa-file-alt"></i> Generate Report</a>
+  {# ── Analyzer / Instrumentation ── #}
+  <div class="card xl:col-span-4" data-reveal x-data="{ tab: 'dm' }">
+    <div class="card-header p-0">
+      <div class="flex border-b border-border-subtle w-full">
+        <button type="button" class="mi-tab px-4 py-3 text-small font-medium text-text-tertiary"
+                :aria-selected="tab === 'dm'" @click="tab = 'dm'" aria-selected="true">Dynamic Analyzer</button>
+        <button type="button" class="mi-tab px-4 py-3 text-small font-medium text-text-tertiary"
+                :aria-selected="tab === 'errors'" @click="tab = 'errors'" aria-selected="false">Errors</button>
+      </div>
+    </div>
+    <div class="card-body">
+      {# ── Dynamic Analyzer tab ── #}
+      <div x-show="tab === 'dm'" id="dm">
+        <textarea id="stat"></textarea>
+        {% if android_version < 5 %}
+        <button id="run_app" class="btn btn-primary btn-sm mt-3"><i class="fas fa-play"></i> Run App</button>
+        {% endif %}
+
+        <form role="form" class="mt-4">
+          <div id="frida_options" class="space-y-5">
+            {# Default hooks #}
+            <div>
+              <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Default Frida Scripts</h4>
+              <div class="space-y-1.5 text-small text-text-secondary">
+                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="api_monitor" checked> API Monitoring</label>
+                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="ssl_pinning_bypass" checked> SSL Pinning Bypass</label>
+                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="root_bypass" checked> Root Detection Bypass</label>
+                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="debugger_check_bypass" checked> Debugger Check Bypass</label>
+                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="dump_clipboard" checked> Clipboard Monitor</label>
+              </div>
+            </div>
+
+            {# Auxiliary hooks #}
+            <div class="pt-4 border-t border-border-subtle">
+              <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Auxiliary Frida Scripts</h4>
+              <div class="space-y-2 text-small text-text-secondary">
+                <label class="flex items-center gap-2"><input name="auxiliary" type="checkbox" value="enum_class" id="enum_class"> Enumerate Loaded Classes</label>
+                <label class="flex items-center gap-2"><input name="auxiliary" type="checkbox" value="string_catch" id="string_catch"> Capture Strings</label>
+                <label class="flex items-center gap-2"><input name="auxiliary" type="checkbox" value="string_compare" id="string_compare"> Capture String Comparisons</label>
+                <label class="flex items-center gap-2"><input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="enum_methods" id="enum_methods"> Enumerate Class methods</label>
+                <input type="text" class="input" id="class_name" placeholder="java.io.File">
+                <label class="flex items-center gap-2"><input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_class" id="search_class"> Search Class Pattern</label>
+                <input type="text" class="input" id="class_search" placeholder="ssl\.Trust*">
+                <label class="flex items-center gap-2"><input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="trace_class" id="trace_class"> Trace Class Methods</label>
+                <input type="text" class="input" id="class_trace" placeholder="java.net.Socket,java.io.File,java.lang.String">
+              </div>
+            </div>
+
+            {# Instrumentation #}
+            <div class="pt-4 border-t border-border-subtle">
+              <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Instrumentation</h4>
+              <div class="flex flex-wrap gap-2">
+                <button id="frida_spawn" type="submit" class="btn btn-primary btn-sm"><i class="far fa-play-circle"></i> Spawn &amp; Inject</button>
+                <button id="frida_session" type="submit" class="btn btn-secondary btn-sm" disabled><i class="fas fa-redo"></i> Inject</button>
+                <button id="frida_attach" type="submit" class="btn btn-secondary btn-sm"><i class="fas fa-bug"></i> Attach</button>
+                <button id="frida_get" class="btn btn-ghost btn-sm" hidden><i class="fas fa-code"></i> Injected Code</button>
+              </div>
+            </div>
+          </div>{# /frida_options #}
+
+          {# User interface: activities + deeplinks #}
+          <div class="pt-4 mt-5 border-t border-border-subtle space-y-4">
+            <h4 class="text-tiny uppercase text-text-tertiary font-medium">User Interface</h4>
+
+            {% if activities or exported_activities %}
+            <div id="start_activity_form">
+              <label class="label" for="activities">Activities</label>
+              <div class="flex gap-2">
+                <select class="input flex-1" name="activities" id="activities">
+                  <optgroup label="Exported Activities">
+                    {% for activity in exported_activities %}<option value="{{ activity }}">{{ activity }}</option>{% endfor %}
+                  </optgroup>
+                  <optgroup label="Activities">
+                    {% for activity in activities %}<option value="{{ activity }}">{{ activity }}</option>{% endfor %}
+                  </optgroup>
+                </select>
+                <button id="start_activity" type="submit" class="btn btn-secondary btn-sm whitespace-nowrap">♢ Start</button>
+              </div>
+            </div>
+            {% endif %}
+
+            {% if deeplinks %}
+            <div>
+              <label class="label" for="schemes">Deep Links</label>
+              <div class="space-y-2">
+                <select class="input" name="schemes" id="schemes">
+                  {% for activity, intent in deeplinks.items %}
+                  <optgroup label="{{ activity }} - Schemes">{% for scheme in intent.schemes %}<option value="{{ scheme }}">{{ scheme }}</option>{% endfor %}</optgroup>
+                  {% endfor %}
+                </select>
+                <select class="input" name="hosts" id="hosts">
+                  {% for activity, intent in deeplinks.items %}
+                  <optgroup label="{{ activity }} - Hosts">{% for host in intent.hosts %}<option value="{{ host }}">{{ host }}</option>{% endfor %}<option value=""></option></optgroup>
+                  {% endfor %}
+                </select>
+                <select class="input" name="paths" id="paths">
+                  {% for activity, intent in deeplinks.items %}
+                  <optgroup label="{{ activity }} - Paths/PathPrefixes">{% for path in intent.paths %}<option value="{{ path }}">{{ path }}</option>{% endfor %}{% for path_prefix in intent.path_prefixs %}<option value="{{ path_prefix }}">{{ path_prefix }}</option>{% endfor %}<option value=""></option></optgroup>
+                  {% endfor %}
+                </select>
+                <div class="flex gap-2">
+                  <input type="text" class="input flex-1" id="query" placeholder="/foo?bar=">
+                  <button id="start_deeplink" type="submit" class="btn btn-secondary btn-sm whitespace-nowrap">▶ Deeplink</button>
                 </div>
               </div>
-              <!-- /.card-body -->
             </div>
-            <!-- /.card -->
+            {% endif %}
           </div>
-          <!-- /.col -->
+        </form>
+      </div>{# /dm #}
 
+      {# ── Errors tab ── #}
+      <div x-show="tab === 'errors'" id="errors" x-cloak>
+        <iframe sandbox frameborder="0" width="100%" height="620px" id="er" class="rounded-md border border-border-subtle bg-surface-0"></iframe>
+      </div>
+    </div>
+  </div>
 
-          <div class="col-md-3">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                <div align="center">
-                  <div class="marvel-device htc-one">
-                  <div class="top-bar"></div>
-                  <div class="camera"></div>
-                  <div class="sensor"></div>
-                  <div class="speaker"></div>
-                  <div class="screen" id="container" tabindex="0" style="outline: none;">
-                  <img width="320" height="580" src="{% url 'download' %}screen/screen.png" id="my" onerror="$('#my').attr('src','/static/img/loading.jpg')" style="background-color:black;">
-                  </div>
-                  </div>
-                </div>
-
-                <div class="card-body">
-                  <p>
-                  <div class="input-group input-group-sm">
-                    <input class="form-control form-control-navbar" id="android_text" type="text" placeholder="Text Input" >
-                    <div class="input-group-append">
-                      <button id="android_text_btn" class="btn btn-primary">
-                        <i class="far fa-paper-plane"></i>
-                      </button>
-                    </div>
-                  </div>
-                </p>
-              </div>
-
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-           <div class="col-md-{% if android_version < 5 %}9{% else %}4{% endif %}">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-
-            <div class="card card-primary card-outline card-outline-tabs">
-              <div class="card-header p-0 border-bottom-0">
-                <ul class="nav nav-tabs" id="tabnav" role="tablist">
-                  <li class="nav-item">
-                    <a class="nav-link active" id="dm-tab" data-toggle="pill" href="#dm" role="tab" aria-controls="dm" aria-selected="true">Dynamic Analyzer</a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" id="errors-tab" data-toggle="pill" href="#errors" role="tab" aria-controls="errors" aria-selected="false">Errors</a>
-                  </li>
-                </ul>
-              </div>
-              <div class="card-body">
-                <div class="tab-content" id="tabs">
-                  <div class="tab-pane fade active show" id="dm" role="tabpanel" aria-labelledby="dm-tab">
-                  <textarea id="stat"></textarea>
-                {% if android_version < 5 %}
-                <!-- xposed only-->
-                <br>
-                <button id="run_app" class="btn btn-success"><i class="fas fa-play"></i> Run App</button>
-                {% endif %}
-                <!--box-->
-                <div class="box box-primary">
-                    <!-- /.box-header -->
-                    <!-- form start -->
-                    <form role="form">
-                      <div class="box-body">
-                      <div id="frida_options">
-                        <hr/>
-                          <div class="form-group">
-                          <h4> Default Frida Scripts </h4>
-                            <label>
-                                <input name="default_hooks" type="checkbox" value="api_monitor" checked>
-                                API Monitoring 
-                              </label>
-                              <label>
-                                <input name="default_hooks" type="checkbox" value="ssl_pinning_bypass" checked>
-                                SSL Pinning Bypass 
-                              </label>
-                              <label>
-                              <input name="default_hooks" type="checkbox"  value="root_bypass" checked>
-                                Root Detection Bypass 
-                              </label>
-                              <label>
-                              <input name="default_hooks" type="checkbox" value="debugger_check_bypass" checked>
-                                Debugger Check Bypass
-                              </label>
-                              <label>
-                                <input name="default_hooks" type="checkbox" value="dump_clipboard" checked>
-                                Clipboard Monitor
-                                </label>
-                          </div>
-                        <hr/>
-                       <div class="form-group">
-                        <h4> Auxiliary Frida Scripts</h4>
-                            <label>
-                            <input name="auxiliary" type="checkbox" value="enum_class" id="enum_class">
-                              Enumerate Loaded Classes
-                            </label> 
-                             <label>
-                            <input name="auxiliary" type="checkbox" value="string_catch" id="string_catch">
-                               Capture Strings
-                            </label>
-                             <label>
-                            <input name="auxiliary" type="checkbox" value="string_compare" id="string_compare">
-                                Capture String Comparisons
-                            </label>
-                            <br />
-                             <label>
-                              <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="enum_methods" id="enum_methods">
-                              Enumerate Class methods
-                            </label>
-                             <input type="text" class="form-control" id="class_name" placeholder="java.io.File">
-
-                             <label>
-                              <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_class" id="search_class">
-                              Search Class Pattern
-                            </label>
-                             <input type="text" class="form-control" id="class_search" placeholder="ssl\.Trust*">
-                             <label>
-                             <input onclick="aux_click(this)" name="auxiliary" type="checkbox"  value="trace_class" id="trace_class">
-                              Trace Class Methods
-                            </label>
-                             <input type="text" class="form-control" id="class_trace" placeholder="java.net.Socket,java.io.File,java.lang.String">
-                       </div>
-                    
-                        <hr/>
-                        <div class="form-group">
-                          <h4> Instrumentation </h4>
-                        </div>
-
-                        <div class="box-footer">
-                          <button id="frida_spawn" type="submit" class="btn btn-success btn-sm"><i class="far fa-play-circle"></i> Spawn & Inject</button>
-                          <button id="frida_session" type="submit" class="btn btn-success btn-sm" disabled><i class="fas fa-redo"></i> Inject </button>
-                          <button id="frida_attach" type="submit" class="btn btn-success btn-sm"><i class="fas fa-bug"></i> Attach </button>
-                          <button id="frida_get" class="btn btn-primary btn-sm" hidden><i class="fas fa-code"></i> Injected Code</button>
-                       </div>
-                      </div>  <!--Frida options, hidden for xposed -->
-
-
-                        <hr/>
-                        <div class="form-group">
-                          <h4> User Interface </h4>
-                        </div>
-
-                        {% if activities or exported_activities %}
-                        <label class="box-title" for="activities">Activities</label>
-                        <div class="form-group form-inline" id="start_activity_form">
-                          <select style="width: 15rem" class="form-select form-control form-group mb-2 mr-3" name="activities" id="activities">
-                            <optgroup label="Exported Activities">
-                              {% for activity in exported_activities %}
-                            <option value="{{ activity }}">{{ activity }}</option>
-                                      {% endfor %}
-                            </optgroup>
-                            <optgroup label="Activities">
-                                        {% for activity in activities %}
-                              <option value="{{ activity }}">{{ activity }}</option>
-                                        {% endfor %}
-                            </optgroup>
-                          </select>
-                          <button id="start_activity" type="submit" class="btn btn-primary btn-sm form-group mb-2">♢ Start Activity</button>
-                        </div>
-                        {% endif %}
-            
-                        {% if deeplinks %}
-                        <div class="mt-3">
-                          <label class="box-title" for="deeplinks">Deep Links</label>
-                          <div class="form-group form-inline">
-                            <select class="form-select form-control form-group mb-2 mr-2" name="schemes" id="schemes">
-                            {% for activity, intent in deeplinks.items %}
-                              <optgroup label="{{ activity }} - Schemes">
-                                {% for scheme in intent.schemes %}
-                                  <option value="{{ scheme }}">{{ scheme }}</option>
-                                {% endfor %}
-                              </optgroup>
-                            {% endfor %}
-                            </select>
-                            <select class="form-select form-control form-group mb-2 mr-2" name="hosts" id="hosts">
-                              {% for activity, intent in deeplinks.items %}
-                                <optgroup label="{{ activity }} - Hosts">
-                                  {% for host in intent.hosts %}
-                                    <option value="{{ host }}">{{ host }}</option>
-                                  {% endfor %}
-                                  <option value=""></option>
-                                </optgroup>
-                              {% endfor %}
-                            </select>
-                            <select class="form-select form-control form-group mb-2 mr-2" name="paths" id="paths">
-                              {% for activity, intent in deeplinks.items %}
-                                <optgroup label="{{ activity }} - Paths/PathPrefixes">
-                                  {% for path in intent.paths %}
-                                    <option value="{{ path }}">{{ path }}</option>
-                                  {% endfor %}
-                                  {% for path_prefix in intent.path_prefixs %}
-                                    <option value="{{ path_prefix }}">{{ path_prefix }}</option>
-                                  {% endfor %}
-                                  <option value=""></option>
-                                </optgroup>
-                              {% endfor %}
-                            </select>
-                            <input type="text" class="form-control form-group mb-2 mr-2" id="query" placeholder="/foo?bar=">
-                            <button id="start_deeplink" type="submit" class="btn btn-primary btn-sm form-group mb-2">▶ Deeplink</button>
-                          </div>
-                        </div>
-                        {% endif %}
-                        
-                      </div>
-                      <!-- /.box-body -->
-                     
-                    </form>
-                  </div>
-           
-                 
-
-               
-
-                  
-              <!--tab end-->
-
-                  </div>
-
-                  <div class="tab-pane fade" id="errors" role="tabpanel" aria-labelledby="errors-tab">
-                    <iframe sandbox frameborder="0" width="100%" height="650px" id="er"></iframe>
-                  </div>
-                </div>
-              </div>
-              <!-- /.card -->
-            </div>
-
-
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-           <div class="col-md-5" id="codeedit">
-            <div class="card card-default">
-              <div class="card-header">
-                <h3 class="card-title"><i class="fa fa-code"></i> Frida Code Editor </h3>
-                <!-- /.card-tools -->
-              </div>
-              <!-- /.card-header -->
-              <div class="card-body">
-                <div id="code-editor">
+  {# ── Frida code editor ── #}
+  <div class="card xl:col-span-5" id="codeedit" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2">{% icon "edit" size=18 %} Frida Code Editor</h2>
+    </div>
+    <div class="card-body">
+      <div id="code-editor">
 <textarea id="code-js" rows="100">
   Java.perform(function() {
     // Use send() for logging
   });
 </textarea>
-                </div>
-                <br/>
-                <div class="form-group">
-                  <span class="box-title">Available Scripts (Use CTRL to choose multiple)  </span>
-                  <button id="loadscript" type="submit" class="btn btn-primary btn-sm">Load</button>
-                </div>
-                <div class="form-group">
-                  <select id="fd_scs" size="10" multiple="" class="form-control">
-                  </select>
-                </div>
-              
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-            <div class="col-md-12">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                   
-                   <div id="shell">
-                    <output></output>
-                    <div id="input-line" class="input-line">
-                      <div class="prompt"></div><div><input class="cmdline" autofocus /></div>
-                    </div>
-                  </div>
-              
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-
-          <div class="col-md-12">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                   <div>
-                    <h4 class="page-header"><strong>Frida Logs </strong></h4>
-                    <div id="messages"></br>Data refreshed in every 3 seconds.</div>
-                    <pre class="frida-pre" id="frida-logs" style="font-size:15pt"></pre>
-                  </div>
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-        
-        </div>
-
-        </div>
-       </div>
-     </div>
+      </div>
+      <div class="flex items-center justify-between gap-2 mt-3">
+        <span class="text-tiny text-text-tertiary">Available Scripts (Use CTRL to choose multiple)</span>
+        <button id="loadscript" type="submit" class="btn btn-secondary btn-sm">Load</button>
+      </div>
+      <select id="fd_scs" size="10" multiple="" class="input mt-2 w-full"></select>
     </div>
-</div>
+  </div>
+</section>
 
-<!--Loader-->
+{# ─────────────────── Shell ─────────────────── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2">{% icon "monitor" size=18 %} Shell Access</h2>
+  </div>
+  <div class="card-body">
+    <div id="shell">
+      <output></output>
+      <div id="input-line" class="input-line">
+        <div class="prompt"></div><div><input class="cmdline" autofocus /></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Frida logs ─────────────────── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Frida Logs</h2>
+    <span class="text-tiny text-text-tertiary" id="messages">Data refreshed every 3 seconds.</span>
+  </div>
+  <div class="card-body">
+    <pre class="frida-pre" id="frida-logs"></pre>
+  </div>
+</section>
+
+{# ─────────────────── Loader ─────────────────── #}
 <div class="hidden loading">
   <div class='uil-ring-css' style='transform:scale(0.79);'>
     <div></div>
   </div>
-  </div>
-<!-- Modal -->
-<div class="modal fade" id="frida_attach_mdl" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Attach to a Running Process</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        <form role="form">
-          <div class="form-group">
-            <select id="process_select" class="form-select" aria-label="Select a process">
-            </select>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button id="attach_to_pid" type="button" class="btn btn-primary"><i class="fas fa-bug"></i> Attach</button>
-      </div>
-
-    </div>
-  </div>
 </div>
 
- <!-- Modal -->
- <div class="modal fade" id="get_code_modal" tabindex="-1" role="dialog">
-  <div class="modal-dialog modal-xl">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h4 class="modal-title">Injected Frida Script</h4>
-        <button type="button" class="close" data-dismiss="modal">&times;</button>
-      </div>
-      <div class="modal-body" id="injected_content">
-      </div>
+{# ─────────────────── Attach-to-process modal ─────────────────── #}
+<dialog id="frida_attach_mdl" class="rounded-xl backdrop:bg-black/40 max-w-lg w-full p-0 bg-surface-1 text-text-primary border border-border-subtle shadow-elevation-3">
+  <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
+    <h3 class="text-h3">Attach to a Running Process</h3>
+    <button type="button" class="text-text-tertiary hover:text-text-primary" onclick="document.getElementById('frida_attach_mdl').close()">{% icon "x" size=18 %}</button>
+  </div>
+  <div class="px-5 py-4">
+    <select id="process_select" class="input w-full" aria-label="Select a process"></select>
+  </div>
+  <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-border-subtle">
+    <button id="attach_to_pid" type="button" class="btn btn-primary btn-md"><i class="fas fa-bug"></i> Attach</button>
+  </div>
+</dialog>
+
+{# ─────────────────── Injected script modal ─────────────────── #}
+<dialog id="get_code_modal" class="rounded-xl backdrop:bg-black/40 max-w-4xl w-full p-0 bg-surface-1 text-text-primary border border-border-subtle shadow-elevation-3">
+  <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
+    <h3 class="text-h3">Injected Frida Script</h3>
+    <button type="button" class="text-text-tertiary hover:text-text-primary" onclick="document.getElementById('get_code_modal').close()">{% icon "x" size=18 %}</button>
+  </div>
+  <div class="px-5 py-4 max-h-[70vh] overflow-auto" id="injected_content"></div>
+</dialog>
+
+{# ─────────────────── TLS/SSL tester modal ─────────────────── #}
+<dialog id="tls_modal" class="rounded-xl backdrop:bg-black/40 max-w-3xl w-full p-0 bg-surface-1 text-text-primary border border-border-subtle shadow-elevation-3">
+  <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
+    <h3 class="text-h3">Run TLS/SSL Security Tests — {{ package }}</h3>
+    <button type="button" class="text-text-tertiary hover:text-text-primary" onclick="document.getElementById('tls_modal').close()">{% icon "x" size=18 %}</button>
+  </div>
+  <div class="px-5 py-4 space-y-4 max-h-[70vh] overflow-auto">
+    <div class="text-small text-text-secondary space-y-2">
+      <p>TLS/SSL Security test helps you evaluate the security of your application's network connections. These tests are applicable only for applications that perform network connections over HTTP protocol.</p>
+      <p><strong class="text-text-primary">TLS Misconfiguration Test</strong> — Enable HTTPS MITM Proxy, Remove Root CA, Run the App for 25 seconds.<br>
+      <code class="font-mono text-mono">Uncovers insecure configurations that allow HTTPS connections bypassing certificate/SSL errors in WebViews.</code></p>
+      <p><strong class="text-text-primary">TLS Pinning/Certificate Transparency Test</strong> — Enable HTTPS MITM Proxy, Install Root CA, Run the App for 25 seconds.<br>
+      <code class="font-mono text-mono">Evaluates the app's TLS/SSL hardening; checks for certificate/public key pinning or certificate transparency.</code></p>
+      <p><strong class="text-text-primary">TLS Pinning/Certificate Transparency Bypass Test</strong> — Enable HTTPS MITM Proxy, Install Root CA, Bypass pinning or certificate transparency.<br>
+      <code class="font-mono text-mono">Tries to bypass certificate/public key pinning or certificate transparency controls.</code></p>
+      <p class="text-tiny text-text-tertiary"><strong>NOTE:</strong> For better results, while the app is running, navigate through different flows that trigger network connections over HTTP. Make sure no other apps are running during the test.</p>
+    </div>
+    <div>
+      <label class="label">Test Progress</label>
+      <textarea id="tls_text" class="input font-mono text-mono w-full" rows="8" placeholder="" disabled></textarea>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-4 py-2 font-medium">Tests</th>
+            <th class="text-left px-4 py-2 font-medium">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-border-subtle"><td class="px-4 py-2">TLS Misconfiguration Test</td><td id="tls_1" class="px-4 py-2">-</td></tr>
+          <tr class="border-b border-border-subtle"><td class="px-4 py-2">TLS Pinning/Certificate Transparency Test</td><td id="tls_2" class="px-4 py-2">-</td></tr>
+          <tr class="border-b border-border-subtle"><td class="px-4 py-2">TLS Pinning/Certificate Transparency Bypass Test</td><td id="tls_3" class="px-4 py-2">-</td></tr>
+          <tr><td class="px-4 py-2">Cleartext Traffic Test</td><td id="tls_4" class="px-4 py-2">-</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
-</div>
-
-
-<!-- Modal -->
-<div class="modal" id="tls_modal" tabindex="-1" role="dialog">
-  <div class="modal-dialog modal-xl">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h4 class="modal-title">Run TLS/SSL Security Tests - {{ package }}</h4>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">×</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        <form role="form">
-            <div class="form-group">
-                <p>TLS/SSL Security test helps you to evaluate the security of your application's network connections. These tests are applicable only for applications that performs network connections over HTTP protocol. We run multiple TLS/SSL tests against the application.<br>
-                </p>
-                <p>
-                <strong>TLS Misconfiguration Test </strong> - Enable HTTPS MITM Proxy, Remove Root CA, Run the App for 25 seconds.<br>
-                <code>This test will uncover insecure configurations that allow HTTPS connections bypassing certificate errors or SSL/TLS errors in WebViews. This is equivalent to not having TLS.</code><br>
-                </p>
-                <p>
-                <strong>TLS Pinning/Certificate Transparency Test </strong> - Enable HTTPS MITM Proxy, Install Root CA, Run the App for 25 seconds.<br>
-                <code>This test will evaluate the application's TLS/SSL hardening controls and will check if the application implement certificate or public key pinning and or certificate transparency.</code><br>
-                <p>
-                <strong>TLS Pinning/Certificate Transparency Bypass Test </strong> - Enable HTTPS MITM Proxy, Install Root CA, Bypass Certificate/Public Key Pinning or Certificate Transparency.<br>
-                <code>This test tries to bypass certificate or public key pinning and or certificate transparency controls in your application. MobInspect can bypass most of the generic implementations.</code><br>
-                </p>
-                <p><strong>NOTE: </strong><i>For Better results, while the application is running, navigate through different business logic flows that will trigger network connections over HTTP protocol. Make sure that no other applications are running during the test.</i></p>
-              </div>
-            <div class="form-group">
-              <label>Test Progress</label>
-              <textarea id="tls_text" class="form-control" rows="10" placeholder="" disabled=""></textarea>
-            </div>
-            <div class="form-group">
-              <table class="table table-bordered table-hover table-striped">
-                <thead>
-                    <tr>
-                      <th>TESTS</th>
-                      <th>RESULT</th>
-                  </tr>
-                </thead>
-                <tbody>
-                   <tr>
-                    <td>TLS Misconfiguration Test</td>
-                    <td id="tls_1">-</td>
-                  </tr>
-                  <tr>
-                    <td>TLS Pinning/Certificate Transparency Test</td>
-                    <td id="tls_2">-</td>
-                  </tr>
-                  <tr>
-                    <td>TLS Pinning/Certificate Transparency Bypass Test</td>
-                    <td id="tls_3">-</td>
-                  </tr>
-                  <tr>
-                    <td>Cleartext Traffic Test</td>
-                    <td id="tls_4">-</td>
-                  </tr>
-              </tbody>
-              </table>
-            </div>
-
-          </form>
-      </div>
-       <div class="modal-footer">
-        <button id="run_tls_tests" type="button" class="btn btn-primary"><i class="fas fa-bolt"></i> Run TLS/SSL Tests</button>
-      </div>
-    </div>
-
-
-
-    <!-- /.modal-content -->
+  <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-border-subtle">
+    <button id="run_tls_tests" type="button" class="btn btn-primary btn-md"><i class="fas fa-bolt"></i> Run TLS/SSL Tests</button>
   </div>
-  <!-- /.modal-dialog -->
-</div>
-<!-- End Modal -->
+</dialog>
 
 {% endblock %}
-{% block extra_scripts %}
+
+{% block extra_js %}
+<script src="{% static "adminlte/plugins/jquery.min.js" %}"></script>
 <script src="{% static "codemirror/codemirror.js" %}"></script>
 <script src="{% static "codemirror/javascript.js" %}"></script>
 <script src="{% static "codemirror/jshint.js" %}"></script>
@@ -590,32 +408,29 @@ document.getElementById('my').ondragstart = function() { return false; };
 document.getElementById('frida-logs').style.display = 'none';
 
 // Frida Auxiliary actions
-
 function aux_click(cb) {
   if (cb.checked && cb.value==='search_class')
-    $('#cls_search').addClass('highlight')
+    $('#class_search').addClass('highlight')
   else if (!cb.checked && cb.value==='search_class')
-    $('#cls_search').removeClass('highlight')
+    $('#class_search').removeClass('highlight')
   else if (cb.checked && cb.value==='enum_methods')
-    $('#cls_name').addClass('highlight')
+    $('#class_name').addClass('highlight')
   else if (!cb.checked && cb.value==='enum_methods')
-    $('#cls_name').removeClass('highlight')
+    $('#class_name').removeClass('highlight')
   else if (cb.checked && cb.value==='trace_class')
-    $('#cls_trace').addClass('highlight')
+    $('#class_trace').addClass('highlight')
   else if (!cb.checked && cb.value==='trace_class')
-    $('#cls_trace').removeClass('highlight')
+    $('#class_trace').removeClass('highlight')
 }
-
-
 
 //For All Ajax
 function action(url, data, on_success){
   //Add CSRF
   data.csrfmiddlewaretoken ='{{ csrf_token }}';
   $.ajax({
-    url : url, 
+    url : url,
     type : "POST",
-    dataType: "json", 
+    dataType: "json",
     data : data,
     success : function(json){ on_success(json) },
     error : function(xhr, ajaxOptions, thrownError) {
@@ -762,30 +577,30 @@ var Terminal = Terminal || function (cmdLineContainer, outputContainer) {
     function scrollToShellBottom(){
       // Scroll to shell bottom and ensure shell is completely visible
       var myElement = document.getElementById('shell');
-      
+
       // Scroll the shell content to the bottom
       myElement.scrollTop = myElement.scrollHeight;
-      
+
       // Ensure the shell element is visible in the viewport
-      myElement.scrollIntoView({ 
-        block: 'end', 
+      myElement.scrollIntoView({
+        block: 'end',
         behavior: 'smooth',
         inline: 'nearest'
       });
-      
+
       // For dynamic content, we need to continuously monitor and scroll
       // Set up a MutationObserver to watch for content changes
       if (!window.shellObserver) {
         window.shellObserver = new MutationObserver(function(mutations) {
           // When content changes, scroll to keep shell visible
           myElement.scrollTop = myElement.scrollHeight;
-          myElement.scrollIntoView({ 
-            block: 'end', 
+          myElement.scrollIntoView({
+            block: 'end',
             behavior: 'smooth',
             inline: 'nearest'
           });
         });
-        
+
         // Start observing the shell for content changes
         window.shellObserver.observe(myElement, {
           childList: true,
@@ -873,7 +688,7 @@ var Terminal = Terminal || function (cmdLineContainer, outputContainer) {
                     break;
                 case 'help':
                     output('<div class="ls-files">' + CMDS_.join('<br>') + '</div>');
-                    break;                      
+                    break;
                 default:
                     if (cmd === 'shell' && args.length === 0)
                         output("Incomplete command. expecting shell &lt;cmd&gt;");
@@ -967,10 +782,10 @@ print_status("Start Instrumentation or Run the application and navigate through 
 
 function get_logs(){
       $.ajax({
-        url : '{% url 'frida_logs' %}?hash={{ hash }}&stream=1', 
+        url : '{% url 'frida_logs' %}?hash={{ hash }}&stream=1',
         type : "GET",
-        dataType: "json", 
-        success : function(json){ 
+        dataType: "json",
+        success : function(json){
           if (json.status==="ok"){
             $('#frida-logs').text(json.message);
           } else {
@@ -1023,8 +838,8 @@ $("#screen").click(function() {
           clearInterval(screenfunc);
           touch = "off";
       }
-      return false;  
-}); 
+      return false;
+});
 
 
 // Touch Events
@@ -1047,7 +862,7 @@ function getXY(e, t){
       var offset = $(t).offset();
       var x = e.pageX - offset.left;
       var y = e.pageY - offset.top;
-      xaxis = x * (screen_width/320); 
+      xaxis = x * (screen_width/320);
       yaxis = y * (screen_height/580);
       console.log('X Axis: '+ xaxis + " Y Axis: "+ yaxis);
 }
@@ -1172,7 +987,7 @@ $("#ss").click(function() {
         print_status(json.message);
     }
   });
-  return false;  
+  return false;
 });
 
 //MobInspect CA
@@ -1195,8 +1010,8 @@ $("#rootca").click(function() {
       else
         print_status(json.message);
     });
-    return false;  
-}); 
+    return false;
+});
 
 
 //MobInspect Global Proxy
@@ -1219,7 +1034,7 @@ $("#proxy").click(function() {
       else
         print_status(json.message);
     });
-    return false;  
+    return false;
 });
 
 function start_activity(activity){
@@ -1255,14 +1070,14 @@ function activity_tester(test){
 $("#expactt").click(function()  {
   print_status("Starting Exported Activity tester...")
   activity_tester('exported')
-  return false;  
+  return false;
 });
 
 //Start Activity Tester
 $("#actt").click(function()  {
   print_status("Starting Activity tester...")
   activity_tester('all_activities')
-  return false;  
+  return false;
 });
 
 //SSL/TLS Tester
@@ -1306,8 +1121,8 @@ $('#run_tls_tests').click(function()  {
       print_tls_progress(json.message)
     }
   });
-  return false;  
-}); 
+  return false;
+});
 
 // Run APK for Xposed
 $("#run_app").click(function() {
@@ -1319,15 +1134,15 @@ $("#run_app").click(function() {
           print_status("Failed to launch the application.");
       }
     });
-    return false;  
+    return false;
 });
 
 // Logcat Stream
 $("#logstream").click(function() {
     print_status("Logcat Steaming started.");
-    setTimeout(function(){ window.open(document.location.origin + '/logcat/?package={{ package }}', '_blank');}, 500);   
-    return false;  
-}); 
+    setTimeout(function(){ window.open(document.location.origin + '/logcat/?package={{ package }}', '_blank');}, 500);
+    return false;
+});
 
 
 // Load Frida Scripts
@@ -1338,7 +1153,7 @@ $("#loadscript").click(function() {
         editor.getDoc().setValue(json.content);
     }
   });
-  return false;  
+  return false;
 });
 
 // Frida Spawn, Session and Ps
@@ -1352,7 +1167,7 @@ function frida_instrument(frida_action, pid=null, new_pkg=null){
     document.getElementById('frida_get').hidden = false;
      var default_hooks = [];
 
-    $.each($("input[name='default_hooks']:checked"), function(){            
+    $.each($("input[name='default_hooks']:checked"), function(){
         default_hooks.push($(this).val());
     });
     if(default_hooks.includes("api_monitor"))
@@ -1360,7 +1175,7 @@ function frida_instrument(frida_action, pid=null, new_pkg=null){
     else
       $('#apimon').hide();
     var auxiliary_hooks = [];
-    $.each($("input[name='auxiliary']:checked"), function(){            
+    $.each($("input[name='auxiliary']:checked"), function(){
         auxiliary_hooks.push($(this).val());
     });
 
@@ -1396,7 +1211,7 @@ function frida_instrument(frida_action, pid=null, new_pkg=null){
         json.message.forEach(function(p) {
           $('<option>').val(p.pid.toString() + ',' + p.identifier.toString()).text(p.pid.toString() + ': ' + p.name.toString() + ' - ' + p.identifier.toString()).appendTo('#process_select');
         });
-        $('#frida_attach_mdl').modal('toggle');
+        document.getElementById('frida_attach_mdl').showModal();
       } else if (frida_action =='get'){
         var injected = document.getElementById("injected_content");
         injected.innerHTML = '<pre id="injected-pre"></pre>';
@@ -1407,7 +1222,7 @@ function frida_instrument(frida_action, pid=null, new_pkg=null){
           textOverflow: 'scroll',
           language: 'javascript',
         });
-        $('#get_code_modal').modal('toggle');
+        document.getElementById('get_code_modal').showModal();
       }
   });
 }
@@ -1415,8 +1230,8 @@ function frida_instrument(frida_action, pid=null, new_pkg=null){
 // Frida Spawn
 $("#frida_spawn").click(function() {
   frida_instrument('spawn');
-  return false;  
-}); 
+  return false;
+});
 
 // Frida Session
 $("#frida_session").click(function() {
@@ -1425,15 +1240,15 @@ $("#frida_session").click(function() {
       // If all default hooks are selected, uncheck all during injection
       $(default_hooks + ':checkbox').prop("checked", false );
   frida_instrument('session');
-  return false;  
-}); 
+  return false;
+});
 
 
 // Frida Get Processes to attach
 $("#frida_attach").click(function() {
   frida_instrument('ps');
-  return false;  
-}); 
+  return false;
+});
 
 // Frida Attach to Pid
 $("#attach_to_pid").click(function() {
@@ -1441,14 +1256,14 @@ $("#attach_to_pid").click(function() {
   var pid = values.split(',')[0];
   var package = values.split(',')[1];
   frida_instrument('session', pid, package);
-  $('#frida_attach_mdl').modal('hide');
-  return false;  
-}); 
+  document.getElementById('frida_attach_mdl').close();
+  return false;
+});
 
 // Frida Get Injected Script
 $("#frida_get").click(function() {
   frida_instrument('get');
-  return false;  
+  return false;
 });
 
 //Frida Get Runtime Dependencies
@@ -1461,7 +1276,7 @@ $("#deps").click(function() {
           print_status(json.message);
       }
     });
-    return false;  
+    return false;
 });
 
 //Dump App data
@@ -1477,7 +1292,7 @@ function dump(){
     }
   });
 }
-  
+
 //Finish & Generate Report
 $("#stop").one( "click", function() {
   print_status("Collecting data...");
@@ -1487,7 +1302,6 @@ $("#stop").one( "click", function() {
     $("#screen").click();
   action(document.location.origin + '/collect_logs/', { hash: '{{ hash }}'}, function(json) {
     if (json.status==="ok"){
-      $('#stop').addClass("btn btn-success");
       $('#stop').text("Please Wait...");
       print_status("Downloading logs.");
       print_status("Stopping Application.");
@@ -1497,7 +1311,7 @@ $("#stop").one( "click", function() {
     }
     dump();
   });
-  return false;  
+  return false;
 });
 
 //end document.ready

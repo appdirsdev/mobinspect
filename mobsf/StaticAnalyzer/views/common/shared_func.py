@@ -18,6 +18,7 @@ import arpy
 
 from django.utils.html import escape
 from django.http import HttpResponseRedirect
+from django.shortcuts import render
 
 from mobsf.MobSF import settings
 from mobsf.MobSF.security import (
@@ -40,6 +41,10 @@ from mobsf.MobSF.views.scanning import (
 )
 from mobsf.StaticAnalyzer.views.comparer import (
     generic_compare,
+)
+from mobsf.StaticAnalyzer.models import (
+    RecentScansDB,
+    StaticAnalyzerAndroid,
 )
 from mobsf.StaticAnalyzer.views.common.entropy import (
     get_entropies,
@@ -390,6 +395,71 @@ def compare_apps(request, hash1: str, hash2: str, api=False):
     logger.info(
         'Starting App compare for %s and %s', hash1, hash2)
     return generic_compare(request, hash1, hash2, api)
+
+
+@login_required
+def compare_versions(request, checksum, api=False):
+    """List other scanned versions of the same app to compare against.
+
+    Finds every other Android static-analysis result that shares the current
+    app's package name and renders a picker; each row links to the existing
+    /compare/<hash1>/<hash2>/ diff. Version comparison is Android-only because
+    generic_compare reads StaticAnalyzerAndroid.
+    """
+    if not is_md5(checksum):
+        return print_n_send_error_response(request, 'Invalid hash', api)
+    current = StaticAnalyzerAndroid.objects.filter(MD5=checksum).first()
+    if not current:
+        return print_n_send_error_response(
+            request,
+            'Version comparison is available for Android apps only, and no '
+            'Android static analysis was found for this hash.', api)
+    package = current.PACKAGE_NAME
+    others = []
+    if package:
+        # Only MD5s with a completed Android static entry can be diffed.
+        android_md5s = set(
+            StaticAnalyzerAndroid.objects
+            .filter(PACKAGE_NAME=package)
+            .exclude(MD5=checksum)
+            .values_list('MD5', flat=True))
+        seen = set()
+        # RecentScansDB carries the scan timestamp + friendly metadata; use it
+        # to order newest-first and label each version.
+        for r in (RecentScansDB.objects
+                  .filter(PACKAGE_NAME=package, MD5__in=android_md5s)
+                  .order_by('-TIMESTAMP')):
+            seen.add(r.MD5)
+            others.append({
+                'md5': r.MD5,
+                'app_name': r.APP_NAME,
+                'version_name': r.VERSION_NAME,
+                'file_name': r.FILE_NAME,
+                'timestamp': r.TIMESTAMP,
+            })
+        # Any Android entries missing from RecentScansDB (e.g. API uploads).
+        for e in StaticAnalyzerAndroid.objects.filter(
+                MD5__in=(android_md5s - seen)):
+            others.append({
+                'md5': e.MD5,
+                'app_name': e.APP_NAME,
+                'version_name': e.VERSION_NAME,
+                'file_name': e.FILE_NAME,
+                'timestamp': None,
+            })
+    context = {
+        'title': 'Compare Versions',
+        'version': settings.MOBSF_VER,
+        'checksum': checksum,
+        'app_name': current.APP_NAME,
+        'version_name': current.VERSION_NAME,
+        'file_name': current.FILE_NAME,
+        'package': package,
+        'others': others,
+    }
+    if api:
+        return context
+    return render(request, 'static_analysis/compare_versions.html', context)
 
 
 def get_avg_cvss(findings):

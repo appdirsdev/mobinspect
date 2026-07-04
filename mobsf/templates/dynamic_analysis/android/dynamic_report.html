@@ -1,731 +1,477 @@
 {% extends "base/legacy_app.html" %}
-   {% load static %}
+{% load static %}
 {% block extra_css %}
-    <!-- DataTables -->
-    <link href="{% static "datatables/css/datatables.combined.min.css" %}" rel="stylesheet">
-     <style type="text/css" media="print">
-        @page { size: landscape; }
-        @media print {
-          .btn, #scan_options  {
-            display: none;
-          }
-        }
-    </style>
-    {% endblock %}
-{% block content %}
-  <!-- Content Wrapper. Contains page content -->
-<div class="content-wrapper">
-  <!-- Content Header (Page header) -->
-  <div class="content-header">
-  <!--
-    <div class="container-fluid">
-      <div class="row mb-2">
-        <div id="mobsf_header" align="center">
-        </div>
-      </div>
-    </div>-->
-  </div>
-  <!-- /.content-header -->
-
-
- <!-- Main content -->
-<a id="information" class="anchor"></a>
-<section class="content">
-    <div class="container-fluid">
-      <div class="row">
-        <div class="col-lg-12">
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title"></h5>
-                <div class="row">
-                <div class="col-12">
-                  <p><strong><i class="fas fa-info-circle"></i> INFORMATION</strong></p>
-                   <div align="center">
-                      <p>
-                      {% if apimon %}
-                      <a target="_blank" class="btn btn-primary" role="button" href="{% url 'live_api' %}?hash={{ hash }}&amp;package={{ package }}"><i class="fa fa-mobile"></i> API Monitor View</a>
-                      {% endif %}
-                      {% if frida_logs %}
-                          <a target="_blank" class="btn btn-primary" role="button" href="{% url 'frida_logs' %}?hash={{ hash }}&amp;package={{ package }}"><i class="fas fa-spider"></i> Frida Logs View</a>
-                      {% endif %}
-                          <a class="btn btn-success" target="_blank" role="button" href="{% url 'httptools' %}?project={{package}}"><i class="fab fa-hire-a-helper"></i> Start HTTPTools</a>
-                      </p>
-                      <p><h6><strong>Raw Logs</strong></h6></p>
-                      <p>
-                      {% if droidmon %}
-                         <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'download' %}{{ hash }}-x_logcat.txt"><i class="fa fa-mobile"></i> Droidmon API Monitor Logs</a>
-                      {% endif %}
-                      {% if apimon %}
-                         <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'download' %}{{ hash }}-api_monitor.txt"><i class="fas fa-water"></i> API Monitor Logs</a>
-                      {% endif %}
-                      {% if frida_logs %}
-                         <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'download' %}{{ hash }}-frida_out.txt"><i class="fas fa-water"></i> Frida Logs</a>
-                      {% endif %}
-                      <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'download' %}{{ hash }}-web_traffic.txt"><i class="fas fa-water"></i> HTTP(S) Traffic</a>
-                      <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'download' %}{{ hash }}-logcat.txt"><i class="fas fa-water"></i> Logcat Logs</a>
-                      <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'download' %}{{ hash }}-dump.txt"><i class="fas fa-water"></i> Dumpsys Logs</a> 
-                      <a class="btn btn-primary btn-sm" role="button" href="{% url 'download' %}{{ hash }}-app_data.tar"><i class="fas fa-download"></i> Application Data</a>
-                      </p>
-                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-      </div>
-      <!-- /.col -->
-      <!-- row and container-->
-      </div>
-  </div>
-  </section>
-<!-- =========================end information==================================== -->
-
-{% for api, details in apimon.items %}
-<a id="{{api | slugify}}" class="anchor"></a>
-<section class="content">
-      <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-12">
-            <div class="card">
-              <div class="card-body">
-              <p><strong><i class="{{details.0|key:"icon"}}"></i> {{api | upper}}</strong></p>
-                <div class="table-responsive">
-                 <table class="table table-striped">
-                    <thead>
-                    <tr>
-                      <th>CLASS</th>
-                      <th>METHOD</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                      {% for call in details %}
-                        <tr>
-                        <td>{{ call|key:"class" }}</td>
-                        <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">
-                            <b>{{ call|key:"method" }}</b>
-                            <p> <br /><b><i>Arguments:</i></b> {{ call|key:"arguments" }} </p>
-                              {% if call|key:"result" %}
-                            <p><b><i>Result: </i></b>{{ call|key:"result"}} </p>
-                              {% endif %}
-                              {% if call|key:"returnValue" %}
-                            <p><b><i>Return Value: </i></b>{{ call|key:"returnValue"}} </p>
-                            {% endif %}
-                            {% if call|key:"decoded" %}
-                              <p> <b><i>Decoded String: </i></b>{{ call|key:"decoded" }} </p>
-                            {% endif %}
-                            <p> <b><i>Called From: </i></b>{{ call|key:"calledFrom" }} </p>
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-                </div>
-              </div>
-            </div><!-- /.card -->
-            </div>
-            <!-- end row -->
-            </div>
-        </div>
-</section>
-{% endfor %}
-<!-- ===========================end apimon================================== -->
-
-{% for api, details in droidmon.items %}
-<a id="{{api}}" class="anchor"></a>
-<section class="content">
-      <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-12">
-            <div class="card">
-              <div class="card-body">
-                <p><strong><i class="{{details|key:"icon"}}"></i> {{details|key:"name"}}</strong></p>
-                <div class="table-responsive">
-                 <table class="table table-striped">
-                    <thead>
-                    <tr>
-                      <th>CLASS</th>
-                      <th>METHOD</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                     {% for call in details|key:"calls" %}
-                      <tr>
-                        <td>{{ call|key:"class" }}</td>
-                        <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">
-                            <b>{{ call|key:"method" }}</b>
-                            {% if call|key:"args" %}
-                            <br/><p> <b><i>Arguments:</i></b> {{ call|key:"args" }} </p>
-                            {% endif %}
-                            {% if call|key:"decoded" %}
-                              <p> <b><i>Decoded String: </i></b>{{ call|key:"decoded" }} </p>
-                            {% endif %}
-                              {% if call|key:"return" %}
-                              <br/><p><b><i>Return: </i></b>{{ call|key:"return" }} </p>
-                              {% endif %}
-                        </td>
-                     </tr>
-                   {% endfor %}
-                  </tbody>
-                </table>
-                </div>
-              </div>
-            </div><!-- /.card -->
-            </div>
-            <!-- end row -->
-            </div>
-        </div>
-</section>
-{% endfor %}
-<!-- ===========================end droidmon================================== -->
-
-<!-- ==========================start tls test================================== -->
-
-<a id="tls_tests" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-              <p>
-                <strong><i class="fas fa-lock"></i> TLS/SSL Security Tester</strong>
-            </p>
-             <div class="table-responsive">
-              <table class="table table-bordered table-hover table-striped">
-                <thead>
-                    <tr>
-                      <th>TESTS</th>
-                      <th>RESULT</th>
-                  </tr>
-                </thead>
-                <tbody>
-                   <tr>
-                    <td>TLS Misconfiguration Test</td>
-                    <td>{% if tls_tests%}{% if tls_tests.tls_misconfigured == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td>
-                  </tr>
-                  <tr>
-                    <td>TLS Pinning/Certificate Transparency Test</td>
-                    <td>{% if tls_tests%}{% if tls_tests.no_tls_pin_or_transparency == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td>
-                  </tr>
-                  <tr>
-                    <td>TLS Pinning/Certificate Transparency Bypass Test</td>
-                    <td>{% if tls_tests%}{% if tls_tests.pin_or_transparency_bypassed == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td>
-                  </tr>
-                  <tr>
-                    <td>Cleartext Traffic Test</td>
-                    <td>{% if tls_tests%}{% if tls_tests.has_cleartext == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td>
-                  </tr>
-              </table>
-              </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-
-</section>
-<!-- ===========================end tls test================================== -->
-<a id="exportedactivitytester" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-              <p>
-                <strong><i class="fas fa-shapes"></i> EXPORTED ACTIVITY TESTER</strong>
-            </p>
-             <div class="table-responsive">
-                    <table class="table table-bordered table-hover table-striped">
-                      <thead>
-                        <tr>
-                          <th>SCREENSHOT</th>
-                          <th>ACTIVITY</th>
-                        </tr>
-                     </thead>
-                     <tbody>
-                    {% for img, desc in exported_activity_tester.items %}
-                        <tr>
-                          <td><img alt="{{desc}}" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" class="img-thumbnail" height="300" width="175"></td>
-                        <td>{{ desc }}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                  </table>
-              </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-
-</section>
- <!-- ===========================end exported activity tester ================================== -->
-<a id="activitytester" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fa fa-language"></i> ACTIVITY TESTER</strong>
-             <p>
-             <div class="table-responsive">
-                  <table class="table table-bordered table-hover table-striped">
-                    <thead>
-                      <tr>
-                        <th>SCREENSHOT</th>
-                        <th>ACTIVITY</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                       {% for img, desc in activity_tester.items %}
-                          <tr>
-                            <td><img alt="{{desc}}" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" class="img-thumbnail" height="300" width="175"></td>
-                          <td>{{ desc }}</td>
-                          </tr>
-                      {% endfor %}
-                    </tbody>
-                    </table>
-                </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end activity tester ================================== -->
- <a id="screenshots" class="anchor"></a>
- <section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-              <p>
-             <strong><i class="fas fa-images"></i> SCREENSHOTS</strong>
-             </p>
-               <div class="list-group">
-                      {% for i in screenshots %}
-                        <img alt="Screenshot" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ i}}" class="img-thumbnail" height="600" width="350">
-                      {% endfor %}
-              </div>
-              
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end screenshots ================================== -->
-
-<a id="deps" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-running"></i> RUNTIME DEPENDENCIES</strong>
-             </p>
-                {% if runtime_dependencies %} 
-                <div class="list-group">
-                  {% for f in runtime_dependencies %}
-                        {{ f }} <br>
-                  {% endfor %}
-              {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-    </div>
-</section>
- <!-- ===========================end dependencies ================================== -->
- <style>
-  #chartdiv {
-  width: 100%;
-  height: 500px;
-  overflow: hidden;
-}
-</style>
- <a id="serverlocations" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-            <p>
-             <strong><i class="fas fa-globe-asia"></i> SERVER LOCATIONS</strong>
-             </p>
-              <div class="table-responsive">
-                <div id="chartdiv"></div>
-            </div>
-
-            <div class="table-responsive">
-              {% if domains %}
-              <p></br>This app may communicate with the following OFAC sanctioned list of countries.</p>
-             <table id="table_ofac" class="table table-bordered table-hover table-striped">
-                  <thead>
-                  <tr>
-                     <th>DOMAIN</th>
-                     <th>COUNTRY/REGION</th>
-                  </tr>
-                 </thead>
-                 <tbody>
-                 {% for domain, details in domains.items %}
-                 {% if details|key:"ofac" == True %}
-                  <tr><td>{{domain}}</td>
-                  <td>
-                    <strong>IP: </strong>{{details|key:"geolocation"|key:"ip"}}  <br/>
-                    <strong>Country: </strong>{{details|key:"geolocation"|key:"country_long"}} <br/>
-                    <strong>Region: </strong>{{details|key:"geolocation"|key:"region"}} <br/>
-                    <strong>City: </strong>{{details|key:"geolocation"|key:"city"}} <br/>
-                  </td>
-                  </tr>
-                  {% endif %}
-                  {% endfor %}
-                </tbody>
-            </table>
-             {% endif %}
-            </div>
-  
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end server locations ================================== -->
- <a id="malware_check" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fab fa-searchengin"></i> DOMAIN MALWARE CHECK</strong>
-             </p>
-              <div class="table-responsive">
-              {% if domains %} 
-                <table id="table_malware" class="table table-bordered table-hover table-striped">
-                  <thead>
-                  <tr>
-                     <th>DOMAIN</th>
-                     <th>STATUS</th>
-                     <th>GEOLOCATION</th>
-                  </tr>
-                 </thead>
-                 <tbody>
-                 {% for domain, details in domains.items %}
-                  <tr><td>{{domain}}</td><td> 
-
-                    {% if details|key:"bad" == "yes" %}
-                    <span class="badge bg-danger">malware</span><br/>
-                      <pre>
-                      <strong>URL: </strong>{{details|key:"domain_or_url"}}
-                      <strong>IP: </strong><span class="badge bg-danger">{{details|key:"ip"}}</span>
-                      <strong>Description: </strong>{{details|key:"desc"}}
-                      </pre>
-                  {% else %}
-                    <span class="badge bg-success">good</span><br/>
-                  {% endif %}
-                  </td>
-                  <td>
-                    {% if details|key:"geolocation" %}
-                      <strong>IP: </strong>{{details|key:"geolocation"|key:"ip"}}  <br/>
-                      <strong>Country: </strong>{{details|key:"geolocation"|key:"country_long"}} <br/>
-                      <strong>Region: </strong>{{details|key:"geolocation"|key:"region"}} <br/>
-                      <strong>City: </strong>{{details|key:"geolocation"|key:"city"}} <br/>
-                      <strong>Latitude: </strong>{{details|key:"geolocation"|key:"latitude"}} <br/>
-                      <strong>Longitude: </strong>{{details|key:"geolocation"|key:"longitude"}} <br/>
-                      <strong>View: <a target="_blank" href="http://maps.google.com/maps?q={{details|key:"geolocation"|key:"latitude"}},{{details|key:"geolocation"|key:"longitude"}}">Google Map</a>
-
-                    {% else %}
-                    No Geolocation information available.
-                    {% endif %}
-                  </td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-            </table>    
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end domain malware check ================================== -->
-
-  <a id="clipboard" class="anchor"></a>
- <section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-              <p>
-             <strong><i class="fas fa-paste"></i> CLIPBOARD DUMP</strong>
-             </p>
-              <div class="list-group">
-                {% for f in clipboard %}
-                    {{ f }} <br>
-                {% endfor %}
-
-              </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end clip dump ================================== -->
- <a id="urls" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-globe"></i> URLS</strong>
-             </p>
-                {% if urls %} 
-                <div class="list-group">
-                  {% for f in urls %}
-                        {{ f}} <br>
-                  {% endfor %}
-
-              {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-    </div>
-</section>
- <!-- ===========================end urls ================================== -->
- <a id="emails" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-envelope"></i> EMAILS</strong>
-             </p>
-                 {% if emails %} 
-                <div class="list-group">
-                  {% for f in emails %}
-                        {{ f}} <br>
-                  {% endfor %}
-
-              {% endif %}
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end emails ================================== -->
- <a id="trackers" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-user-secret"></i> TRACKERS</strong>
-             </p>
-              <div class="table-responsive">
-              {% if trackers %}
-               <table id="table_trackers" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                    <th>TRACKER NAME</th>
-                    <th>CATEGORIES</th>
-                    <th>URL</th>
-                  </tr>
-                </thead>
-               <tbody>
-                {% for trk in trackers|key:"trackers" %}
-                <tr>
-                  <td>
-                    {{trk.name}}
-                  </td>
-                  <td>
-                    {{trk.categories}}
-                  </td>
-                  <td>
-                    <a target="_blank" href="{{trk.url}}" rel="noopener noreferrer">{{trk.url}}</a>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end trackers ================================== -->
-<a id="b64" class="anchor"></a>
-<section class="content">
-      <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-12">
-            <div class="card">
-              <div class="card-body">
-              <p><strong><i class="fas fa-puzzle-piece"></i> BASE64 STRINGS DECODED</strong></p>
-                <div class="table-responsive">
-                 <table class="table table-striped">
-                    <thead>
-                    <tr>
-                      <th>CALLED</th>
-                      <th>DECODED STRING</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                      {% for details in base64_strings %}
-                        <tr>
-                        <td>
-                            {{ details.0  }}
-                        </td>
-                        <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">
-                            {{ details.1|slice:500}}
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-                </div>
-              </div>
-            </div><!-- /.card -->
-            </div>
-            <!-- end row -->
-            </div>
-        </div>
-</section>
- <!-- ===========================end base64 decoded strings ================================== -->
-<a id="sqlitedb" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-database"></i> SQLITE DATABASE</strong>
-             </p>
-              <div class="table-responsive">
-                    <table class="table table-bordered table-hover table-striped">
-                      <thead>
-                        <tr>
-                          <th>FILES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                     {% for file in sqlite %}
-                     <tr><td><a href="{% url 'dynamic_view_file' %}?file={{file|key:"file"}}&amp;hash={{hash}}&amp;type={{file|key:"type"}}">{{file|key:"file"}}</a></td></tr>
-                    {% endfor %}
-                     </tbody>
-                    </table>
-              </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end sqlite ================================== -->
- <a id="xmlfiles" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-file-code"></i> XML FILES</strong>
-             </p>
-               <div class="table-responsive">
-                    <table class="table table-bordered table-hover table-striped">
-                      <thead>
-                        <tr>
-                          <th>FILES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                     {% for file in xml %}
-                     <tr><td><a href="{% url 'dynamic_view_file' %}?file={{file|key:"file"}}&amp;hash={{hash}}&amp;type={{file|key:"type"}}">{{file|key:"file"}}</a></td></tr>
-                    {% endfor %}
-                     </tbody>
-                    </table>
-              </div>
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-</section>
- <!-- ===========================end xml files ================================== -->
- <a id="other_files" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-file-contract"></i> OTHER FILES</strong>
-             </p>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover table-striped">
-                      <thead>
-                        <tr>
-                          <th>FILES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                     {% for file in others %}
-                     <tr><td><a href="{% url 'dynamic_view_file' %}?file={{file|key:"file"}}&amp;hash={{hash}}&amp;type={{file|key:"type"}}">{{file|key:"file"}}</a></td></tr>
-                    {% endfor %}
-                    </tbody>
-                    </table>
-                </div>
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-</section>
- <!-- ===========================end other files ================================== -->
-<!-- end of contents -->
-</div>
+  <!-- DataTables -->
+  <link href="{% static "datatables/css/datatables.combined.min.css" %}" rel="stylesheet">
+  <style type="text/css" media="print">
+    @page { size: landscape; }
+    @media print {
+      .btn, #scan_options { display: none; }
+    }
+  </style>
+  <style>
+    #chartdiv { width: 100%; height: 500px; overflow: hidden; background: rgb(var(--surface-2) / 0.4); border-radius: 0.5rem; }
+    /* Data cells that can hold long values */
+    .cell-wrap { word-wrap: break-word; min-width: 160px; max-width: 320px; }
+    /* Give the report tables the design-system look; DataTables still enhances them. */
+    .mi-table { width: 100%; font-size: 0.8125rem; }
+    .mi-table thead th {
+      text-align: left; padding: 0.5rem 0.75rem; font-weight: 500;
+      text-transform: uppercase; font-size: 0.6875rem; letter-spacing: 0.03em;
+      color: rgb(var(--text-secondary));
+      border-bottom: 1px solid rgb(var(--border-subtle));
+    }
+    .mi-table tbody td { padding: 0.625rem 0.75rem; border-bottom: 1px solid rgb(var(--border-subtle)); vertical-align: top; }
+    .mi-badge { display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.375rem; font-size: 0.6875rem; font-weight: 500; }
+  </style>
 {% endblock %}
-<!--end new UI-->
+
+{% block content %}
+
+{# ─────────────────── Page header ─────────────────── #}
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-4 min-w-0">
+    <span class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
+      <i class="fas fa-file-alt text-xl"></i>
+    </span>
+    <div class="min-w-0">
+      <p class="text-tiny uppercase text-text-tertiary">Dynamic · Android · Report</p>
+      <h1 class="text-h2 truncate" title="{{ package }}">{{ package|default:"Dynamic Analysis Report" }}</h1>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="{% url 'dynamic' %}" class="btn btn-ghost btn-md"><i class="fas fa-chevron-left"></i> All platforms</a>
+  </div>
+</header>
+
+{# ─────────────────── Information / actions ─────────────────── #}
+<section class="mb-6" id="information">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-info-circle"></i> Information</h2>
+    </div>
+    <div class="card-body space-y-4">
+      <div class="flex flex-wrap gap-2">
+        {% if apimon %}
+        <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'live_api' %}?hash={{ hash }}&amp;package={{ package }}"><i class="fa fa-mobile"></i> API Monitor View</a>
+        {% endif %}
+        {% if frida_logs %}
+        <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'frida_logs' %}?hash={{ hash }}&amp;package={{ package }}"><i class="fas fa-spider"></i> Frida Logs View</a>
+        {% endif %}
+        <a class="btn btn-secondary btn-sm" target="_blank" role="button" href="{% url 'httptools' %}?project={{ package }}"><i class="fab fa-hire-a-helper"></i> Start HTTPTools</a>
+      </div>
+
+      <div>
+        <h6 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Raw Logs</h6>
+        <div class="flex flex-wrap gap-2">
+          {% if droidmon %}
+          <a target="_blank" class="btn btn-ghost btn-sm" role="button" href="{% url 'download' %}{{ hash }}-x_logcat.txt"><i class="fa fa-mobile"></i> Droidmon API Monitor Logs</a>
+          {% endif %}
+          {% if apimon %}
+          <a target="_blank" class="btn btn-ghost btn-sm" role="button" href="{% url 'download' %}{{ hash }}-api_monitor.txt"><i class="fas fa-water"></i> API Monitor Logs</a>
+          {% endif %}
+          {% if frida_logs %}
+          <a target="_blank" class="btn btn-ghost btn-sm" role="button" href="{% url 'download' %}{{ hash }}-frida_out.txt"><i class="fas fa-water"></i> Frida Logs</a>
+          {% endif %}
+          <a target="_blank" class="btn btn-ghost btn-sm" role="button" href="{% url 'download' %}{{ hash }}-web_traffic.txt"><i class="fas fa-water"></i> HTTP(S) Traffic</a>
+          <a target="_blank" class="btn btn-ghost btn-sm" role="button" href="{% url 'download' %}{{ hash }}-logcat.txt"><i class="fas fa-water"></i> Logcat Logs</a>
+          <a target="_blank" class="btn btn-ghost btn-sm" role="button" href="{% url 'download' %}{{ hash }}-dump.txt"><i class="fas fa-water"></i> Dumpsys Logs</a>
+          <a class="btn btn-ghost btn-sm" role="button" href="{% url 'download' %}{{ hash }}-app_data.tar"><i class="fas fa-download"></i> Application Data</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── API Monitor (apimon) ─────────────────── #}
+{% for api, details in apimon.items %}
+<section class="mb-6" id="{{ api|slugify }}">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="{{ details.0|key:"icon" }}"></i> {{ api|upper }}</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      <table class="mi-table">
+        <thead><tr><th>Class</th><th>Method</th></tr></thead>
+        <tbody>
+          {% for call in details %}
+          <tr>
+            <td class="font-mono text-mono text-text-secondary">{{ call|key:"class" }}</td>
+            <td class="cell-wrap">
+              <b>{{ call|key:"method" }}</b>
+              <p class="mt-1"><b><i>Arguments:</i></b> {{ call|key:"arguments" }}</p>
+              {% if call|key:"result" %}<p><b><i>Result: </i></b>{{ call|key:"result" }}</p>{% endif %}
+              {% if call|key:"returnValue" %}<p><b><i>Return Value: </i></b>{{ call|key:"returnValue" }}</p>{% endif %}
+              {% if call|key:"decoded" %}<p><b><i>Decoded String: </i></b>{{ call|key:"decoded" }}</p>{% endif %}
+              <p><b><i>Called From: </i></b>{{ call|key:"calledFrom" }}</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endfor %}
+
+{# ─────────────────── Droidmon ─────────────────── #}
+{% for api, details in droidmon.items %}
+<section class="mb-6" id="{{ api }}">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="{{ details|key:"icon" }}"></i> {{ details|key:"name" }}</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      <table class="mi-table">
+        <thead><tr><th>Class</th><th>Method</th></tr></thead>
+        <tbody>
+          {% for call in details|key:"calls" %}
+          <tr>
+            <td class="font-mono text-mono text-text-secondary">{{ call|key:"class" }}</td>
+            <td class="cell-wrap">
+              <b>{{ call|key:"method" }}</b>
+              {% if call|key:"args" %}<p class="mt-1"><b><i>Arguments:</i></b> {{ call|key:"args" }}</p>{% endif %}
+              {% if call|key:"decoded" %}<p><b><i>Decoded String: </i></b>{{ call|key:"decoded" }}</p>{% endif %}
+              {% if call|key:"return" %}<p><b><i>Return: </i></b>{{ call|key:"return" }}</p>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endfor %}
+
+{# ─────────────────── TLS/SSL tester ─────────────────── #}
+<section class="mb-6" id="tls_tests">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-lock"></i> TLS/SSL Security Tester</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      <table class="mi-table">
+        <thead><tr><th>Tests</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>TLS Misconfiguration Test</td><td>{% if tls_tests %}{% if tls_tests.tls_misconfigured == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td></tr>
+          <tr><td>TLS Pinning/Certificate Transparency Test</td><td>{% if tls_tests %}{% if tls_tests.no_tls_pin_or_transparency == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td></tr>
+          <tr><td>TLS Pinning/Certificate Transparency Bypass Test</td><td>{% if tls_tests %}{% if tls_tests.pin_or_transparency_bypassed == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td></tr>
+          <tr><td>Cleartext Traffic Test</td><td>{% if tls_tests %}{% if tls_tests.has_cleartext == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Exported activity tester ─────────────────── #}
+<section class="mb-6" id="exportedactivitytester">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-shapes"></i> Exported Activity Tester</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      <table class="mi-table">
+        <thead><tr><th>Screenshot</th><th>Activity</th></tr></thead>
+        <tbody>
+          {% for img, desc in exported_activity_tester.items %}
+          <tr>
+            <td><img alt="{{ desc }}" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" class="rounded-md border border-border-subtle" height="300" width="175"></td>
+            <td>{{ desc }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Activity tester ─────────────────── #}
+<section class="mb-6" id="activitytester">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fa fa-language"></i> Activity Tester</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      <table class="mi-table">
+        <thead><tr><th>Screenshot</th><th>Activity</th></tr></thead>
+        <tbody>
+          {% for img, desc in activity_tester.items %}
+          <tr>
+            <td><img alt="{{ desc }}" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" class="rounded-md border border-border-subtle" height="300" width="175"></td>
+            <td>{{ desc }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Screenshots ─────────────────── #}
+<section class="mb-6" id="screenshots">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-images"></i> Screenshots</h2>
+    </div>
+    <div class="card-body">
+      <div class="flex flex-wrap gap-3">
+        {% for i in screenshots %}
+        <img alt="Screenshot" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ i }}" class="rounded-md border border-border-subtle" height="600" width="350">
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Runtime dependencies ─────────────────── #}
+<section class="mb-6" id="deps">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-running"></i> Runtime Dependencies</h2>
+    </div>
+    <div class="card-body">
+      {% if runtime_dependencies %}
+      <div class="font-mono text-mono text-text-secondary space-y-1">
+        {% for f in runtime_dependencies %}<div>{{ f }}</div>{% endfor %}
+      </div>
+      {% else %}<p class="text-text-tertiary text-small">No runtime dependencies captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Server locations ─────────────────── #}
+<section class="mb-6" id="serverlocations">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-globe-asia"></i> Server Locations</h2>
+    </div>
+    <div class="card-body space-y-4">
+      <div id="chartdiv"></div>
+      {% if domains %}
+      <div class="overflow-x-auto">
+        <p class="text-small text-text-secondary mb-2">This app may communicate with the following OFAC sanctioned list of countries.</p>
+        <table id="table_ofac" class="mi-table">
+          <thead><tr><th>Domain</th><th>Country/Region</th></tr></thead>
+          <tbody>
+            {% for domain, details in domains.items %}
+            {% if details|key:"ofac" == True %}
+            <tr>
+              <td class="font-mono text-mono text-text-secondary">{{ domain }}</td>
+              <td>
+                <strong>IP: </strong>{{ details|key:"geolocation"|key:"ip" }}<br/>
+                <strong>Country: </strong>{{ details|key:"geolocation"|key:"country_long" }}<br/>
+                <strong>Region: </strong>{{ details|key:"geolocation"|key:"region" }}<br/>
+                <strong>City: </strong>{{ details|key:"geolocation"|key:"city" }}<br/>
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Domain malware check ─────────────────── #}
+<section class="mb-6" id="malware_check">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fab fa-searchengin"></i> Domain Malware Check</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if domains %}
+      <table id="table_malware" class="mi-table">
+        <thead><tr><th>Domain</th><th>Status</th><th>Geolocation</th></tr></thead>
+        <tbody>
+          {% for domain, details in domains.items %}
+          <tr>
+            <td class="font-mono text-mono text-text-secondary">{{ domain }}</td>
+            <td>
+              {% if details|key:"bad" == "yes" %}
+              <span class="mi-badge bg-severity-critical/10 text-severity-critical dark:bg-severity-critical-dark/15 dark:text-severity-critical-dark">malware</span><br/>
+              <pre class="font-mono text-mono mt-1"><strong>URL: </strong>{{ details|key:"domain_or_url" }}
+<strong>IP: </strong>{{ details|key:"ip" }}
+<strong>Description: </strong>{{ details|key:"desc" }}</pre>
+              {% else %}
+              <span class="mi-badge bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark">good</span><br/>
+              {% endif %}
+            </td>
+            <td>
+              {% if details|key:"geolocation" %}
+              <strong>IP: </strong>{{ details|key:"geolocation"|key:"ip" }}<br/>
+              <strong>Country: </strong>{{ details|key:"geolocation"|key:"country_long" }}<br/>
+              <strong>Region: </strong>{{ details|key:"geolocation"|key:"region" }}<br/>
+              <strong>City: </strong>{{ details|key:"geolocation"|key:"city" }}<br/>
+              <strong>Latitude: </strong>{{ details|key:"geolocation"|key:"latitude" }}<br/>
+              <strong>Longitude: </strong>{{ details|key:"geolocation"|key:"longitude" }}<br/>
+              <strong>View: </strong><a class="text-text-brand hover:underline" target="_blank" href="http://maps.google.com/maps?q={{ details|key:"geolocation"|key:"latitude" }},{{ details|key:"geolocation"|key:"longitude" }}">Google Map</a>
+              {% else %}
+              No Geolocation information available.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Clipboard dump ─────────────────── #}
+<section class="mb-6" id="clipboard">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-paste"></i> Clipboard Dump</h2>
+    </div>
+    <div class="card-body">
+      <div class="font-mono text-mono text-text-secondary space-y-1">
+        {% for f in clipboard %}<div>{{ f }}</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── URLs ─────────────────── #}
+<section class="mb-6" id="urls">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-globe"></i> URLs</h2>
+    </div>
+    <div class="card-body">
+      {% if urls %}
+      <div class="font-mono text-mono text-text-secondary space-y-1">
+        {% for f in urls %}<div>{{ f }}</div>{% endfor %}
+      </div>
+      {% else %}<p class="text-text-tertiary text-small">No URLs captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Emails ─────────────────── #}
+<section class="mb-6" id="emails">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-envelope"></i> Emails</h2>
+    </div>
+    <div class="card-body">
+      {% if emails %}
+      <div class="font-mono text-mono text-text-secondary space-y-1">
+        {% for f in emails %}<div>{{ f }}</div>{% endfor %}
+      </div>
+      {% else %}<p class="text-text-tertiary text-small">No emails captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Trackers ─────────────────── #}
+<section class="mb-6" id="trackers">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-user-secret"></i> Trackers</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if trackers %}
+      <table id="table_trackers" class="mi-table">
+        <thead><tr><th>Tracker Name</th><th>Categories</th><th>URL</th></tr></thead>
+        <tbody>
+          {% for trk in trackers|key:"trackers" %}
+          <tr>
+            <td>{{ trk.name }}</td>
+            <td>{{ trk.categories }}</td>
+            <td><a class="text-text-brand hover:underline" target="_blank" href="{{ trk.url }}" rel="noopener noreferrer">{{ trk.url }}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Base64 decoded ─────────────────── #}
+<section class="mb-6" id="b64">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-puzzle-piece"></i> Base64 Strings Decoded</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      <table class="mi-table">
+        <thead><tr><th>Called</th><th>Decoded String</th></tr></thead>
+        <tbody>
+          {% for details in base64_strings %}
+          <tr>
+            <td class="font-mono text-mono text-text-secondary">{{ details.0 }}</td>
+            <td class="cell-wrap">{{ details.1|slice:500 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── SQLite databases ─────────────────── #}
+<section class="mb-6" id="sqlitedb">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-database"></i> SQLite Database</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      <table class="mi-table">
+        <thead><tr><th>Files</th></tr></thead>
+        <tbody>
+          {% for file in sqlite %}
+          <tr><td><a class="text-text-brand hover:underline" href="{% url 'dynamic_view_file' %}?file={{ file|key:"file" }}&amp;hash={{ hash }}&amp;type={{ file|key:"type" }}">{{ file|key:"file" }}</a></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── XML files ─────────────────── #}
+<section class="mb-6" id="xmlfiles">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-file-code"></i> XML Files</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      <table class="mi-table">
+        <thead><tr><th>Files</th></tr></thead>
+        <tbody>
+          {% for file in xml %}
+          <tr><td><a class="text-text-brand hover:underline" href="{% url 'dynamic_view_file' %}?file={{ file|key:"file" }}&amp;hash={{ hash }}&amp;type={{ file|key:"type" }}">{{ file|key:"file" }}</a></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Other files ─────────────────── #}
+<section class="mb-6" id="other_files">
+  <div class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-file-contract"></i> Other Files</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      <table class="mi-table">
+        <thead><tr><th>Files</th></tr></thead>
+        <tbody>
+          {% for file in others %}
+          <tr><td><a class="text-text-brand hover:underline" href="{% url 'dynamic_view_file' %}?file={{ file|key:"file" }}&amp;hash={{ hash }}&amp;type={{ file|key:"type" }}">{{ file|key:"file" }}</a></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
 {% block extra_scripts %}
 <!-- DataTables -->
 <script src="{% static "datatables/js/pdfmake.min.js" %}"></script>
@@ -738,7 +484,7 @@
 <script src="{% static "amcharts/animated.js" %}"></script>
 <script>
   // Navbar Active
-    $(".nav-link").on("click", function() {
+  $(".nav-link").on("click", function() {
     $(".nav-link").removeClass("active");
     $(this).addClass("active");
   });
@@ -747,61 +493,61 @@
   // Themes begin
   am4core.useTheme(am4themes_animated);
   // Themes end
-  
+
   // Create map instance
   var chart = am4core.create("chartdiv", am4maps.MapChart);
-  
+
   // Set map definition
   chart.geodata = am4geodata_worldIndiaLow;
-  
+
   // Set projection
   chart.projection = new am4maps.projections.Miller();
-  
+
   // Create map polygon series
   var polygonSeries = chart.series.push(new am4maps.MapPolygonSeries());
-  
+
   // Exclude Antartica
   polygonSeries.exclude = ["AQ"];
-  
+
   // Make map load polygon (like country names) data from GeoJSON
   polygonSeries.useGeodata = true;
-  
+
   // Configure series
   var polygonTemplate = polygonSeries.mapPolygons.template;
   polygonTemplate.tooltipText = "{name}";
   polygonTemplate.polygon.fillOpacity = 0.6;
-  
+
   // Create hover state and set alternative fill color
   var hs = polygonTemplate.states.create("hover");
   hs.properties.fill = chart.colors.getIndex(0);
-  
+
   // Add image series
   var imageSeries = chart.series.push(new am4maps.MapImageSeries());
   imageSeries.mapImages.template.propertyFields.longitude = "longitude";
   imageSeries.mapImages.template.propertyFields.latitude = "latitude";
   imageSeries.mapImages.template.tooltipText = "{title}";
   imageSeries.mapImages.template.propertyFields.url = "url";
-  
+
   var circle = imageSeries.mapImages.template.createChild(am4core.Circle);
   circle.radius = 3;
   circle.propertyFields.fill = "color";
-  
+
   var circle2 = imageSeries.mapImages.template.createChild(am4core.Circle);
   circle2.radius = 3;
   circle2.propertyFields.fill = "color";
-  
-  
+
+
   circle2.events.on("inited", function(event){
     animateBullet(event.target);
   })
-  
+
   function animateBullet(circle) {
       var animation = circle.animate([{ property: "scale", from: 1, to: 5 }, { property: "opacity", from: 1, to: 0 }], 1000, am4core.ease.circleOut);
       animation.events.on("animationended", function(event){
         animateBullet(event.target.object);
       })
   }
-  
+
   var colorSet = new am4core.ColorSet();
   imageSeries.data = [
   {% if domains %}
@@ -817,5 +563,5 @@
     {% endfor %}
   {% endif %}
   ];
-  </script>
+</script>
 {% endblock %}

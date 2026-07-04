@@ -303,7 +303,10 @@ if settings.API_ONLY == '0':
                 name='delete_suppression'),
         # App Compare
         re_path(r'^compare/(?P<hash1>[0-9a-f]{32})/(?P<hash2>[0-9a-f]{32})/$',
-                shared_func.compare_apps),
+                shared_func.compare_apps, name='compare_apps'),
+        # Pick another scanned version of the same app to compare against
+        re_path(fr'^compare_versions/{checksum_regex}$',
+                shared_func.compare_versions, name='compare_versions'),
         # Relative Shared & Dynamic Library scan
         re_path(fr'^scan_library/{checksum_regex}$',
                 shared_func.scan_library,

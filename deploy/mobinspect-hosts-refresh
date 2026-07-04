@@ -1,0 +1,40 @@
+#!/bin/bash
+# Regenerate MobInspect's ALLOWED_HOSTS env file from the VM's current IPv4s.
+# Works for ANY IP assignment method: it reads whatever address the interface
+# actually has right now via `hostname -I` (DHCP lease OR a statically-configured
+# IP alike), so it always matches — no code change needed if you switch the VM
+# from DHCP to a static IP. Django rejects requests to unlisted hosts with a
+# plain "Bad Request (400)", so the allow-list must track the live IP.
+#
+# Installed at /usr/local/bin/mobinspect-hosts-refresh. Invoked by:
+#   - mobinspect-hosts.service        (at boot, before mobinspect-web)
+#   - mobinspect-hosts-watch.timer    (every 2 min, with --apply)
+#
+# --apply: additionally restart mobinspect-web if the value changed, so a
+#          mid-run IP change is picked up without a manual restart.
+set -u
+ENV_FILE=/etc/mobinspect/hosts.env
+
+# At boot we can be scheduled before DHCP has assigned an address even with
+# network-online.target — wait up to 90s for at least one IPv4.
+ips=""
+for _ in $(seq 1 45); do
+    ips=$(hostname -I 2>/dev/null | xargs -n1 | grep -E '^[0-9]+\.' | paste -sd, -)
+    [ -n "$ips" ] && break
+    sleep 2
+done
+
+hosts="${ips:+$ips,}127.0.0.1,localhost"
+new="MOBINSPECT_ALLOWED_HOSTS=$hosts"
+old=$(cat "$ENV_FILE" 2>/dev/null || true)
+
+if [ "$new" != "$old" ]; then
+    mkdir -p /etc/mobinspect
+    printf '%s\n' "$new" > "$ENV_FILE"
+    echo "mobinspect-hosts: ALLOWED_HOSTS -> $hosts"
+    if [ "${1:-}" = "--apply" ]; then
+        # Only restarts if the service is currently running.
+        systemctl try-restart mobinspect-web.service
+    fi
+fi
+exit 0

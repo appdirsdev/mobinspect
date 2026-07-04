@@ -1,0 +1,100 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}Compare Versions — {{ app_name|default:package }}{% endblock %}
+
+{% block content %}
+
+{# ─────────────────── Header ─────────────────── #}
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-4 min-w-0">
+    <span class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
+      {% icon "git-compare" size=24 %}
+    </span>
+    <div class="min-w-0">
+      <p class="text-tiny uppercase text-text-tertiary">Static · Android · Compare versions</p>
+      <h1 class="text-h2 truncate" title="{{ app_name }}">
+        {{ app_name|default:file_name }}
+        {% if version_name %}<span class="text-text-tertiary">v{{ version_name }}</span>{% endif %}
+      </h1>
+      {% if package %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ package }}</p>{% endif %}
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="{% url 'static_analyzer' checksum=checksum %}" class="btn btn-ghost btn-md">
+      {% icon "chevron-left" size=14 %} Back to report
+    </a>
+  </div>
+</header>
+
+{# ─────────────────── Current (base) version ─────────────────── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-body flex items-center gap-3">
+    <span class="mi-badge inline-flex items-center px-2 py-0.5 rounded text-tiny font-medium bg-text-brand/10 text-text-brand">Base</span>
+    <div class="min-w-0">
+      <p class="font-medium text-text-primary truncate">
+        {{ app_name|default:file_name }}{% if version_name %} <span class="text-text-tertiary">v{{ version_name }}</span>{% endif %}
+      </p>
+      <p class="text-tiny text-text-tertiary font-mono truncate">{{ checksum }}</p>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Other versions to compare ─────────────────── #}
+<section class="card" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2">{% icon "layers" size=18 %} Other scanned versions</h2>
+    <span class="text-tiny text-text-tertiary">
+      {% if others %}{{ others|length }} version{{ others|length|pluralize }}{% else %}none{% endif %}
+    </span>
+  </div>
+
+  {% if others %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-small">
+      <thead>
+        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+          <th class="text-left px-5 py-2.5 font-medium">Version</th>
+          <th class="text-left px-5 py-2.5 font-medium">File</th>
+          <th class="text-left px-5 py-2.5 font-medium">Scanned</th>
+          <th class="text-left px-5 py-2.5 font-medium">Hash</th>
+          <th class="text-right px-5 py-2.5 font-medium">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in others %}
+        <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+          <td class="px-5 py-3">
+            <span class="font-medium text-text-primary">{{ o.version_name|default:"—" }}</span>
+          </td>
+          <td class="px-5 py-3 text-text-secondary truncate max-w-xs" title="{{ o.file_name }}">{{ o.file_name|default:o.app_name }}</td>
+          <td class="px-5 py-3 text-text-secondary whitespace-nowrap">
+            {% if o.timestamp %}{{ o.timestamp|date:"Y-m-d H:i" }}{% else %}<span class="text-text-tertiary">—</span>{% endif %}
+          </td>
+          <td class="px-5 py-3 font-mono text-mono text-text-tertiary truncate">{{ o.md5|slice:":12" }}…</td>
+          <td class="px-5 py-3 text-right">
+            <a class="btn btn-primary btn-sm" href="{% url 'compare_apps' hash1=checksum hash2=o.md5 %}">
+              {% icon "git-compare" size=12 %} Compare
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body">
+    <div class="py-10 text-center text-text-tertiary">
+      <p class="text-text-secondary">No other versions of this app have been scanned yet.</p>
+      <p class="text-tiny mt-1">
+        Scan another build with the same package name
+        {% if package %}(<span class="font-mono">{{ package }}</span>){% endif %}
+        to compare it here.
+        <a href="{% url 'home' %}" class="text-text-brand hover:underline">Upload a version</a>.
+      </p>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+{% endblock %}

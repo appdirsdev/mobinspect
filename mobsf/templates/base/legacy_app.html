@@ -28,6 +28,78 @@
     .content-wrapper { background: transparent !important; min-height: auto !important; }
     /* AdminLTE forces .main-footer; we hide it because base/app.html ships its own. */
     .main-footer, .main-sidebar:not(.mi-keep), .main-header, .control-sidebar { display: none !important; }
+
+    /* ─────────────────────────────────────────────────────────────────────
+       Theme bridge: AdminLTE/Bootstrap CSS loads AFTER app.css and hardcodes
+       white/light backgrounds on .card/.table/.modal/.form-control/etc., so
+       those components ignore the design system and show WHITE in dark mode.
+       These rules re-map the common legacy components to design tokens, which
+       resolve per [data-theme] — so legacy pages follow light & dark themes.
+       Scoped to legacy Bootstrap/AdminLTE classes only; the new chrome
+       (sidebar/topbar) uses Tailwind utilities and is untouched.
+       ───────────────────────────────────────────────────────────────────── */
+    .card, .card-body, .card-footer, .info-box, .small-box, .box {
+      background-color: rgb(var(--surface-1)) !important;
+      color: rgb(var(--text-primary)) !important;
+      border-color: rgb(var(--border-subtle)) !important;
+    }
+    .card { box-shadow: none !important; }
+    .card-header, .card-footer, .box-header, .box-footer {
+      background-color: rgb(var(--surface-1)) !important;
+      border-color: rgb(var(--border-subtle)) !important;
+      color: rgb(var(--text-primary)) !important;
+    }
+    .card-title, .box-title { color: rgb(var(--text-primary)) !important; }
+
+    /* Tables */
+    .table { color: rgb(var(--text-primary)) !important; border-color: rgb(var(--border-subtle)) !important; }
+    .table > :not(caption) > * > * { background-color: transparent !important; }
+    .table th, .table td { border-color: rgb(var(--border-subtle)) !important; color: rgb(var(--text-primary)) !important; }
+    .table thead th { color: rgb(var(--text-secondary)) !important; }
+    .table-bordered, .table-bordered th, .table-bordered td { border-color: rgb(var(--border-subtle)) !important; }
+    .table-striped > tbody > tr:nth-of-type(odd) > *,
+    .table-striped tbody tr:nth-of-type(odd) { background-color: rgb(var(--surface-2) / 0.5) !important; color: rgb(var(--text-primary)) !important; }
+    .table-hover > tbody > tr:hover > *,
+    .table-hover tbody tr:hover { background-color: rgb(var(--surface-2)) !important; }
+
+    /* Modals */
+    .modal-content { background-color: rgb(var(--surface-1)) !important; color: rgb(var(--text-primary)) !important; border-color: rgb(var(--border-subtle)) !important; }
+    .modal-header, .modal-footer { border-color: rgb(var(--border-subtle)) !important; }
+    .close, .modal .close, .btn-close { color: rgb(var(--text-primary)) !important; text-shadow: none !important; opacity: .7; }
+
+    /* Form controls */
+    .form-control, .form-select, .custom-select, select.form-control, textarea.form-control, .dataTables_filter input, .dataTables_length select {
+      background-color: rgb(var(--surface-2)) !important;
+      color: rgb(var(--text-primary)) !important;
+      border-color: rgb(var(--border-default)) !important;
+    }
+    .form-control::placeholder { color: rgb(var(--text-tertiary)) !important; }
+    .form-control:focus, .form-select:focus { border-color: rgb(var(--text-brand)) !important; box-shadow: 0 0 0 2px rgb(var(--text-brand) / 0.25) !important; }
+    .input-group-text { background-color: rgb(var(--surface-2)) !important; color: rgb(var(--text-secondary)) !important; border-color: rgb(var(--border-default)) !important; }
+
+    /* Lists / dropdowns / tabs */
+    .list-group-item { background-color: rgb(var(--surface-1)) !important; color: rgb(var(--text-primary)) !important; border-color: rgb(var(--border-subtle)) !important; }
+    .dropdown-menu { background-color: rgb(var(--surface-1)) !important; border-color: rgb(var(--border-subtle)) !important; }
+    .dropdown-item { color: rgb(var(--text-primary)) !important; }
+    .dropdown-item:hover, .dropdown-item:focus { background-color: rgb(var(--surface-2)) !important; }
+    .nav-tabs { border-color: rgb(var(--border-subtle)) !important; }
+    .nav-tabs .nav-link { color: rgb(var(--text-secondary)) !important; }
+    .nav-tabs .nav-link.active { color: rgb(var(--text-primary)) !important; background-color: rgb(var(--surface-1)) !important; border-color: rgb(var(--border-subtle)) rgb(var(--border-subtle)) rgb(var(--surface-1)) !important; }
+
+    /* Pagination / DataTables controls */
+    .page-link, .paginate_button, .dataTables_paginate a { background-color: rgb(var(--surface-1)) !important; color: rgb(var(--text-primary)) !important; border-color: rgb(var(--border-subtle)) !important; }
+    .page-item.active .page-link, .paginate_button.current { background-color: rgb(var(--surface-2)) !important; border-color: rgb(var(--border-default)) !important; }
+    .dataTables_wrapper, .dataTables_info, .dataTables_length, .dataTables_filter, .dataTables_paginate { color: rgb(var(--text-secondary)) !important; }
+
+    /* Misc text & separators */
+    .content, .content-header, .content-wrapper, section.content { color: rgb(var(--text-primary)); }
+    .text-muted { color: rgb(var(--text-secondary)) !important; }
+    hr { border-color: rgb(var(--border-subtle)) !important; }
+    /* Legacy pre/code blocks (not the CodeMirror editor, which themes itself) */
+    pre:not(.CodeMirror-line):not(.frida-pre), code:not([class*="language-"]) {
+      background-color: rgb(var(--surface-2)) !important; color: rgb(var(--text-primary)) !important; border-color: rgb(var(--border-subtle)) !important;
+    }
+    .img-thumbnail { background-color: rgb(var(--surface-2)) !important; border-color: rgb(var(--border-subtle)) !important; }
   </style>
   {% block extra_css %}{% endblock %}
 {% endblock %}

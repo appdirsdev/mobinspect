@@ -1,6 +1,6 @@
 # This file is generated with the help of https://github.com/reddr/axplorer/tree/master/permissions to cover permissions till Android API 25
 # Some of the permissions, classes, and methods are generated using ChatGPT, so the results might not be accurate.
-# Ajin Abraham - github.com/ajinabraham | GPLv3 License
+# Ajin Abraham - github.com/ajinabraham
 ---
 - id: android.permission.SET_WALLPAPER
   message: android.permission.SET_WALLPAPER

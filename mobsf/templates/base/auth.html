@@ -16,8 +16,8 @@
     {# Top bar — minimal: brand left, theme toggle right #}
     <header class="h-topbar flex items-center px-4 lg:px-6 border-b border-border-subtle">
       <div class="flex items-center gap-2 min-w-0">
-        <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500 text-white shadow-elevation-1">
-          {% icon "shield-check" size=18 %}
+        <span class="inline-flex w-8 h-8 rounded-lg shadow-elevation-1">
+          {% include "components/logo_mark.html" %}
         </span>
         <span class="font-semibold tracking-tight text-text-primary">MobInspect</span>
       </div>
@@ -44,7 +44,7 @@
     </main>
 
     <footer class="px-6 py-3 border-t border-border-subtle text-tiny text-text-tertiary text-center">
-      © {% now "Y" %} Appdirs · MobInspect · GPL-3.0
+      © {% now "Y" %} Appdirs · MobInspect
     </footer>
   </div>
 

@@ -1,13 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80">
-  <!-- Mi tile (matches favicon.svg) -->
-  <rect x="4" y="8" width="64" height="64" rx="14" fill="#2563EB"/>
-  <path d="M18 54V26h6l9 16 9-16h6v28h-5V36l-7 12h-6L23 36v18z" fill="#fff"/>
-  <circle cx="52" cy="28" r="3" fill="#fff"/>
-  <!-- Wordmark -->
-  <text x="84" y="53"
-        font-family="'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif"
-        font-size="34"
-        font-weight="700"
-        fill="#2563EB"
-        letter-spacing="0.5">MobInspect</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 72" fill="none" role="img" aria-label="MobInspect">
+  <defs>
+    <linearGradient id="miT" x1="10" y1="6" x2="58" y2="66" gradientUnits="userSpaceOnUse"><stop stop-color="#4F8DF9"/><stop offset="1" stop-color="#1B3AAE"/></linearGradient>
+    <linearGradient id="miS" x1="34" y1="15" x2="34" y2="57" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#D3E2FF"/></linearGradient>
+  </defs>
+  <g transform="translate(4,4)">
+    <rect width="64" height="64" rx="16" fill="url(#miT)"/>
+    <path d="M0 16A16 16 0 0 1 16 0H48A16 16 0 0 1 64 16V21H0Z" fill="#fff" opacity="0.08"/>
+    <path d="M32 11.5c4.6 2 9 3 14 3.2v13.1c0 9.7-5.7 16.6-14 20.7-8.3-4.1-14-11-14-20.7V14.7c5-.2 9.4-1.2 14-3.2Z" fill="url(#miS)"/>
+    <circle cx="29.5" cy="27" r="8" stroke="#2456D6" stroke-width="3.1"/>
+    <path d="M35.4 33l6.4 6.4" stroke="#2456D6" stroke-width="3.8" stroke-linecap="round"/>
+    <path d="M26 27.2l2.7 2.7 4.7-5.2" stroke="#12C8A6" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="84" y="47" font-family="'Open Sans','Helvetica Neue',Arial,sans-serif" font-size="30" font-weight="700" letter-spacing="-0.2">
+    <tspan fill="#0F172A">Mob</tspan><tspan fill="#2456D6">Inspect</tspan>
+  </text>
 </svg>
