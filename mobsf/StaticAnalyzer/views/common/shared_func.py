@@ -123,11 +123,14 @@ def unzip(checksum, app_path, ext_path):
     append_scan_status(checksum, msg)
     files = []
     original_ext_path = ext_path
+    # Initialized before the try so the except handler can reference it even
+    # when ZipFile()/namelist() raises (e.g. a non-zip upload) instead of
+    # crashing with UnboundLocalError and masking the real error.
+    stop_fallback_extraction = False
     try:
         with zipfile.ZipFile(app_path, 'r') as zipptr:
             files = zipptr.namelist()
             total_size = 0
-            stop_fallback_extraction = False
             for fileinfo in zipptr.infolist():
                 ext_path = original_ext_path
 
