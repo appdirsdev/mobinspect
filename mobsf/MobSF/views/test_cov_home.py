@@ -1,0 +1,440 @@
+# -*- coding: utf_8 -*-
+"""Real-execution (STRICT no-mock) coverage tests for mobsf.MobSF.views.home.
+
+Every branch below is exercised by driving the REAL Django views/functions
+with a REAL superuser, REAL DB rows (RecentScansDB / StaticAnalyzer* via the
+Django ORM against the isolated SQLite test DB) and REAL files on disk. No
+mocks, no monkeypatching, no fake returns.
+"""
+import json
+import os
+import shutil
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, Client, RequestFactory
+
+from mobsf.MobSF.views import home
+from mobsf.StaticAnalyzer.models import (
+    RecentScansDB,
+    StaticAnalyzerAndroid,
+    StaticAnalyzerIOS,
+)
+
+
+def _mk_recent(md5, **kw):
+    """Create a real RecentScansDB row."""
+    defaults = dict(
+        ANALYZER='static_analyzer',
+        SCAN_TYPE='apk',
+        FILE_NAME='sample.apk',
+        APP_NAME='Sample',
+        PACKAGE_NAME='com.example.sample',
+        VERSION_NAME='1.0',
+        MD5=md5,
+        SCAN_LOGS='[]',
+    )
+    defaults.update(kw)
+    return RecentScansDB.objects.create(**defaults)
+
+
+class HomeViewsRealTests(TestCase):
+    """Drive the reachable branches of home.py with real inputs."""
+
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.admin = User.objects.create_superuser(
+            'covadmin', 'covadmin@example.com', 'covadmin')
+
+    def setUp(self):
+        self.client = Client()
+        self.client.force_login(self.admin)
+        self.factory = RequestFactory()
+        self._cleanup_paths = []
+
+    def tearDown(self):
+        for p in self._cleanup_paths:
+            if os.path.isdir(p):
+                shutil.rmtree(p, ignore_errors=True)
+            elif os.path.isfile(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+
+    def _authed_request(self, method, path, data=None):
+        """Build a real request already carrying the authenticated superuser."""
+        if method == 'GET':
+            req = self.factory.get(path, data or {})
+        else:
+            req = self.factory.post(path, data or {})
+        req.user = self.admin
+        return req
+
+    # ------------------------------------------------------------------ index
+    def test_index_renders_with_recent_rows(self):
+        _mk_recent('a' * 32, FILE_NAME='one.apk')
+        _mk_recent('b' * 32, FILE_NAME='two.ipa', SCAN_TYPE='ipa')
+        resp = self.client.get('/')
+        self.assertEqual(resp.status_code, 200)
+        # upload_accept must be a comma-separated dotted list, never '|'-joined.
+        self.assertIn('upload_accept', resp.context)
+        self.assertIn('.apk', resp.context['upload_accept'])
+        self.assertNotIn('|', resp.context['upload_accept'])
+
+    # ---------------------------------------------------------------- uploads
+    def test_upload_unsupported_file_format(self):
+        bad = SimpleUploadedFile(
+            'notreal.txt', b'this is plain text, not an app',
+            content_type='text/plain')
+        resp = self.client.post('/upload/', {'file': bad})
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'error')
+        self.assertEqual(data['description'], 'File format not Supported!')
+
+    def test_upload_invalid_form_missing_file(self):
+        resp = self.client.post('/upload/', {})
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data['description'], 'Invalid Form Data!')
+
+    def test_upload_method_not_post(self):
+        resp = self.client.get('/upload/')
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data['description'], 'Method not Supported!')
+
+    def test_upload_api_unsupported_and_invalid_form(self):
+        # Exercise Upload.upload_api() directly (real object, real request).
+        bad = SimpleUploadedFile(
+            'x.txt', b'not an app', content_type='text/plain')
+        req = self._authed_request('POST', '/api/v1/upload', {'file': bad})
+        up = home.Upload(req)
+        resp, code = up.upload_api()
+        self.assertEqual(code, home.HTTP_BAD_REQUEST)
+        self.assertEqual(resp['error'], 'File format not Supported!')
+
+        req2 = self._authed_request('POST', '/api/v1/upload', {})
+        up2 = home.Upload(req2)
+        resp2, code2 = up2.upload_api()
+        self.assertEqual(code2, home.HTTP_BAD_REQUEST)
+        self.assertIn('error', resp2)
+
+    # ----------------------------------------------------------- recent_scans
+    def test_recent_scans_pagination_and_ipa_branch(self):
+        # Android row with a real matching StaticAnalyzerAndroid (package map).
+        _mk_recent('c' * 32, FILE_NAME='apk_app.apk',
+                   PACKAGE_NAME='com.cov.apk')
+        StaticAnalyzerAndroid.objects.create(
+            MD5='c' * 32, PACKAGE_NAME='com.cov.apk',
+            FILE_NAME='apk_app.apk', VERSION_NAME='1.0',
+            ICON_PATH='icon.png')
+        # iOS row (.ipa) exercises the BUNDLE_HASH / mobsf_dump_file branch.
+        _mk_recent('d' * 32, FILE_NAME='ios_app.ipa', SCAN_TYPE='ipa',
+                   PACKAGE_NAME='com.cov.ios')
+        StaticAnalyzerIOS.objects.create(
+            MD5='d' * 32, FILE_NAME='ios_app.ipa', ICON_PATH='ios_icon.png')
+        # A plain row with no static row -> PACKAGE '' fallback branch.
+        _mk_recent('e' * 32, FILE_NAME='plain.apk')
+
+        resp = self.client.get('/recent_scans/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['title'], 'Recent Scans')
+        md5s = {e['MD5'] for e in resp.context['entries']}
+        self.assertTrue({'c' * 32, 'd' * 32, 'e' * 32}.issubset(md5s))
+        for e in resp.context['entries']:
+            if e['MD5'] == 'c' * 32:
+                self.assertEqual(e['PACKAGE'], 'com.cov.apk')
+            if e['MD5'] == 'e' * 32:
+                self.assertEqual(e['PACKAGE'], '')
+
+        # Explicit page_size / page_number path.
+        resp2 = self.client.get('/recent_scans/2/1/')
+        self.assertEqual(resp2.status_code, 200)
+        # page_size arrives from the URL as a string.
+        self.assertEqual(str(resp2.context['page_obj'].page_size), '2')
+        self.assertEqual(len(resp2.context['entries']), 2)
+
+    def test_recent_scans_class_api(self):
+        _mk_recent('f' * 32)
+        req = self._authed_request('GET', '/api/v1/scans', {'page': 1})
+        data = home.RecentScans(req).recent_scans()
+        self.assertIn('content', data)
+        self.assertGreaterEqual(data['count'], 1)
+        # Invalid page value -> exception path returns {'error': ...}
+        req_bad = self._authed_request('GET', '/api/v1/scans', {'page': 999})
+        data_bad = home.RecentScans(req_bad).recent_scans()
+        self.assertIn('error', data_bad)
+
+    # ------------------------------------------------------------ delete_scan
+    def test_delete_scan_invalid_hash(self):
+        resp = self.client.post('/delete_scan/', {'md5': 'not-a-md5'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(json.loads(resp.content)['deleted'], 'Invalid scan hash')
+
+    def test_delete_scan_missing_hash(self):
+        resp = self.client.post('/delete_scan/', {'md5': '0' * 32})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            json.loads(resp.content)['deleted'], 'Scan not found in Database')
+
+    def test_delete_scan_api_mode(self):
+        # api=True reads request.POST['hash'] and returns a plain dict.
+        req = self._authed_request(
+            'POST', '/api/v1/delete_scan', {'hash': '2' * 32})
+        result = home.delete_scan(req, api=True)
+        self.assertEqual(result, {'deleted': 'Scan not found in Database'})
+
+    def test_delete_scan_real_delete(self):
+        md5 = '1' * 32
+        _mk_recent(md5, FILE_NAME='del.apk')
+        StaticAnalyzerAndroid.objects.create(
+            MD5=md5, PACKAGE_NAME='com.del', FILE_NAME='del.apk')
+        # Real upload dir + a stray download file to exercise cleanup loops.
+        app_dir = os.path.join(settings.UPLD_DIR, md5)
+        os.makedirs(app_dir, exist_ok=True)
+        with open(os.path.join(app_dir, 'f.txt'), 'w') as fh:
+            fh.write('x')
+        self._cleanup_paths.append(app_dir)
+        dwd_file = os.path.join(settings.DWD_DIR, md5 + '-java.zip')
+        with open(dwd_file, 'w') as fh:
+            fh.write('x')
+        self._cleanup_paths.append(dwd_file)
+
+        resp = self.client.post('/delete_scan/', {'md5': md5})
+        self.assertEqual(json.loads(resp.content)['deleted'], 'yes')
+        self.assertFalse(RecentScansDB.objects.filter(MD5=md5).exists())
+        self.assertFalse(os.path.exists(app_dir))
+        self.assertFalse(os.path.exists(dwd_file))
+
+    # ----------------------------------------------------------------- search
+    def test_search_empty_query(self):
+        resp = self.client.get('/search', {'query': ''})
+        # print_n_send_error_response renders an error page (not a redirect).
+        self.assertNotEqual(resp.status_code, 302)
+
+    def test_search_md5_match_redirects(self):
+        md5 = '2' * 32
+        _mk_recent(md5, ANALYZER='static_analyzer')
+        resp = self.client.get('/search', {'query': md5})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp['Location'], f'/static_analyzer/{md5}/')
+
+    def test_search_post_query(self):
+        md5 = 'aa' * 16
+        _mk_recent(md5, ANALYZER='static_analyzer')
+        resp = self.client.post('/search', {'query': md5})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp['Location'], f'/static_analyzer/{md5}/')
+
+    def test_search_md5_no_row(self):
+        resp = self.client.get('/search', {'query': '3' * 32})
+        self.assertNotEqual(resp.status_code, 302)
+
+    def test_search_text_match_by_filename(self):
+        md5 = '4' * 32
+        _mk_recent(md5, FILE_NAME='uniquefilename.apk')
+        resp = self.client.get('/search', {'query': 'uniquefilename'})
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(md5, resp['Location'])
+
+    def test_search_api_returns_checksum(self):
+        md5 = '5' * 32
+        _mk_recent(md5)
+        req = self._authed_request('GET', '/search', {'query': md5})
+        result = home.search(req, api=True)
+        self.assertEqual(result, {'checksum': md5})
+
+    def test_find_checksum_direct(self):
+        md5 = '6' * 32
+        _mk_recent(md5, APP_NAME='ZzSpecialApp')
+        self.assertEqual(home.find_checksum('ZzSpecialApp'), md5)
+        self.assertIsNone(home.find_checksum('no-such-thing-anywhere'))
+
+    # ------------------------------------------------------------ scan_status
+    def test_scan_status_invalid_hash(self):
+        resp = self.client.post('/status/', {'hash': 'bad'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(json.loads(resp.content)['status'], 'failed')
+
+    def test_scan_status_not_found(self):
+        resp = self.client.post('/status/', {'hash': '7' * 32})
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'failed')
+        self.assertEqual(data['error'], 'scan hash not found')
+
+    def test_scan_status_found(self):
+        md5 = '8' * 32
+        _mk_recent(md5, SCAN_LOGS='[]')
+        resp = self.client.post('/status/', {'hash': md5})
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'ok')
+        self.assertIn('logs', data)
+
+    # -------------------------------------------------------- download_binary
+    def test_download_binary_invalid_md5(self):
+        req = self._authed_request('GET', '/download_binary/xx/')
+        resp = home.download_binary(req, 'not-md5')
+        self.assertEqual(resp.status_code, home.HTTP_STATUS_404)
+        self.assertIn(b'Invalid MD5 Hash', resp.content)
+
+    def test_download_binary_hash_not_found(self):
+        md5 = '9' * 32
+        req = self._authed_request('GET', f'/download_binary/{md5}/')
+        resp = home.download_binary(req, md5)
+        self.assertEqual(resp.status_code, home.HTTP_STATUS_404)
+        self.assertIn(b'Scan hash not found', resp.content)
+
+    def test_download_binary_invalid_scan_type(self):
+        md5 = 'a' * 31 + '0'
+        _mk_recent(md5, SCAN_TYPE='exe')  # '.exe' not in ALLOWED_EXTENSIONS
+        req = self._authed_request('GET', f'/download_binary/{md5}/')
+        resp = home.download_binary(req, md5)
+        self.assertEqual(resp.status_code, home.HTTP_STATUS_404)
+        self.assertIn(b'Invalid Scan Type', resp.content)
+
+    def test_download_binary_file_missing(self):
+        md5 = 'b' * 31 + '0'
+        _mk_recent(md5, SCAN_TYPE='apk', FILE_NAME='gone.apk')
+        req = self._authed_request('GET', f'/download_binary/{md5}/')
+        resp = home.download_binary(req, md5)
+        self.assertEqual(resp.status_code, home.HTTP_STATUS_404)
+        self.assertIn(b'File not found', resp.content)
+
+    def test_download_binary_success(self):
+        md5 = 'c' * 31 + '0'
+        _mk_recent(md5, SCAN_TYPE='txt', FILE_NAME='real.txt')
+        app_dir = os.path.join(settings.UPLD_DIR, md5)
+        os.makedirs(app_dir, exist_ok=True)
+        self._cleanup_paths.append(app_dir)
+        with open(os.path.join(app_dir, f'{md5}.txt'), 'wb') as fh:
+            fh.write(b'downloadable-binary-content')
+        req = self._authed_request('GET', f'/download_binary/{md5}/')
+        resp = home.download_binary(req, md5)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('attachment', resp['Content-Disposition'])
+
+    def test_download_binary_svg_sanitized(self):
+        md5 = 'd' * 31 + '0'
+        _mk_recent(md5, SCAN_TYPE='svg', FILE_NAME='pic.svg')
+        app_dir = os.path.join(settings.UPLD_DIR, md5)
+        os.makedirs(app_dir, exist_ok=True)
+        self._cleanup_paths.append(app_dir)
+        svg = ('<svg xmlns="http://www.w3.org/2000/svg">'
+               '<script>alert(1)</script><rect/></svg>')
+        with open(os.path.join(app_dir, f'{md5}.svg'), 'w',
+                  encoding='utf-8') as fh:
+            fh.write(svg)
+        req = self._authed_request('GET', f'/download_binary/{md5}/')
+        resp = home.download_binary(req, md5)
+        self.assertEqual(resp.status_code, 200)
+        # sanitize_svg strips the <script> tag.
+        self.assertNotIn(b'<script>', resp.content)
+
+    # --------------------------------------------------------------- download
+    def test_download_path_traversal_blocked(self):
+        req = self._authed_request('GET', '/download/../../etc/passwd')
+        resp = home.download(req)
+        # print_n_send_error_response -> rendered page, not a file download.
+        self.assertNotIn('Content-Disposition', resp)
+
+    def test_download_missing_file_404(self):
+        req = self._authed_request('GET', '/download/does_not_exist_here.txt')
+        resp = home.download(req)
+        self.assertEqual(resp.status_code, home.HTTP_STATUS_404)
+
+    def test_download_screen_png_special_case(self):
+        req = self._authed_request(
+            'GET', '/download/somehash/screen/screen.png')
+        resp = home.download(req)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.content, b'')
+
+    def test_download_real_file(self):
+        name = 'covreal_download.txt'
+        dwd_file = os.path.join(settings.DWD_DIR, name)
+        with open(dwd_file, 'wb') as fh:
+            fh.write(b'real download file body')
+        self._cleanup_paths.append(dwd_file)
+        req = self._authed_request('GET', f'/download/{name}')
+        resp = home.download(req)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_download_real_svg_file(self):
+        name = 'covreal_download.svg'
+        dwd_file = os.path.join(settings.DWD_DIR, name)
+        with open(dwd_file, 'w', encoding='utf-8') as fh:
+            fh.write('<svg xmlns="http://www.w3.org/2000/svg">'
+                     '<script>bad()</script></svg>')
+        self._cleanup_paths.append(dwd_file)
+        req = self._authed_request('GET', f'/download/{name}')
+        resp = home.download(req)
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn(b'<script>', resp.content)
+
+    # ------------------------------------------------------ generate_download
+    def test_generate_download_invalid_type(self):
+        req = self._authed_request(
+            'GET', '/generate_download/',
+            {'hash': 'e' * 32, 'file_type': 'bogus'})
+        resp = home.generate_download(req)
+        # Renders the error page rather than redirecting.
+        self.assertNotEqual(resp.status_code, 302)
+
+    def test_generate_download_java_zip(self):
+        md5 = 'e' * 31 + '0'
+        src_dir = os.path.join(settings.UPLD_DIR, md5, 'java_source')
+        os.makedirs(src_dir, exist_ok=True)
+        self._cleanup_paths.append(os.path.join(settings.UPLD_DIR, md5))
+        with open(os.path.join(src_dir, 'A.java'), 'w') as fh:
+            fh.write('class A {}')
+        out_zip = os.path.join(settings.DWD_DIR, f'{md5}-java.zip')
+        self._cleanup_paths.append(out_zip)
+        req = self._authed_request(
+            'GET', '/generate_download/',
+            {'hash': md5, 'file_type': 'java'})
+        resp = home.generate_download(req)
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(os.path.exists(out_zip))
+
+    def test_generate_download_smali_zip(self):
+        md5 = 'f' * 31 + '0'
+        src_dir = os.path.join(settings.UPLD_DIR, md5, 'smali_source')
+        os.makedirs(src_dir, exist_ok=True)
+        self._cleanup_paths.append(os.path.join(settings.UPLD_DIR, md5))
+        with open(os.path.join(src_dir, 'A.smali'), 'w') as fh:
+            fh.write('.class A')
+        out_zip = os.path.join(settings.DWD_DIR, f'{md5}-smali.zip')
+        self._cleanup_paths.append(out_zip)
+        req = self._authed_request(
+            'GET', '/generate_download/',
+            {'hash': md5, 'file_type': 'smali'})
+        resp = home.generate_download(req)
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(os.path.exists(out_zip))
+
+    # ------------------------------------------------------- static templates
+    def test_simple_template_routes(self):
+        self.assertEqual(self.client.get('/about').status_code, 200)
+        self.assertEqual(self.client.get('/api_docs').status_code, 200)
+        self.assertEqual(self.client.get('/zip_format/').status_code, 200)
+        self.assertEqual(self.client.get('/dynamic_analysis/').status_code, 200)
+        r = self.client.get('/robots.txt')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'User-agent', r.content)
+        # error view (not login-gated).
+        self.assertEqual(self.client.get('/error/').status_code, 200)
+
+    # ----------------------------------------------------- update_scan_timestamp
+    def test_update_scan_timestamp(self):
+        from django.utils import timezone
+        md5 = '0' * 31 + '1'
+        _mk_recent(md5)
+        before = timezone.now()
+        home.update_scan_timestamp(md5)
+        row = RecentScansDB.objects.get(MD5=md5)
+        # update_scan_timestamp writes a fresh tz-aware timezone.now().
+        self.assertGreaterEqual(row.TIMESTAMP, before)
