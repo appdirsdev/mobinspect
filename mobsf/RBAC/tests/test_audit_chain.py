@@ -167,20 +167,36 @@ class AuditVerifyCommandTests(_ChainTestBase):
 
         # Bypass the trigger to simulate an attacker with raw DB access.
         with connection.cursor() as cur:
-            cur.execute('DROP TRIGGER IF EXISTS no_audit_modify')
-            cur.execute(
-                'UPDATE rbac_auditevent SET action = %s WHERE id = %s',
-                ['silently.rewritten', target.pk],
-            )
-            # Reinstall so other tests still see the protection.
-            cur.execute(
-                'CREATE TRIGGER IF NOT EXISTS no_audit_modify '
-                'BEFORE UPDATE OF actor_id, action, target_type, '
-                'target_id, metadata, occurred_at, prev_hash, '
-                'current_hash ON rbac_auditevent '
-                "BEGIN SELECT RAISE(ABORT, "
-                "'audit log is append-only'); END;",
-            )
+            if connection.vendor == 'postgresql':
+                # Postgres refuses ALTER TABLE ... DISABLE TRIGGER while the
+                # transaction has pending (deferred FK) trigger events, so
+                # flush them first, then disable/re-enable around the write.
+                cur.execute('SET CONSTRAINTS ALL IMMEDIATE')
+                cur.execute(
+                    'ALTER TABLE rbac_auditevent '
+                    'DISABLE TRIGGER no_audit_modify')
+                cur.execute(
+                    'UPDATE rbac_auditevent SET action = %s WHERE id = %s',
+                    ['silently.rewritten', target.pk],
+                )
+                cur.execute(
+                    'ALTER TABLE rbac_auditevent '
+                    'ENABLE TRIGGER no_audit_modify')
+            else:
+                cur.execute('DROP TRIGGER IF EXISTS no_audit_modify')
+                cur.execute(
+                    'UPDATE rbac_auditevent SET action = %s WHERE id = %s',
+                    ['silently.rewritten', target.pk],
+                )
+                # Reinstall so other tests still see the protection.
+                cur.execute(
+                    'CREATE TRIGGER IF NOT EXISTS no_audit_modify '
+                    'BEFORE UPDATE OF actor_id, action, target_type, '
+                    'target_id, metadata, occurred_at, prev_hash, '
+                    'current_hash ON rbac_auditevent '
+                    "BEGIN SELECT RAISE(ABORT, "
+                    "'audit log is append-only'); END;",
+                )
 
         code, out, err = self._run()
         self.assertEqual(code, 1)

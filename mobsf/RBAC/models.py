@@ -260,6 +260,13 @@ class AuditEvent(models.Model):
                     "'audit log is append-only'); END;",
                 )
             elif vendor == 'postgresql':
+                # Django declares FK constraints DEFERRABLE INITIALLY
+                # DEFERRED on Postgres, so audit rows inserted earlier in
+                # this test's transaction leave deferred trigger events
+                # queued. Postgres refuses ``ALTER TABLE ... DISABLE
+                # TRIGGER`` while any trigger events are pending, so flush
+                # them first.
+                cur.execute('SET CONSTRAINTS ALL IMMEDIATE')
                 cur.execute(
                     f'ALTER TABLE {table} DISABLE TRIGGER no_audit_delete',
                 )
