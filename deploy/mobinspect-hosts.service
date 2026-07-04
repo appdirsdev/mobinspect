@@ -1,0 +1,13 @@
+[Unit]
+Description=MobInspect - generate ALLOWED_HOSTS env file from current IP
+Wants=network-online.target
+After=network-online.target
+Before=mobinspect-web.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/mobinspect-hosts-refresh
+
+[Install]
+WantedBy=multi-user.target

@@ -17,17 +17,9 @@
         font-style: normal;
         font-weight: 400;
         font-display: swap;
-        src: local('Open Sans Regular'), local('OpenSans-Regular'), url('{{base_url}}{% static 'fonts/Open_Sans/OpenSans-Regular.ttf' %}') format('truetype');
+        src: url('{{base_url}}{% static 'fonts/Open_Sans/OpenSans-Regular.ttf' %}') format('truetype');
       }
 
-      /* latin */
-      @font-face {
-        font-family: 'Oswald';
-        font-style: normal;
-        font-weight: 400;
-        font-display: swap;
-        src: local('Oswald'), local('Oswald'), url('{{base_url}}{% static 'fonts/Oswald/Oswald-Regular.ttf' %}') format('truetype');
-      }
   </style>
   {% endif %}
   <style>
@@ -60,7 +52,7 @@
     * { box-sizing: border-box; }
 
     html {
-      color: var(--ink);
+      color: #0F172A;
       font-size: 10.5pt;
       line-height: 1.55;
       -webkit-print-color-adjust: exact;
@@ -71,13 +63,13 @@
       font-family: 'Open Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
       margin: 0;
       padding: 0;
-      background: var(--white);
-      color: var(--ink);
+      background: #FFFFFF;
+      color: #0F172A;
     }
 
     p { margin: 7px 0; }
 
-    a { color: var(--brand); text-decoration: none; word-break: break-all; }
+    a { color: #2563EB; text-decoration: none; word-break: break-all; }
 
     code, .mono {
       font-family: 'Consolas', 'JetBrains Mono', 'Courier New', monospace;
@@ -86,14 +78,14 @@
 
     /* ---- Section headings ---- */
     h2 {
-      font-family: 'Oswald', 'Open Sans', sans-serif;
+      font-family: 'Open Sans', sans-serif;
       font-size: 17pt;
       font-weight: 600;
-      color: var(--ink);
+      color: #0F172A;
       margin: 26px 0 12px;
       padding: 0 0 7px 12px;
-      border-left: 5px solid var(--brand);
-      border-bottom: 2px solid var(--line);
+      border-left: 5px solid #2563EB;
+      border-bottom: 2px solid #E2E8F0;
       letter-spacing: 0.2px;
       page-break-after: avoid;
       text-transform: uppercase;
@@ -103,7 +95,7 @@
       font-family: 'Open Sans', sans-serif;
       font-size: 8pt;
       font-weight: 700;
-      color: var(--brand);
+      color: #2563EB;
       background: rgba(37, 99, 235, 0.08);
       border: 1px solid rgba(37, 99, 235, 0.25);
       border-radius: 4px;
@@ -114,25 +106,25 @@
     }
 
     h3 {
-      font-family: 'Oswald', 'Open Sans', sans-serif;
+      font-family: 'Open Sans', sans-serif;
       font-size: 12.5pt;
       font-weight: 600;
-      color: var(--ink-2);
+      color: #334155;
       margin: 16px 0 6px;
       page-break-after: avoid;
     }
-    h4 { font-size: 11pt; font-weight: 600; color: var(--ink-2); margin: 12px 0 5px; }
+    h4 { font-size: 11pt; font-weight: 600; color: #334155; margin: 12px 0 5px; }
 
     h5 {
-      font-family: 'Oswald', 'Open Sans', sans-serif;
+      font-family: 'Open Sans', sans-serif;
       font-size: 10pt;
       font-weight: 600;
-      color: var(--ink-3);
+      color: #475569;
       display: inline;
     }
 
     h1 {
-      color: var(--ink);
+      color: #0F172A;
       font-size: 22pt;
       font-weight: 700;
       margin: 0;
@@ -152,13 +144,15 @@
       margin: -0.50in;            /* bleed to page edge under wkhtmltopdf margins */
     }
     #cover .cover-band {
-      background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%);
+      background-color: #1E40AF;  /* Qt-WebKit ignores linear-gradient */
       color: #ffffff;
-      padding: 56px 48px 48px;
+      /* Extra top padding keeps the wordmark/kicker clear of the -0.5in cover
+         bleed edge so they don't intermittently clip at the page top. */
+      padding: 92px 48px 52px;
     }
-    #cover .brand-logo { height: 56px; width: auto; margin: 0 auto 22px; display: block; filter: brightness(0) invert(1); }
+    #cover .brand-wordmark { font-family: 'Open Sans', sans-serif; font-size: 23pt; font-weight: 700; letter-spacing: 1.5px; color: #ffffff; margin: 0 auto 16px; }
     #cover .report-kicker {
-      font-family: 'Oswald', sans-serif;
+      font-family: 'Open Sans', sans-serif;
       font-size: 11pt;
       letter-spacing: 4px;
       text-transform: uppercase;
@@ -166,7 +160,7 @@
       margin: 0 0 6px;
     }
     #cover .report-title {
-      font-family: 'Oswald', sans-serif;
+      font-family: 'Open Sans', sans-serif;
       font-size: 30pt;
       font-weight: 700;
       margin: 0;
@@ -174,15 +168,15 @@
       color: #ffffff;
     }
     #cover .cover-body { padding: 30px 48px 8px; }
-    #cover .app-icon { width: 110px; height: 110px; margin: 0 auto 14px; display: block; border-radius: 22px; border: 1px solid var(--line); }
+    #cover .app-icon { width: 110px; height: 110px; margin: 0 auto 14px; display: block; border-radius: 22px; border: 1px solid #E2E8F0; }
     #cover .app-name {
-      font-family: 'Oswald', sans-serif;
+      font-family: 'Open Sans', sans-serif;
       font-size: 21pt;
       font-weight: 600;
-      color: var(--ink);
+      color: #0F172A;
       margin: 0 0 4px;
     }
-    #cover .app-name .ver { color: var(--muted); font-weight: 400; font-size: 15pt; }
+    #cover .app-name .ver { color: #64748B; font-weight: 400; font-size: 15pt; }
 
     .cover-meta {
       width: 86%;
@@ -192,7 +186,7 @@
     }
     .cover-meta td {
       border: none;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid #E2E8F0;
       padding: 9px 10px;
       vertical-align: middle;
       height: auto;
@@ -200,14 +194,14 @@
     .cover-meta .k {
       text-align: left;
       width: 38%;
-      color: var(--muted);
-      font-family: 'Oswald', sans-serif;
+      color: #64748B;
+      font-family: 'Open Sans', sans-serif;
       font-weight: 600;
       font-size: 9.5pt;
       text-transform: uppercase;
       letter-spacing: 0.4px;
     }
-    .cover-meta .v { text-align: left; color: var(--ink); font-weight: 600; }
+    .cover-meta .v { text-align: left; color: #0F172A; font-weight: 600; }
     .cover-meta .v .mono { font-weight: 400; }
 
     /* Cover grade chip */
@@ -216,7 +210,7 @@
       width: 76px; height: 76px; line-height: 76px;
       border-radius: 16px;
       color: #fff;
-      font-family: 'Oswald', sans-serif;
+      font-family: 'Open Sans', sans-serif;
       font-size: 40pt;
       font-weight: 700;
       text-align: center;
@@ -227,7 +221,7 @@
       width: 64px; height: 64px; line-height: 64px;
       border-radius: 12px;
       color: #fff;
-      font-family: 'Oswald', sans-serif;
+      font-family: 'Open Sans', sans-serif;
       font-size: 30pt;
       font-weight: 700;
       text-align: center;
@@ -242,14 +236,14 @@
     .score-card {
       text-align: center;
       padding: 18px 16px;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-top: 4px solid var(--brand);
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-top: 4px solid #2563EB;
       border-radius: 8px;
     }
-    .score-card .score-num { font-family: 'Oswald', sans-serif; font-size: 44pt; font-weight: 700; line-height: 1; }
-    .score-card .score-den { font-size: 16pt; font-weight: 600; color: var(--muted); }
-    .score-card .score-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 8px; font-weight: 700; }
+    .score-card .score-num { font-family: 'Open Sans', sans-serif; font-size: 44pt; font-weight: 700; line-height: 1; }
+    .score-card .score-den { font-size: 16pt; font-weight: 600; color: #64748B; }
+    .score-card .score-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; color: #64748B; margin-top: 8px; font-weight: 700; }
     .score-card .risk-pill {
       display: inline-block; margin-top: 10px; padding: 3px 12px; border-radius: 12px;
       font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #fff;
@@ -262,21 +256,21 @@
       text-align: center;
       padding: 14px 8px;
       border-radius: 8px;
-      border: 1px solid var(--line);
-      background: var(--white);
+      border: 1px solid #E2E8F0;
+      background: #FFFFFF;
     }
-    .stat-tile .stat-num { font-family: 'Oswald', sans-serif; font-size: 26pt; font-weight: 700; line-height: 1; }
+    .stat-tile .stat-num { font-family: 'Open Sans', sans-serif; font-size: 26pt; font-weight: 700; line-height: 1; }
     .stat-tile .stat-name { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; margin-top: 7px; }
-    .tile-high    { border-top: 4px solid var(--critical); }
-    .tile-high    .stat-num, .tile-high .stat-name    { color: var(--critical); }
-    .tile-warning { border-top: 4px solid var(--warning); }
-    .tile-warning .stat-num, .tile-warning .stat-name { color: var(--warning); }
-    .tile-info    { border-top: 4px solid var(--info); }
-    .tile-info    .stat-num, .tile-info .stat-name    { color: var(--info); }
-    .tile-secure  { border-top: 4px solid var(--secure); }
-    .tile-secure  .stat-num, .tile-secure .stat-name  { color: var(--secure); }
-    .tile-hotspot { border-top: 4px solid var(--neutral); }
-    .tile-hotspot .stat-num, .tile-hotspot .stat-name { color: var(--neutral); }
+    .tile-high    { border-top: 4px solid #DC2626; }
+    .tile-high    .stat-num, .tile-high .stat-name    { color: #DC2626; }
+    .tile-warning { border-top: 4px solid #D97706; }
+    .tile-warning .stat-num, .tile-warning .stat-name { color: #D97706; }
+    .tile-info    { border-top: 4px solid #2563EB; }
+    .tile-info    .stat-num, .tile-info .stat-name    { color: #2563EB; }
+    .tile-secure  { border-top: 4px solid #16A34A; }
+    .tile-secure  .stat-num, .tile-secure .stat-name  { color: #16A34A; }
+    .tile-hotspot { border-top: 4px solid #64748B; }
+    .tile-hotspot .stat-num, .tile-hotspot .stat-name { color: #64748B; }
 
     /* =========================================================================
        TABLES
@@ -286,48 +280,48 @@
     tfoot { display: table-row-group; }
     tr { page-break-inside: avoid; }
 
-    .basic { width: 100%; border: 1px solid var(--line); border-radius: 6px; margin: 8px 0 4px; }
-    .basic th, .basic td { border: 1px solid var(--line); padding: 8px 11px; text-align: left; vertical-align: top; }
+    .basic { width: 100%; border: 1px solid #E2E8F0; border-radius: 6px; margin: 8px 0 4px; }
+    .basic th, .basic td { border: 1px solid #E2E8F0; padding: 8px 11px; text-align: left; vertical-align: top; }
     .basic th {
-      background: var(--surface-2);
-      color: var(--ink-2);
-      font-family: 'Oswald', sans-serif;
+      background: #F1F5F9;
+      color: #334155;
+      font-family: 'Open Sans', sans-serif;
       font-size: 9.5pt;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.4px;
-      border-bottom: 2px solid var(--line-2);
+      border-bottom: 2px solid #CBD5E1;
     }
-    .basic td { font-size: 9.5pt; color: var(--ink-2); }
-    .basic tbody tr:nth-child(even) td { background: var(--surface); }
+    .basic td { font-size: 9.5pt; color: #334155; }
+    .basic tbody tr:nth-child(even) td { background: #F8FAFC; }
 
     /* default fallbacks for legacy generic tables */
     th, td { padding: 8px 11px; }
     td { height: auto; }
     .table { width: 100%; }
-    .table-bordered th, .table-bordered td { border: 1px solid var(--line); }
-    .table-striped tbody tr:nth-child(odd) td { background: var(--surface); }
+    .table-bordered th, .table-bordered td { border: 1px solid #E2E8F0; }
+    .table-striped tbody tr:nth-child(odd) td { background: #F8FAFC; }
 
     /* no-border helpers (cover summary) */
     table.no_border, th.no_border, td.no_border { border: none; }
 
     /* Nested table (APKiD) */
-    .basic .basic { margin: 0; border: 1px solid var(--line); }
+    .basic .basic { margin: 0; border: 1px solid #E2E8F0; }
     .basic .basic th { font-size: 8.5pt; padding: 5px 8px; }
     .basic .basic td { font-size: 8.5pt; padding: 5px 8px; }
 
     /* =========================================================================
        SEVERITY COLORS + BADGES
        ========================================================================= */
-    .danger  { color: var(--critical); font-weight: 600; }
-    .high    { color: var(--high); font-weight: 600; }
-    .warning { color: var(--warning); font-weight: 600; }
-    .info    { color: var(--info); font-weight: 600; }
-    .success { color: var(--secure); font-weight: 600; }
-    .secondary { color: var(--neutral); font-weight: 600; }
-    .disabled { color: var(--neutral); font-weight: 600; }
-    .text-success { color: var(--secure); }
-    .text-danger  { color: var(--critical); }
+    .danger  { color: #DC2626; font-weight: 600; }
+    .high    { color: #EA580C; font-weight: 600; }
+    .warning { color: #D97706; font-weight: 600; }
+    .info    { color: #2563EB; font-weight: 600; }
+    .success { color: #16A34A; font-weight: 600; }
+    .secondary { color: #64748B; font-weight: 600; }
+    .disabled { color: #64748B; font-weight: 600; }
+    .text-success { color: #16A34A; }
+    .text-danger  { color: #DC2626; }
 
     /* Severity pills used inside finding tables */
     .danger, .high, .warning, .info, .success, .secondary, .disabled {
@@ -338,43 +332,43 @@
     .tbl-white { color: #ffffff; }
     .severity-breakdown { border-collapse: collapse; width: 100%; margin: 6px 0; }
     .severity-breakdown th {
-      padding: 9px; text-align: center; color: #fff; font-family: 'Oswald', sans-serif;
+      padding: 9px; text-align: center; color: #fff; font-family: 'Open Sans', sans-serif;
       font-weight: 600; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px;
       border: 1px solid rgba(255,255,255,0.35);
     }
     .severity-breakdown td {
-      padding: 12px; text-align: center; font-family: 'Oswald', sans-serif;
-      font-size: 22pt; font-weight: 700; border: 1px solid var(--line);
+      padding: 12px; text-align: center; font-family: 'Open Sans', sans-serif;
+      font-size: 22pt; font-weight: 700; border: 1px solid #E2E8F0;
     }
-    .td-high    { background-color: var(--critical); }
-    .td-warning { background-color: var(--warning); }
-    .td-info    { background-color: var(--info); }
-    .td-success { background-color: var(--secure); }
-    .td-secondary { background-color: var(--neutral); }
-    .severity-breakdown td.td-high    { color: var(--critical);  background: rgba(220,38,38,0.06); }
-    .severity-breakdown td.td-warning { color: var(--warning);   background: rgba(217,119,6,0.06); }
-    .severity-breakdown td.td-info    { color: var(--info);      background: rgba(37,99,235,0.06); }
-    .severity-breakdown td.td-success { color: var(--secure);    background: rgba(22,163,74,0.06); }
-    .severity-breakdown td.td-secondary { color: var(--neutral); background: rgba(100,116,139,0.06); }
+    .td-high    { background-color: #DC2626; }
+    .td-warning { background-color: #D97706; }
+    .td-info    { background-color: #2563EB; }
+    .td-success { background-color: #16A34A; }
+    .td-secondary { background-color: #64748B; }
+    .severity-breakdown td.td-high    { color: #DC2626;  background: rgba(220,38,38,0.06); }
+    .severity-breakdown td.td-warning { color: #D97706;   background: rgba(217,119,6,0.06); }
+    .severity-breakdown td.td-info    { color: #2563EB;      background: rgba(37,99,235,0.06); }
+    .severity-breakdown td.td-success { color: #16A34A;    background: rgba(22,163,74,0.06); }
+    .severity-breakdown td.td-secondary { color: #64748B; background: rgba(100,116,139,0.06); }
 
     /* Findings summary chip line (HIGH / WARNING / INFO ...) */
     .summary-line {
       margin: 4px 0 8px;
       padding: 9px 12px;
-      background: var(--surface-2);
-      border: 1px solid var(--line);
+      background: #F1F5F9;
+      border: 1px solid #E2E8F0;
       border-radius: 6px;
       font-size: 9.5pt;
     }
-    .summary-line .description-header { font-family: 'Oswald', sans-serif; }
+    .summary-line .description-header { font-family: 'Open Sans', sans-serif; }
 
     /* =========================================================================
        PANELS / CALLOUTS
        ========================================================================= */
     .panel-body {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-left: 4px solid var(--brand);
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-left: 4px solid #2563EB;
       border-radius: 6px;
       padding: 12px 14px;
       margin: 8px 0;
@@ -385,11 +379,11 @@
     .info-list { margin: 6px 0 10px; }
     .info-list .row {
       padding: 5px 0;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid #E2E8F0;
     }
-    .info-list h5 { min-width: 190px; }
+    .info-list h5 { display: inline-block; width: 178px; margin: 0; vertical-align: top; }
 
-    hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+    hr { border: none; border-top: 1px solid #E2E8F0; margin: 14px 0; }
 
     /* =========================================================================
        PAGE BREAKS / FOOTER
@@ -400,17 +394,17 @@
     #columns {
       margin-top: 30px;
       padding-top: 14px;
-      border-top: 2px solid var(--line);
+      border-top: 2px solid #E2E8F0;
       font-size: 8.5pt;
-      color: var(--muted);
+      color: #64748B;
     }
     #columns h3 {
-      font-family: 'Oswald', sans-serif;
-      color: var(--ink-2);
+      font-family: 'Open Sans', sans-serif;
+      color: #334155;
       font-size: 11pt;
       margin: 0 0 6px;
     }
-    #columns p { font-size: 8.5pt; color: var(--ink-3); }
+    #columns p { font-size: 8.5pt; color: #475569; }
 
     @media print {
       .page-break { page-break-before: always; }
@@ -423,13 +417,14 @@
   <body bgcolor="FFFFFF">
     <article id="cover">
       <div class="cover-band">
-        <img src="{{base_url}}{% static "mobinspect/img/logo.svg" %}" class="brand-logo" alt="MobInspect Logo"/>
+        <div class="brand-wordmark">MobInspect</div>
         <p class="report-kicker">Mobile Application Security Assessment</p>
         <h2 class="report-title" style="border:none;padding:0;margin:0;text-transform:none;color:#fff;">ANDROID STATIC ANALYSIS REPORT</h2>
       </div>
 
       <div class="cover-body">
-        <img class="app-icon center" id="icon" src="{% if icon_path %}{{dwd_dir}}{{icon_path}}{% else %}{{base_url}}{% static 'img/no_icon.png' %}{% endif %}" alt="app_icon"/>
+        {# Qt-WebKit can't decode WEBP: webp icons fall back to the placeholder. #}
+        <img class="app-icon center" id="icon" src="{% if icon_path and '.webp' not in icon_path %}{{dwd_dir}}{{icon_path}}{% else %}{{base_url}}{% static 'img/no_icon.png' %}{% endif %}" alt=""/>
         <div class="app-name">{% if app_name %}{{ app_name }}{% else %}{{ file_name }}{% endif %} {% if version_name %}<span class="ver">({{version_name}})</span>{% endif %}</div>
 
         <table class="cover-meta no_border">
@@ -1473,7 +1468,7 @@
           MobInspect is an automated, all-in-one mobile application (Android/iOS/Windows) pen-testing, malware analysis and security assessment framework capable of performing static and dynamic analysis.
         </p>
         <p>
-        <strong>© {% now "Y" %} Appdirs · MobInspect · GPL-3.0</strong>
+        <strong>© {% now "Y" %} Appdirs · MobInspect</strong>
       </p>
       </section>
     </article>

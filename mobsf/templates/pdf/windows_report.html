@@ -17,15 +17,15 @@
         font-style: normal;
         font-weight: 400;
         font-display: swap;
-        src: local('Open Sans Regular'), local('OpenSans-Regular'), url('{{base_url}}{% static 'fonts/Open_Sans/OpenSans-Regular.ttf' %}') format('truetype');
+        src: url('{{base_url}}{% static 'fonts/Open_Sans/OpenSans-Regular.ttf' %}') format('truetype');
       }
       /* latin */
       @font-face {
-        font-family: 'Oswald';
+        font-family: 'OswaldDisabled';
         font-style: normal;
         font-weight: 400;
         font-display: swap;
-        src: local('Oswald'), local('Oswald'), url('{{base_url}}{% static 'fonts/Oswald/Oswald-Regular.ttf' %}') format('truetype');
+        src: url('{{base_url}}{% static 'fonts/Oswald/Oswald-Regular.ttf' %}') format('truetype');
       }
     </style>
     {% endif %}
@@ -63,7 +63,7 @@
 
       body {
         font-family: 'Open Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
-        color: var(--c-text);
+        color: #0F172A;
         font-size: 12px;
         line-height: 1.55;
         margin: 0;
@@ -72,12 +72,12 @@
         print-color-adjust: exact;
       }
 
-      a { color: var(--c-primary); text-decoration: none; }
+      a { color: #2563EB; text-decoration: none; }
 
       /* --- Headings --- */
       h1, h2, h3, h4, h5 {
-        font-family: 'Oswald', 'Open Sans', 'Segoe UI', sans-serif;
-        color: var(--c-text);
+        font-family: 'Open Sans', 'Open Sans', 'Segoe UI', sans-serif;
+        color: #0F172A;
         margin: 0;
       }
 
@@ -88,7 +88,7 @@
         text-transform: uppercase;
         margin: 34px 0 14px;
         padding-bottom: 8px;
-        border-bottom: 2px solid var(--c-primary);
+        border-bottom: 2px solid #2563EB;
         page-break-after: avoid;
         display: flex;
         align-items: center;
@@ -98,7 +98,7 @@
         width: 22px; height: 22px;
         margin-right: 10px;
         border-radius: 5px;
-        background: var(--c-primary);
+        background: #2563EB;
         color: #fff;
         font-family: 'Open Sans', sans-serif;
         font-size: 12px;
@@ -113,7 +113,7 @@
 
       p { margin: 8px 0; }
 
-      .muted { color: var(--c-text-3); }
+      .muted { color: #64748B; }
       .mono  { font-family: 'Consolas', 'JetBrains Mono', 'Courier New', monospace; }
 
       /* ============================ COVER ============================ */
@@ -122,7 +122,7 @@
         position: relative;
         min-height: 720px;
         padding: 64px 70px 60px;
-        background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%);
+        background-color: #1E40AF;
         color: #ffffff;
         overflow: hidden;
       }
@@ -146,7 +146,7 @@
       }
       .cover .brandbar .logo { height: 46px; }
       .cover .brandbar .kicker {
-        font-family: 'Oswald', sans-serif;
+        font-family: 'Open Sans', sans-serif;
         font-size: 13px;
         letter-spacing: 0.22em;
         text-transform: uppercase;
@@ -159,7 +159,7 @@
         margin-top: 90px;
       }
       .cover .report-kind {
-        font-family: 'Oswald', sans-serif;
+        font-family: 'Open Sans', sans-serif;
         font-size: 14px;
         letter-spacing: 0.3em;
         text-transform: uppercase;
@@ -192,7 +192,7 @@
       }
       .cover .app-icon img { width: 100%; height: 100%; object-fit: contain; }
       .cover .app-name {
-        font-family: 'Oswald', sans-serif;
+        font-family: 'Open Sans', sans-serif;
         font-size: 26px;
         font-weight: 500;
       }
@@ -233,8 +233,8 @@
         border-radius: 10px;
         font-size: 12px;
       }
-      .cover .pill-danger { background: rgba(255,255,255,0.92); color: var(--c-critical); }
-      .cover .pill-ok { background: rgba(255,255,255,0.92); color: var(--c-passed); }
+      .cover .pill-danger { background: rgba(255,255,255,0.92); color: #DC2626; }
+      .cover .pill-ok { background: rgba(255,255,255,0.92); color: #16A34A; }
 
       .cover .cover-foot {
         position: absolute;
@@ -255,14 +255,14 @@
 
       /* --- Executive summary --- */
       .exec {
-        background: var(--c-bg-alt);
-        border-left: 4px solid var(--c-primary);
+        background: #F1F5F9;
+        border-left: 4px solid #2563EB;
         border-radius: 6px;
         padding: 18px 22px;
         margin: 8px 0 22px;
       }
-      .exec h3 { margin-top: 0; color: var(--c-primary-dark); }
-      .exec p { margin: 6px 0; color: var(--c-text-2); }
+      .exec h3 { margin-top: 0; color: #1E40AF; }
+      .exec p { margin: 6px 0; color: #475569; }
 
       /* --- Score / posture cards --- */
       .summary-cards {
@@ -277,36 +277,36 @@
         display: table-cell;
         width: 20%;
         background: #ffffff;
-        border: 1px solid var(--c-border);
-        border-top: 3px solid var(--c-border-strong);
+        border: 1px solid #E2E8F0;
+        border-top: 3px solid #CBD5E1;
         border-radius: 8px;
         padding: 16px 14px;
         text-align: center;
         vertical-align: top;
       }
-      .scard.sc-critical { border-top-color: var(--c-critical); }
-      .scard.sc-high     { border-top-color: var(--c-high); }
-      .scard.sc-medium   { border-top-color: var(--c-medium); }
-      .scard.sc-low      { border-top-color: var(--c-low); }
-      .scard.sc-passed   { border-top-color: var(--c-passed); }
+      .scard.sc-critical { border-top-color: #DC2626; }
+      .scard.sc-high     { border-top-color: #EA580C; }
+      .scard.sc-medium   { border-top-color: #D97706; }
+      .scard.sc-low      { border-top-color: #2563EB; }
+      .scard.sc-passed   { border-top-color: #16A34A; }
       .scard .scard-num {
-        font-family: 'Oswald', sans-serif;
+        font-family: 'Open Sans', sans-serif;
         font-size: 34px;
         font-weight: 600;
         line-height: 1;
       }
-      .sc-critical .scard-num { color: var(--c-critical); }
-      .sc-high     .scard-num { color: var(--c-high); }
-      .sc-medium   .scard-num { color: var(--c-medium); }
-      .sc-low      .scard-num { color: var(--c-low); }
-      .sc-passed   .scard-num { color: var(--c-passed); }
+      .sc-critical .scard-num { color: #DC2626; }
+      .sc-high     .scard-num { color: #EA580C; }
+      .sc-medium   .scard-num { color: #D97706; }
+      .sc-low      .scard-num { color: #2563EB; }
+      .sc-passed   .scard-num { color: #16A34A; }
       .scard .scard-label {
         margin-top: 8px;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: var(--c-text-3);
+        color: #64748B;
       }
 
       /* --- Severity breakdown table --- */
@@ -318,7 +318,7 @@
       .sev-table th, .sev-table td {
         padding: 10px 12px;
         text-align: center;
-        border: 1px solid var(--c-border);
+        border: 1px solid #E2E8F0;
       }
       .sev-table thead th {
         font-size: 11px;
@@ -327,22 +327,22 @@
         text-transform: uppercase;
         color: #ffffff;
       }
-      .sev-table th.h-high     { background: var(--c-high); }
-      .sev-table th.h-medium   { background: var(--c-medium); }
-      .sev-table th.h-info     { background: var(--c-low); }
-      .sev-table th.h-passed   { background: var(--c-passed); }
-      .sev-table th.h-total    { background: var(--c-unknown); }
+      .sev-table th.h-high     { background: #EA580C; }
+      .sev-table th.h-medium   { background: #D97706; }
+      .sev-table th.h-info     { background: #2563EB; }
+      .sev-table th.h-passed   { background: #16A34A; }
+      .sev-table th.h-total    { background: #64748B; }
       .sev-table tbody td {
-        font-family: 'Oswald', sans-serif;
+        font-family: 'Open Sans', sans-serif;
         font-size: 22px;
         font-weight: 600;
         background: #ffffff;
       }
-      .sev-table td.v-high   { color: var(--c-high); }
-      .sev-table td.v-medium { color: var(--c-medium); }
-      .sev-table td.v-info   { color: var(--c-low); }
-      .sev-table td.v-passed { color: var(--c-passed); }
-      .sev-table td.v-total  { color: var(--c-text); }
+      .sev-table td.v-high   { color: #EA580C; }
+      .sev-table td.v-medium { color: #D97706; }
+      .sev-table td.v-info   { color: #2563EB; }
+      .sev-table td.v-passed { color: #16A34A; }
+      .sev-table td.v-total  { color: #0F172A; }
 
       /* --- Key/value info grid --- */
       .info-grid {
@@ -353,22 +353,22 @@
       }
       .info-grid td {
         padding: 9px 14px;
-        border: 1px solid var(--c-border);
+        border: 1px solid #E2E8F0;
         vertical-align: top;
         font-size: 12px;
       }
       .info-grid td.k {
         width: 18%;
-        background: var(--c-bg);
+        background: #F8FAFC;
         font-weight: 600;
-        color: var(--c-text-3);
+        color: #64748B;
         font-size: 10px;
         letter-spacing: 0.06em;
         text-transform: uppercase;
       }
       .info-grid td.v {
         width: 32%;
-        color: var(--c-text);
+        color: #0F172A;
         word-break: break-word;
       }
       .info-grid td.v.mono {
@@ -384,29 +384,29 @@
         font-size: 11.5px;
       }
       table.data thead th {
-        background: var(--c-bg-alt);
-        color: var(--c-text-2);
+        background: #F1F5F9;
+        color: #475569;
         text-align: left;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.06em;
         text-transform: uppercase;
         padding: 9px 12px;
-        border-bottom: 2px solid var(--c-border-strong);
+        border-bottom: 2px solid #CBD5E1;
       }
       table.data tbody td {
         padding: 9px 12px;
-        border-bottom: 1px solid var(--c-border);
+        border-bottom: 1px solid #E2E8F0;
         vertical-align: top;
-        color: var(--c-text-2);
+        color: #475569;
         word-break: break-word;
       }
-      table.data tbody tr:nth-child(even) td { background: var(--c-bg); }
+      table.data tbody tr:nth-child(even) td { background: #F8FAFC; }
       table.data tbody tr { page-break-inside: avoid; }
       table.data td.rule {
         font-family: 'Consolas', 'JetBrains Mono', 'Courier New', monospace;
         font-size: 11px;
-        color: var(--c-text);
+        color: #0F172A;
         font-weight: 600;
         white-space: nowrap;
       }
@@ -422,18 +422,18 @@
         text-transform: uppercase;
         white-space: nowrap;
       }
-      .badge.danger  { background: rgba(220,38,38,0.10);  color: var(--c-critical); border: 1px solid rgba(220,38,38,0.30); }
-      .badge.success { background: rgba(22,163,74,0.10);  color: var(--c-passed);   border: 1px solid rgba(22,163,74,0.30); }
-      .badge.info    { background: rgba(37,99,235,0.10);  color: var(--c-low);      border: 1px solid rgba(37,99,235,0.30); }
-      .badge.warning { background: rgba(217,119,6,0.10);  color: var(--c-medium);   border: 1px solid rgba(217,119,6,0.30); }
+      .badge.danger  { background: rgba(220,38,38,0.10);  color: #DC2626; border: 1px solid rgba(220,38,38,0.30); }
+      .badge.success { background: rgba(22,163,74,0.10);  color: #16A34A;   border: 1px solid rgba(22,163,74,0.30); }
+      .badge.info    { background: rgba(37,99,235,0.10);  color: #2563EB;      border: 1px solid rgba(37,99,235,0.30); }
+      .badge.warning { background: rgba(217,119,6,0.10);  color: #D97706;   border: 1px solid rgba(217,119,6,0.30); }
 
       /* Inline severity text (kept for compatibility w/ existing class hooks) */
-      .danger  { color: var(--c-critical); font-weight: 600; }
-      .success { color: var(--c-passed);   font-weight: 600; }
-      .info    { color: var(--c-low);      font-weight: 600; }
-      .warning { color: var(--c-medium);   font-weight: 600; }
-      .text-success { color: var(--c-passed); }
-      .text-danger  { color: var(--c-critical); }
+      .danger  { color: #DC2626; font-weight: 600; }
+      .success { color: #16A34A;   font-weight: 600; }
+      .info    { color: #2563EB;      font-weight: 600; }
+      .warning { color: #D97706;   font-weight: 600; }
+      .text-success { color: #16A34A; }
+      .text-danger  { color: #DC2626; }
 
       /* --- VirusTotal callout --- */
       .vt-callout {
@@ -447,21 +447,21 @@
       .vt-callout.clean  { background: rgba(22,163,74,0.08); border: 1px solid rgba(22,163,74,0.30); }
       .vt-callout.dirty  { background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.30); }
       .vt-callout .vt-ratio {
-        font-family: 'Oswald', sans-serif;
+        font-family: 'Open Sans', sans-serif;
         font-size: 26px;
         font-weight: 600;
       }
-      .vt-callout.clean .vt-ratio { color: var(--c-passed); }
-      .vt-callout.dirty .vt-ratio { color: var(--c-critical); }
-      .vt-callout .vt-text { color: var(--c-text-2); font-size: 12px; }
+      .vt-callout.clean .vt-ratio { color: #16A34A; }
+      .vt-callout.dirty .vt-ratio { color: #DC2626; }
+      .vt-callout .vt-text { color: #475569; font-size: 12px; }
 
       /* --- Empty state --- */
       .empty {
         text-align: center;
         padding: 22px;
-        color: var(--c-text-3);
-        background: var(--c-bg);
-        border: 1px dashed var(--c-border-strong);
+        color: #64748B;
+        background: #F8FAFC;
+        border: 1px dashed #CBD5E1;
         border-radius: 8px;
         font-size: 12px;
       }
@@ -470,19 +470,19 @@
       .appendix {
         margin-top: 26px;
         padding: 20px 24px;
-        background: var(--c-bg);
-        border: 1px solid var(--c-border);
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
         border-radius: 8px;
       }
-      .appendix h3 { color: var(--c-primary-dark); margin-top: 0; }
-      .appendix p { color: var(--c-text-2); font-size: 12px; }
+      .appendix h3 { color: #1E40AF; margin-top: 0; }
+      .appendix p { color: #475569; font-size: 12px; }
       .report-footer {
         margin-top: 22px;
         padding-top: 14px;
-        border-top: 1px solid var(--c-border-strong);
+        border-top: 1px solid #CBD5E1;
         text-align: center;
         font-size: 11px;
-        color: var(--c-text-3);
+        color: #64748B;
       }
 
       @media print {
@@ -547,7 +547,7 @@
 
       <div class="cover-foot">
         <span>MobInspect {{ version }}</span>
-        <span>&copy; {% now "Y" %} Appdirs &middot; MobInspect &middot; GPL-3.0</span>
+        <span>&copy; {% now "Y" %} Appdirs &middot; MobInspect</span>
       </div>
     </article>
 
@@ -789,7 +789,7 @@
 
       <div class="report-footer">
         Report Generated by MobInspect {{ version }} &nbsp;&middot;&nbsp;
-        <strong>&copy; {% now "Y" %} Appdirs &middot; MobInspect &middot; GPL-3.0</strong>
+        <strong>&copy; {% now "Y" %} Appdirs &middot; MobInspect</strong>
       </div>
 
     </article>

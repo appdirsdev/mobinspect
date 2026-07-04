@@ -25,9 +25,9 @@
   summary.list-none::-webkit-details-marker { display: none; }
   summary.list-none { list-style: none; }
   /* Styling for the shared base/list.html + list_href.html includes */
-  .mi-list a { color: var(--text-brand, #2563EB); }
+  .mi-list a { color: rgb(var(--text-brand)); }
   .mi-list a:hover { text-decoration: underline; }
-  .mi-list summary { cursor: pointer; font-weight: 500; color: var(--text-primary, #0f172a); }
+  .mi-list summary { cursor: pointer; font-weight: 500; color: rgb(var(--text-primary)); }
   @media print {
     body { -webkit-print-color-adjust: exact; }
     aside, header.h-topbar, footer { display: none !important; }
@@ -59,6 +59,7 @@
     </div>
   </div>
   <div class="flex flex-wrap items-center gap-2">
+    <a href="{% url 'recent' %}" class="btn btn-ghost btn-md">{% icon "chevron-left" size=14 %} Back</a>
     {% if app_type not in 'so' %}
       <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-primary btn-md">{% icon "shield-check" size=14 %} Scorecard</a>
     {% endif %}
@@ -66,6 +67,7 @@
     {% if app_type not in 'jar,aar,so' %}
       <a onclick="dynamic_loader()" href="{% url 'dynamic_analyzer' checksum=md5 %}" class="btn btn-secondary btn-md">{% icon "smartphone" size=14 %} Dynamic</a>
     {% endif %}
+    <a href="{% url 'compare_versions' checksum=md5 %}" class="btn btn-secondary btn-md">{% icon "git-compare" size=14 %} Compare</a>
     <a href="{% url 'pdf' checksum=md5 %}" class="btn btn-ghost btn-md">{% icon "file-text" size=14 %} PDF</a>
   </div>
 </header>

@@ -6,8 +6,8 @@
 {% endcomment %}
 <div class="flex items-center gap-2 px-4 h-topbar border-b border-border-subtle">
   <a href="{% url 'home' %}" class="flex items-center gap-2 min-w-0 group">
-    <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500 text-white shadow-elevation-1 transition-transform duration-fast group-hover:scale-105">
-      {% icon "shield-check" size=18 %}
+    <span class="inline-flex w-8 h-8 rounded-lg shadow-elevation-1 transition-transform duration-fast group-hover:scale-105">
+      {% include "components/logo_mark.html" %}
     </span>
     <span x-show="!sidebarCollapsed" x-transition.opacity class="font-semibold tracking-tight text-text-primary truncate">
       MobInspect

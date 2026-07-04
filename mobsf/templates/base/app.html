@@ -16,6 +16,58 @@
 
   <link rel="stylesheet" href="{% static 'mobinspect/css/dist/app.css' %}" />
 
+  <style id="mi-widget-dark-theme">
+    /* Dark-mode overrides for third-party widgets (CodeMirror, highlight.js,
+       jsTree, EnlighterJS, DataTables). Their vendor CSS hardcodes white/light
+       surfaces, so they render as bright boxes in dark mode. Scoped to
+       [data-theme="dark"] so light mode keeps the vendor look; all colors use
+       design tokens so they track the palette. Loaded globally because these
+       widget pages extend this base directly (the legacy_app override doesn't
+       reach them). */
+    /* CodeMirror (Frida/JS editors) */
+    [data-theme="dark"] .CodeMirror { background: rgb(var(--surface-2)); color: rgb(var(--text-primary)); }
+    [data-theme="dark"] .CodeMirror-gutters { background: rgb(var(--surface-1)); border-right: 1px solid rgb(var(--border-subtle)); }
+    [data-theme="dark"] .CodeMirror-linenumber { color: rgb(var(--text-tertiary)); }
+    [data-theme="dark"] .CodeMirror-cursor { border-left: 1px solid rgb(var(--text-primary)); }
+    [data-theme="dark"] .CodeMirror-selected { background: rgb(var(--surface-4)); }
+    [data-theme="dark"] .CodeMirror-scrollbar-filler,
+    [data-theme="dark"] .CodeMirror-gutter-filler { background: rgb(var(--surface-1)); }
+
+    /* highlight.js (xcode theme) — code in the source browser */
+    [data-theme="dark"] .hljs { background: rgb(var(--surface-2)) !important; color: rgb(var(--text-primary)) !important; }
+    [data-theme="dark"] .hljs-subst, [data-theme="dark"] .hljs-attribute { color: rgb(var(--text-primary)); }
+
+    /* jsTree file tree + project custom.css panels */
+    [data-theme="dark"] .jstree-default .jstree-anchor { color: rgb(var(--text-primary)); }
+    [data-theme="dark"] .jstree-default .jstree-hovered,
+    [data-theme="dark"] .jstree-default .jstree-wholerow-hovered { background: rgb(var(--surface-3)); box-shadow: none; }
+    [data-theme="dark"] .jstree-default .jstree-clicked,
+    [data-theme="dark"] .jstree-default .jstree-wholerow-clicked { background: rgb(var(--surface-4)); }
+    [data-theme="dark"] div#fileframe { background-color: rgb(var(--surface-1)) !important; }
+    [data-theme="dark"] div#contentframe { background-color: rgb(var(--surface-0)) !important; background-image: none !important; }
+    [data-theme="dark"] .fa-folder, [data-theme="dark"] .fa-file { color: rgb(var(--text-secondary)); }
+
+    /* EnlighterJS code blocks (file viewer, injected-code, reports) */
+    [data-theme="dark"] .enlighter-default .enlighter,
+    [data-theme="dark"] .enlighter-t-enlighter .enlighter,
+    [data-theme="dark"] .enlighter-t-enlighter .enlighter-raw,
+    [data-theme="dark"] .enlighter-t-beyond .enlighter { background-color: rgb(var(--surface-2)) !important; color: rgb(var(--text-primary)) !important; }
+    [data-theme="dark"] .enlighter-t-enlighter .enlighter-text,
+    [data-theme="dark"] .enlighter-t-beyond .enlighter-text { color: rgb(var(--text-primary)); }
+    [data-theme="dark"] .enlighter-t-enlighter.enlighter-linenumbers div.enlighter > div::before {
+      background-color: rgb(var(--surface-1)) !important; color: rgb(var(--text-tertiary)) !important; border-right-color: rgb(var(--border-subtle)) !important;
+    }
+
+    /* DataTables (static-analysis result tables on app.html pages) */
+    [data-theme="dark"] table.dataTable,
+    [data-theme="dark"] table.dataTable tbody tr { background-color: rgb(var(--surface-1)); color: rgb(var(--text-primary)); }
+    [data-theme="dark"] table.dataTable tbody tr.odd,
+    [data-theme="dark"] table.dataTable.stripe tbody tr.odd,
+    [data-theme="dark"] table.dataTable.display tbody tr.odd { background-color: rgb(var(--surface-2)); }
+    [data-theme="dark"] .dataTables_wrapper { color: rgb(var(--text-secondary)); }
+    [data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button { color: rgb(var(--text-primary)) !important; }
+  </style>
+
   {% block extra_head %}{% endblock %}
 </head>
 
@@ -52,7 +104,7 @@
 
       {# Footer (intentionally tiny) #}
       <footer class="px-6 py-3 border-t border-border-subtle text-tiny text-text-tertiary flex items-center justify-between">
-        <span>© {% now "Y" %} Appdirs · MobInspect · GPL-3.0 — see <a href="/about/" class="text-text-brand hover:underline">about</a></span>
+        <span>© {% now "Y" %} Appdirs · MobInspect — see <a href="/about/" class="text-text-brand hover:underline">about</a></span>
         <span>v{{ version|default:"" }}</span>
       </footer>
     </div>

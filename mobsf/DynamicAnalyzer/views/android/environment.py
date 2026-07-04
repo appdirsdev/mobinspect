@@ -38,6 +38,11 @@ from mobsf.StaticAnalyzer.models import StaticAnalyzerAndroid
 
 logger = logging.getLogger(__name__)
 ANDROID_API_SUPPORTED = 30
+# On-device path for the pushed frida-server binary. Must live under
+# /data/local/tmp (shell_data_file SELinux context), NOT /system, so its
+# linker namespace can dlopen the ART runtime from /apex on Android 10+.
+# See frida_setup() for the full rationale.
+FRIDA_SERVER_REMOTE = '/data/local/tmp/fd_server'
 
 
 class Environment:
@@ -769,8 +774,16 @@ class Environment:
             return
         frida_path = os.path.join(settings.DWD_DIR, frida_bin)
         logger.info('Copying frida server v%s for %s', frida_version, frida_arch)
-        self.adb_command(['push', frida_path, '/system/fd_server'])
-        self.adb_command(['chmod', '755', '/system/fd_server'], True)
+        # Push frida-server to /data/local/tmp instead of /system. A binary
+        # executed from /system runs with the SELinux system_file context,
+        # whose restricted linker namespace cannot dlopen the ART runtime from
+        # the /apex/com.android.art/ APEX mount on Android 10+ (API 29+). That
+        # makes Frida spawn() fail with "unable to load libart.so: dlopen
+        # failed: library libart.so not found". Running from /data/local/tmp
+        # (shell_data_file context) has an unrestricted namespace that can
+        # reach /apex, so spawn-based instrumentation works.
+        self.adb_command(['push', frida_path, FRIDA_SERVER_REMOTE])
+        self.adb_command(['chmod', '755', FRIDA_SERVER_REMOTE], True)
 
     def run_frida_server(self):
         """Start Frida Server."""
@@ -785,7 +798,7 @@ class Environment:
                     '-s',
                     self.identifier,
                     'shell',
-                    '/system/fd_server']
+                    FRIDA_SERVER_REMOTE]
             subprocess.call(argz, stdout=fnull, stderr=subprocess.STDOUT)
         trd = threading.Thread(target=start_frida)
         trd.daemon = True

@@ -161,6 +161,13 @@ def pdf(request, checksum, api=False, jsonres=False):
                         ('Accept-Encoding', 'gzip'),
                     ],
                     'no-outline': None,
+                    # wkhtmltopdf loads @font-face fonts asynchronously; without a
+                    # delay it can snapshot the page before the bundled Open Sans
+                    # is ready, intermittently dropping text (e.g. the white cover
+                    # title). Wait for fonts to settle so output is deterministic
+                    # across runs and platforms (macOS/Linux).
+                    'javascript-delay': '1000',
+                    'no-stop-slow-scripts': '',
                 }
                 # Added proxy support to wkhtmltopdf
                 proxies, _ = upstream_proxy('https')
