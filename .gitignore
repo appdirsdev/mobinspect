@@ -87,3 +87,6 @@ emulator/
 .start.log
 .genymotion.log
 .detached_start.sh
+
+# Local PostgreSQL credentials (copy .env.postgres.example → .env.postgres)
+.env.postgres

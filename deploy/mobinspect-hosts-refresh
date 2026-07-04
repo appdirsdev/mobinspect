@@ -12,6 +12,11 @@
 #
 # --apply: additionally restart mobinspect-web if the value changed, so a
 #          mid-run IP change is picked up without a manual restart.
+#
+# If no IPv4 is detected within the wait window, an existing env file is kept
+# as-is (a transient DHCP renewal must not shrink the allow-list to loopback
+# only); the loopback-only fallback is written only on first boot when no env
+# file exists yet, so the service can still start.
 set -u
 ENV_FILE=/etc/mobinspect/hosts.env
 
@@ -23,6 +28,14 @@ for _ in $(seq 1 45); do
     [ -n "$ips" ] && break
     sleep 2
 done
+
+# No IPv4 after the full wait: keep a previously-recorded value rather than
+# rewriting (and restarting) with a loopback-only list that would 400 every
+# remote client until the next timer tick.
+if [ -z "$ips" ] && [ -f "$ENV_FILE" ]; then
+    echo "mobinspect-hosts: no IPv4 detected; keeping previous ALLOWED_HOSTS"
+    exit 0
+fi
 
 hosts="${ips:+$ips,}127.0.0.1,localhost"
 new="MOBINSPECT_ALLOWED_HOSTS=$hosts"

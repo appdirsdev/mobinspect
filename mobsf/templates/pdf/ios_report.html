@@ -21,6 +21,14 @@
       }
       /* latin */
       @font-face {
+        font-family: 'Open Sans';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('{{base_url}}{% static 'fonts/Open_Sans/OpenSans-Bold.ttf' %}') format('truetype');
+      }
+      /* latin */
+      @font-face {
         font-family: 'OswaldDisabled';
         font-style: normal;
         font-weight: 400;
@@ -136,15 +144,13 @@
         text-align: center;
         padding: 46px 40px 40px;
       }
-      #cover .header .logo {
-        width: 280px;
-        max-width: 60%;
-        height: auto;
-        background: #ffffff;
-        padding: 14px 22px;
-        border-radius: 12px;
-        margin: 0 auto 22px;
-        display: block;
+      #cover .header .brand-wordmark {
+        font-family: 'Open Sans', sans-serif;
+        font-size: 23pt;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        color: #ffffff;
+        margin: 0 auto 16px;
       }
       #cover .htext {
         color: #ffffff;
@@ -413,7 +419,7 @@
     <!-- =====================  COVER  ===================== -->
     <article id="cover">
       <div class="header">
-        <img src="{{base_url}}{% static "mobinspect/img/logo.svg" %}" class="center logo" alt="MobInspect Logo"/>
+        <div class="brand-wordmark">MobInspect</div>
         <div class="htext">iOS Static Analysis Report</div>
         <div class="subtitle">Security Assessment</div>
       </div>

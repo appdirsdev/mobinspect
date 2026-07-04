@@ -53,7 +53,12 @@ class Environment:
         else:
             self.identifier = get_device()
         self.tools_dir = settings.TOOLS_DIR
-        self.frida_str = f'MobSF-Frida-{frida_version}'.encode('utf-8')
+        # Suffix the marker with the on-device install path so that
+        # relocating the frida-server binary invalidates markers written
+        # by older builds and is_mobsfyied() triggers a re-provision.
+        self.frida_str = (
+            f'MobSF-Frida-{frida_version}-{FRIDA_SERVER_REMOTE}'
+            .encode('utf-8'))
         self.xposed_str = b'MobSF-Xposed'
 
     def wait(self, sec):
@@ -791,6 +796,16 @@ class Environment:
         if b'fd_server' in check:
             logger.info('Frida Server v%s is already running', frida_version)
             return
+        # Devices MobSFyed by older builds carry frida-server at the
+        # legacy /system location and nothing at FRIDA_SERVER_REMOTE,
+        # yet can still pass is_mobsfyied(). The exec below discards its
+        # output, so a missing binary would fail silently. Verify the
+        # binary exists and re-provision it if it does not.
+        out = self.adb_command(['ls', FRIDA_SERVER_REMOTE], True, True)
+        if not out or b'No such file' in out:
+            logger.info('frida-server not found at %s, provisioning it',
+                        FRIDA_SERVER_REMOTE)
+            self.frida_setup()
 
         def start_frida():
             fnull = open(os.devnull, 'w')

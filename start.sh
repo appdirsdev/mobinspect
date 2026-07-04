@@ -45,45 +45,34 @@ export MOBSF_ANALYZER_IDENTIFIER="$EMU_TCP"
 START_EMULATOR=1
 [[ "${1:-}" == "--no-emulator" ]] && START_EMULATOR=0
 
-# Load PostgreSQL env (switches the app from SQLite to Postgres)
+# Shared launcher helpers (log/warn, env loading, pg wait, migrations, web)
+DJANGO_MANAGE=("$PY" -m poetry run python manage.py)
+GUNICORN=("$PY" -m poetry run gunicorn)
 # shellcheck disable=SC1091
-source ./.env.postgres
+source ./scripts/start-common.sh
+
+# Load PostgreSQL env (switches the app from SQLite to Postgres)
+load_postgres_env
 
 EMU_PID=""
-QCLUSTER_PID=""
 
-log()  { printf "\033[1;36m[start]\033[0m %s\n" "$*"; }
-warn() { printf "\033[1;33m[start]\033[0m %s\n" "$*"; }
-
-cleanup() {
-  echo
-  log "Shutting down..."
-  [[ -n "$QCLUSTER_PID" ]] && kill "$QCLUSTER_PID" 2>/dev/null || true
+cleanup_extra() {
   if [[ "$START_EMULATOR" == "1" ]]; then
     adb emu kill 2>/dev/null || true
   fi
-  log "Stack stopped. (PostgreSQL service left running — 'brew services stop postgresql@16' to stop it.)"
 }
+CLEANUP_NOTE="(PostgreSQL service left running — 'brew services stop postgresql@16' to stop it.)"
 trap cleanup EXIT INT TERM
 
 # ---- 1. PostgreSQL ---------------------------------------------------------
-# Only start it if it isn't already accepting connections. If it's already
-# running, leave it exactly as-is (never restart a live server).
-if pg_isready -q -h "$POSTGRES_HOST" -p "$POSTGRES_PORT"; then
-  log "PostgreSQL already running — leaving it as-is."
-else
+start_pg_service() {
   log "PostgreSQL not running — starting it..."
   brew services start postgresql@16 >/dev/null 2>&1 || true
-  for i in $(seq 1 30); do pg_isready -q -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" && break; sleep 1; done
-  pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" || { warn "PostgreSQL not reachable"; exit 1; }
-  log "PostgreSQL is up."
-fi
+}
+wait_for_postgres start_pg_service
 
 # Apply any pending migrations (safe/idempotent)
-log "Applying migrations..."
-"$PY" -m poetry run python manage.py migrate --noinput >/dev/null 2>&1 || \
-  "$PY" -m poetry run python manage.py migrate --noinput
-log "Database ready."
+run_migrations
 
 # ---- 2. Android emulator ---------------------------------------------------
 if [[ "$START_EMULATOR" == "1" ]]; then
@@ -117,14 +106,8 @@ else
 fi
 
 # ---- 3. django-q qcluster (background scan worker) -------------------------
-log "Starting background worker (qcluster)..."
-"$PY" -m poetry run python manage.py qcluster >/tmp/mobinspect_qcluster.log 2>&1 &
-QCLUSTER_PID=$!
-log "Worker started (pid $QCLUSTER_PID, logs: /tmp/mobinspect_qcluster.log)."
+start_qcluster
 
 # ---- 4. Web server (foreground) -------------------------------------------
 # MobInspect disables Django's dev runserver; use gunicorn (same as run.sh).
-log "Starting MobInspect web server → http://$HOST:$PORT  (Ctrl-C to stop everything)"
-exec "$PY" -m poetry run gunicorn -b "$HOST:$PORT" mobsf.MobSF.wsgi:application \
-  --workers=1 --threads=10 --timeout=3600 \
-  --log-level=info --log-file=- --access-logfile=- --error-logfile=- --capture-output
+run_web_foreground

@@ -127,7 +127,7 @@
           <div class="sensor"></div>
           <div class="speaker"></div>
           <div class="screen" id="container" tabindex="0" style="outline: none;">
-            <img width="320" height="580" src="{% url 'download' %}screen/screen.png" id="my" onerror="$('#my').attr('src','/static/img/loading.jpg')" style="background-color:black;">
+            <img width="320" height="580" src="{% url 'download' %}screen/screen.png" id="my" onerror="this.onerror=null;this.src='/static/img/loading.jpg'" style="background-color:black;">
           </div>
         </div>
       </div>

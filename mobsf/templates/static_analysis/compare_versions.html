@@ -87,8 +87,13 @@
     <div class="py-10 text-center text-text-tertiary">
       <p class="text-text-secondary">No other versions of this app have been scanned yet.</p>
       <p class="text-tiny mt-1">
+        {% if package %}
         Scan another build with the same package name
-        {% if package %}(<span class="font-mono">{{ package }}</span>){% endif %}
+        (<span class="font-mono">{{ package }}</span>)
+        {% else %}
+        No package name could be parsed for this scan; scan another build
+        with the same file name (<span class="font-mono">{{ file_name }}</span>)
+        {% endif %}
         to compare it here.
         <a href="{% url 'home' %}" class="text-text-brand hover:underline">Upload a version</a>.
       </p>

@@ -24,7 +24,8 @@ if [ -f "$CACHE" ]; then
 fi
 # 2) ARP neighbors on the subnet
 if [ -z "$ip" ]; then
-    for c in $(arp -a 2>/dev/null | grep -oE "$SUBNET\.[0-9]+" | sort -u); do
+    SUBNET_RE="${SUBNET//./\\.}"
+    for c in $(arp -a 2>/dev/null | grep -oE "${SUBNET_RE}\.[0-9]+" | sort -u); do
         if is_server "$c"; then ip="$c"; break; fi
     done
 fi

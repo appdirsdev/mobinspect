@@ -16,6 +16,7 @@ from pathlib import Path
 
 import arpy
 
+from django.db.models import Q
 from django.utils.html import escape
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
@@ -402,9 +403,10 @@ def compare_versions(request, checksum, api=False):
     """List other scanned versions of the same app to compare against.
 
     Finds every other Android static-analysis result that shares the current
-    app's package name and renders a picker; each row links to the existing
-    /compare/<hash1>/<hash2>/ diff. Version comparison is Android-only because
-    generic_compare reads StaticAnalyzerAndroid.
+    app's package name (falling back to the uploaded file name when a package
+    name could not be parsed) and renders a picker; each row links to the
+    existing /compare/<hash1>/<hash2>/ diff. Version comparison is
+    Android-only because generic_compare reads StaticAnalyzerAndroid.
     """
     if not is_md5(checksum):
         return print_n_send_error_response(request, 'Invalid hash', api)
@@ -415,19 +417,31 @@ def compare_versions(request, checksum, api=False):
             'Version comparison is available for Android apps only, and no '
             'Android static analysis was found for this hash.', api)
     package = current.PACKAGE_NAME
-    others = []
+    # FILE_NAME is always recorded at upload; use it as a fallback match so
+    # scans whose package name could not be parsed (e.g. a source zip with a
+    # broken manifest) remain comparable.
+    file_name = current.FILE_NAME
+    match = Q()
     if package:
+        match |= Q(PACKAGE_NAME=package)
+        if file_name:
+            # Also offer builds whose own package failed to parse.
+            match |= Q(PACKAGE_NAME='', FILE_NAME=file_name)
+    elif file_name:
+        match |= Q(FILE_NAME=file_name)
+    others = []
+    if match:
         # Only MD5s with a completed Android static entry can be diffed.
         android_md5s = set(
             StaticAnalyzerAndroid.objects
-            .filter(PACKAGE_NAME=package)
+            .filter(match)
             .exclude(MD5=checksum)
             .values_list('MD5', flat=True))
         seen = set()
         # RecentScansDB carries the scan timestamp + friendly metadata; use it
         # to order newest-first and label each version.
         for r in (RecentScansDB.objects
-                  .filter(PACKAGE_NAME=package, MD5__in=android_md5s)
+                  .filter(MD5__in=android_md5s)
                   .order_by('-TIMESTAMP')):
             seen.add(r.MD5)
             others.append({

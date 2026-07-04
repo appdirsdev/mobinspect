@@ -24,46 +24,30 @@ elif command -v wkhtmltopdf >/dev/null; then
   export MOBSF_WKHTMLTOPDF_BINARY="$(command -v wkhtmltopdf)"
 fi
 
-# Load PostgreSQL env (switches the app from SQLite to Postgres)
+# Shared launcher helpers (log/warn, env loading, pg wait, migrations, web)
+DJANGO_MANAGE=("$PY" manage.py)
+GUNICORN=("$PY" -m gunicorn)
 # shellcheck disable=SC1091
-source ./.env.postgres
+source ./scripts/start-common.sh
 
-QCLUSTER_PID=""
-log()  { printf "\033[1;36m[start]\033[0m %s\n" "$*"; }
-warn() { printf "\033[1;33m[start]\033[0m %s\n" "$*"; }
+# Load PostgreSQL env (switches the app from SQLite to Postgres)
+load_postgres_env
 
-cleanup() {
-  echo
-  log "Shutting down..."
-  [[ -n "$QCLUSTER_PID" ]] && kill "$QCLUSTER_PID" 2>/dev/null || true
-  log "Stack stopped. (PostgreSQL service left running.)"
-}
+CLEANUP_NOTE="(PostgreSQL service left running.)"
 trap cleanup EXIT INT TERM
 
 # ---- 1. PostgreSQL ---------------------------------------------------------
-if pg_isready -q -h "$POSTGRES_HOST" -p "$POSTGRES_PORT"; then
-  log "PostgreSQL already running — leaving it as-is."
-else
+start_pg_service() {
   log "PostgreSQL not running — starting it (systemd)..."
   sudo systemctl start postgresql
-  for i in $(seq 1 30); do pg_isready -q -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" && break; sleep 1; done
-  pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" || { warn "PostgreSQL not reachable"; exit 1; }
-  log "PostgreSQL is up."
-fi
+}
+wait_for_postgres start_pg_service
 
 # ---- 2. Migrations ----------------------------------------------------------
-log "Applying migrations..."
-"$PY" manage.py migrate --noinput >/dev/null 2>&1 || "$PY" manage.py migrate --noinput
-log "Database ready."
+run_migrations
 
 # ---- 3. django-q qcluster (background scan worker) --------------------------
-log "Starting background worker (qcluster)..."
-"$PY" manage.py qcluster >/tmp/mobinspect_qcluster.log 2>&1 &
-QCLUSTER_PID=$!
-log "Worker started (pid $QCLUSTER_PID, logs: /tmp/mobinspect_qcluster.log)."
+start_qcluster
 
 # ---- 4. Web server (foreground) ---------------------------------------------
-log "Starting MobInspect web server → http://$HOST:$PORT  (Ctrl-C to stop everything)"
-exec "$PY" -m gunicorn -b "$HOST:$PORT" mobsf.MobSF.wsgi:application \
-  --workers=1 --threads=10 --timeout=3600 \
-  --log-level=info --log-file=- --access-logfile=- --error-logfile=- --capture-output
+run_web_foreground
