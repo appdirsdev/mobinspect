@@ -1,80 +1,110 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
-# MobInspect — single end-to-end launcher.
-# Brings up the WHOLE stack in the right order and tears it down on Ctrl-C:
-#   1. PostgreSQL 16        (Homebrew service)
-#   2. Android AVD          (emulator, for Dynamic Analysis)
-#   3. django-q qcluster    (background worker for scans/analysis)
-#   4. MobInspect web server (foreground → http://127.0.0.1:8000)
+# MobInspect — single cross-platform launcher (macOS + Linux).
+# Brings up the stack in order and tears it down on Ctrl-C:
+#   1. PostgreSQL      — CHECKED, and started only if down
+#                        (brew on macOS, systemd on Linux). A running server
+#                        is left exactly as-is — never restarted.
+#   2. Android AVD     — macOS only, for Dynamic Analysis (--no-emulator skips).
+#                        On Linux, point MOBSF_ANALYZER_IDENTIFIER at a remote AVD.
+#   3. django-q qcluster — background worker for scans/analysis.
+#   4. MobInspect web server (gunicorn, foreground → http://HOST:PORT).
 #
 # Usage:
-#   ./start.sh                 # everything (default)
-#   ./start.sh --no-emulator   # skip the Android emulator (static analysis only)
+#   ./start.sh                 # everything (emulator on macOS)
+#   ./start.sh --no-emulator   # static analysis only
 #   HOST=0.0.0.0 PORT=8080 ./start.sh
+#   PY=/path/to/python ./start.sh          # override the interpreter
+#   USE_POETRY=0 ./start.sh                 # run $PY directly (no `poetry run`)
 # =============================================================================
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# ---- config / toolchain paths (from the install) ---------------------------
-PY="$HOME/.pyenv/versions/3.13.5/bin/python"
-export JAVA_HOME="/opt/homebrew/opt/openjdk@17"
-export ANDROID_HOME="$HOME/Library/Android/sdk"
-export ANDROID_SDK_ROOT="$ANDROID_HOME"
-export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:/opt/homebrew/opt/postgresql@16/bin:$PATH"
-
-# macOS: gunicorn forks workers after Objective-C libs init, which macOS
-# kills ("+[NSCharacterSet initialize] ... fork()"). This disables that guard.
-export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-
-# PDF report export (wkhtmltopdf). Homebrew dropped the formula (upstream
-# archived), so it's installed from the official pkg into ~/.local/wkhtmltox.
-# MobInspect maps this env var to settings.WKHTMLTOPDF_BINARY.
-if [[ -x "$HOME/.local/wkhtmltox/bin/wkhtmltopdf" ]]; then
-  export MOBSF_WKHTMLTOPDF_BINARY="$HOME/.local/wkhtmltox/bin/wkhtmltopdf"
-fi
-
-HOST="${HOST:-127.0.0.1}"
-PORT="${PORT:-8000}"
-AVD="${AVD:-MobInspect_API30}"
-# Dynamic Analysis target. A local emulator's `emulator-5554` id is NOT
-# usable with `adb connect` (MobInspect connects that way), so point it at
-# the emulator's TCP adb port instead. This is the fix for
-# "Cannot connect to emulator-5554".
-EMU_TCP="127.0.0.1:5555"
-export MOBSF_ANALYZER_IDENTIFIER="$EMU_TCP"
+OS="$(uname -s)"
 START_EMULATOR=1
 [[ "${1:-}" == "--no-emulator" ]] && START_EMULATOR=0
 
-# Shared launcher helpers (log/warn, env loading, pg wait, migrations, web)
-DJANGO_MANAGE=("$PY" -m poetry run python manage.py)
-GUNICORN=("$PY" -m poetry run gunicorn)
+# ---- platform config -------------------------------------------------------
+if [[ "$OS" == "Darwin" ]]; then
+  # macOS dev box: pyenv interpreter + poetry virtualenv, local emulator.
+  PY="${PY:-$HOME/.pyenv/versions/3.13.5/bin/python}"
+  USE_POETRY="${USE_POETRY:-1}"
+  export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+  export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+  export ANDROID_SDK_ROOT="$ANDROID_HOME"
+  export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:/opt/homebrew/opt/postgresql@16/bin:$PATH"
+  # macOS kills workers forked after Objective-C init; disable that guard.
+  export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+  HOST="${HOST:-127.0.0.1}"
+  CLEANUP_NOTE="(PostgreSQL service left running — 'brew services stop postgresql@16' to stop it.)"
+  start_pg_service() {
+    log "PostgreSQL not running — starting it (brew)..."
+    brew services start postgresql@16 >/dev/null 2>&1 || true
+  }
+else
+  # Linux server: venv interpreter, no local emulator (use a remote AVD).
+  PY="${PY:-$HOME/MobInspect/.venv/bin/python}"
+  USE_POETRY="${USE_POETRY:-0}"
+  HOST="${HOST:-0.0.0.0}"
+  START_EMULATOR=0
+  # Make pg_isready reachable regardless of the login PATH.
+  for pgbin in /usr/lib/postgresql/*/bin /usr/pgsql-*/bin; do
+    [[ -d "$pgbin" ]] && PATH="$pgbin:$PATH"
+  done
+  export PATH
+  CLEANUP_NOTE="(PostgreSQL service left running.)"
+  start_pg_service() {
+    log "PostgreSQL not running — starting it (systemd)..."
+    sudo systemctl start postgresql
+  }
+fi
+PORT="${PORT:-8000}"
+
+# wkhtmltopdf for PDF export (both platforms).
+if [[ -x "$HOME/.local/wkhtmltox/bin/wkhtmltopdf" ]]; then
+  export MOBSF_WKHTMLTOPDF_BINARY="$HOME/.local/wkhtmltox/bin/wkhtmltopdf"
+elif command -v wkhtmltopdf >/dev/null 2>&1; then
+  export MOBSF_WKHTMLTOPDF_BINARY="$(command -v wkhtmltopdf)"
+fi
+
+# ---- how we invoke Django / gunicorn ---------------------------------------
+if [[ "$USE_POETRY" == "1" ]]; then
+  DJANGO_MANAGE=("$PY" -m poetry run python manage.py)
+  GUNICORN=("$PY" -m poetry run gunicorn)
+else
+  DJANGO_MANAGE=("$PY" manage.py)
+  GUNICORN=("$PY" -m gunicorn)
+fi
+
+# Shared launcher helpers (log/warn, env loading, pg wait, migrations, web).
 # shellcheck disable=SC1091
 source ./scripts/start-common.sh
 
-# Load PostgreSQL env (switches the app from SQLite to Postgres)
+# Load PostgreSQL env (switches the app from SQLite to Postgres).
 load_postgres_env
 
+# ---- Dynamic Analysis target (macOS local emulator) ------------------------
 EMU_PID=""
+AVD="${AVD:-MobInspect_API30}"
+# A local emulator's `emulator-5554` id is NOT usable with `adb connect`
+# (MobInspect connects that way), so target the emulator's TCP adb port.
+EMU_TCP="127.0.0.1:5555"
+if [[ "$START_EMULATOR" == "1" ]]; then
+  export MOBSF_ANALYZER_IDENTIFIER="${MOBSF_ANALYZER_IDENTIFIER:-$EMU_TCP}"
+fi
 
 cleanup_extra() {
-  if [[ "$START_EMULATOR" == "1" ]]; then
-    adb emu kill 2>/dev/null || true
-  fi
+  if [[ "$START_EMULATOR" == "1" ]]; then adb emu kill 2>/dev/null || true; fi
 }
-CLEANUP_NOTE="(PostgreSQL service left running — 'brew services stop postgresql@16' to stop it.)"
 trap cleanup EXIT INT TERM
 
-# ---- 1. PostgreSQL ---------------------------------------------------------
-start_pg_service() {
-  log "PostgreSQL not running — starting it..."
-  brew services start postgresql@16 >/dev/null 2>&1 || true
-}
+# ---- 1. PostgreSQL (check; start only if down) -----------------------------
 wait_for_postgres start_pg_service
 
-# Apply any pending migrations (safe/idempotent)
+# ---- 2. Migrations (safe/idempotent) ---------------------------------------
 run_migrations
 
-# ---- 2. Android emulator ---------------------------------------------------
+# ---- 3. Android emulator (macOS only) --------------------------------------
 if [[ "$START_EMULATOR" == "1" ]]; then
   if adb devices 2>/dev/null | grep -q "emulator-.*device"; then
     log "An emulator is already running — reusing it."
@@ -101,13 +131,14 @@ if [[ "$START_EMULATOR" == "1" ]]; then
   else
     warn "Could not register $EMU_TCP — Dynamic Analysis may be unavailable."
   fi
-else
+elif [[ "$OS" == "Darwin" ]]; then
   warn "Skipping emulator (--no-emulator). Dynamic Analysis will be unavailable."
+else
+  warn "Linux: no local emulator. Set MOBSF_ANALYZER_IDENTIFIER=<avd-host>:5555 for Dynamic Analysis."
 fi
 
-# ---- 3. django-q qcluster (background scan worker) -------------------------
+# ---- 4. django-q qcluster (background scan worker) -------------------------
 start_qcluster
 
-# ---- 4. Web server (foreground) -------------------------------------------
-# MobInspect disables Django's dev runserver; use gunicorn (same as run.sh).
+# ---- 5. Web server (foreground) -------------------------------------------
 run_web_foreground
