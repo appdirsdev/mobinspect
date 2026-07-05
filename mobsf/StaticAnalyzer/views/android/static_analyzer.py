@@ -38,6 +38,7 @@ from mobsf.StaticAnalyzer.views.android.so import (
 from mobsf.MobSF.views.authentication import (
     login_required,
 )
+from mobsf.RBAC.decorators import require_permission
 
 APK_TYPE = 'apk'
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ register.filter('pathify', pathify)
 
 
 @login_required
+@require_permission('scan.view')
 def static_analyzer(request, checksum, api=False):
     """Do static analysis on an request and save to db."""
     try:

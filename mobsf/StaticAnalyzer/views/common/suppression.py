@@ -34,6 +34,7 @@ from mobsf.MobSF.views.authorization import (
     Permissions,
     permission_required,
 )
+from mobsf.RBAC.decorators import require_permission
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +175,7 @@ def suppress_by_files(request, api=False):
 
 
 @login_required
+@require_permission('scan.view')
 @require_http_methods(['POST'])
 def list_suppressions(request, api=False):
     """List Suppression Rules."""

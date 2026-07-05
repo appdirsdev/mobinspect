@@ -191,9 +191,11 @@ def role_assign(request, role_id):
 
     # Prevent privilege escalation: actor must already hold every permission
     # the granted role confers. Superusers escape this guard.
-    if not request.user.is_superuser:
-        from mobsf.RBAC.permissions import get_user_permissions
-        actor_perms = get_user_permissions(request.user)
+    # Use effective_user() so API-key callers are evaluated correctly.
+    from mobsf.RBAC.permissions import effective_user, get_user_permissions
+    actor = effective_user(request)
+    if actor is None or not actor.is_superuser:
+        actor_perms = get_user_permissions(actor) if actor else frozenset()
         role_perms  = role.codenames()
         elevated    = role_perms - actor_perms
         if elevated:
@@ -204,20 +206,38 @@ def role_assign(request, role_id):
             )
             return redirect('users')
 
+    expires_at = form.cleaned_data.get('expires_at')
     ra, created = RoleAssignment.objects.get_or_create(
         user=user, role=role,
         defaults={
             'granted_by': request.user,
-            'expires_at': form.cleaned_data.get('expires_at'),
+            'expires_at': expires_at,
         },
     )
+    # Re-assigning an existing role must be able to RENEW/CHANGE expiry
+    # (get_or_create only applies defaults on creation, so an existing
+    # grant would otherwise silently keep — or keep expired — its old
+    # window). Update in place when the expiry changed.
+    expiry_changed = not created and ra.expires_at != expires_at
+    if expiry_changed:
+        ra.expires_at = expires_at
+        ra.granted_by = request.user
+        ra.save(update_fields=['expires_at', 'granted_by'])
+    if created:
+        action = 'role.assign'
+    elif expiry_changed:
+        action = 'role.assign.update'
+    else:
+        action = 'role.assign.noop'
     audit.record(
-        request, 'role.assign' if created else 'role.assign.noop',
+        request, action,
         target_type='user', target_id=user.pk,
         metadata={'role': role.name, 'created': created},
     )
     if created:
         messages.success(request, f'Granted "{role.name}" to {user.username}.')
+    elif expiry_changed:
+        messages.success(request, f'Updated "{role.name}" for {user.username}.')
     else:
         messages.info(request, f'{user.username} already has "{role.name}".')
     return redirect('users')
@@ -306,7 +326,7 @@ def api_keys(request):
     })
 
 
-@login_required
+@require_permission('api.key.create')
 @require_http_methods(['POST'])
 def api_key_revoke(request, key_id):
     key = get_object_or_404(ApiKey, pk=key_id, user=request.user)

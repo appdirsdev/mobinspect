@@ -122,14 +122,15 @@
         <label class="label" for="id_role">Initial role</label>
         <select id="id_role" name="role" required class="input">
           <option value="" disabled selected>Select role</option>
-          <option value="viewer">Viewer · read-only access to scans and analytics</option>
-          <option value="maintainer">Maintainer · upload, scan, suppress findings</option>
+          {% for value, label in form.fields.role.choices %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
         </select>
         {% for err in form.role.errors %}
           <p class="text-tiny text-system-error mt-1">{{ err }}</p>
         {% endfor %}
         <p class="text-tiny text-text-tertiary mt-1">
-          You can grant additional roles (Administrator, Security Analyst, API User, custom) from the Users page after creating this account.
+          Additional roles can be granted from the Users page after creating this account.
         </p>
       </div>
 

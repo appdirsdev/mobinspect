@@ -19,6 +19,7 @@ from mobsf.MobSF.views.home import (
     search,
 )
 from mobsf.MobSF.views.api.api_middleware import make_api_response
+from mobsf.RBAC.decorators import require_permission
 from mobsf.StaticAnalyzer.views.android.views import view_source
 from mobsf.StaticAnalyzer.views.android.static_analyzer import static_analyzer
 from mobsf.StaticAnalyzer.views.ios.views import view_source as ios_view_source
@@ -144,6 +145,7 @@ def api_delete_scan(request):
 
 @request_method(['POST'])
 @csrf_exempt
+@require_permission('scan.export.pdf')
 def api_pdf_report(request):
     """Generate and Download PDF."""
     if 'hash' not in request.POST:
@@ -153,6 +155,10 @@ def api_pdf_report(request):
         request,
         request.POST['hash'],
         api=True)
+    if isinstance(resp, HttpResponse):
+        # An auth/permission denial (401/403) — forward it verbatim instead
+        # of letting the dict checks below coerce it into a bogus 500.
+        return make_api_response(resp)
     if 'error' in resp:
         if resp.get('error') == 'Invalid scan hash':
             response = make_api_response(resp, 400)
@@ -174,6 +180,7 @@ def api_pdf_report(request):
 
 @request_method(['POST'])
 @csrf_exempt
+@require_permission('scan.export.json')
 def api_json_report(request):
     """Generate JSON Report."""
     if 'hash' not in request.POST:
@@ -184,6 +191,8 @@ def api_json_report(request):
         request.POST['hash'],
         api=True,
         jsonres=True)
+    if isinstance(resp, HttpResponse):
+        return make_api_response(resp)
     if 'error' in resp:
         if resp.get('error') == 'Invalid scan hash':
             response = make_api_response(resp, 400)
@@ -265,6 +274,9 @@ def api_scorecard(request):
         request,
         request.POST['hash'],
         api=True)
+    if isinstance(resp, HttpResponse):
+        # scan.view denial from appsec_dashboard's decorator — forward as-is.
+        return make_api_response(resp)
     if 'error' in resp:
         if resp.get('error') == 'Invalid scan hash':
             response = make_api_response(resp, 400)

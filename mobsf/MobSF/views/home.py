@@ -57,6 +57,7 @@ from mobsf.DynamicAnalyzer.views.common.shared import (
 from mobsf.MobSF.views.authentication import (
     login_required,
 )
+from mobsf.RBAC.decorators import require_permission
 from mobsf.MobSF.views.authorization import (
     MAINTAINER_GROUP,
     Permissions,
@@ -440,6 +441,7 @@ def file_download(dwd_file, filename, content_type):
 
 
 @login_required
+@require_permission('scan.view')
 @require_http_methods(['GET'])
 def download_binary(request, checksum, api=False):
     """Download binary from uploads directory."""
@@ -477,6 +479,7 @@ def download_binary(request, checksum, api=False):
 
 
 @login_required
+@require_permission('scan.view')
 @require_http_methods(['GET'])
 def download(request):
     """Download from mobsf downloads directory."""
@@ -506,6 +509,7 @@ def download(request):
 
 
 @login_required
+@require_permission('scan.view')
 def generate_download(request):
     """Generate downloads for smali/java zip."""
     try:

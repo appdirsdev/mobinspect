@@ -56,6 +56,7 @@ from mobsf.StaticAnalyzer.views.windows import windows
 from mobsf.StaticAnalyzer.views.android import static_analyzer as android_sa
 from mobsf.StaticAnalyzer.views.ios import static_analyzer as ios_sa
 from mobsf.StaticAnalyzer.views.ios.views import view_source as io_view_source
+from mobsf.RBAC.decorators import require_permission
 
 from . import settings
 
@@ -284,7 +285,9 @@ if settings.API_ONLY == '0':
                 windows.staticanalyzer_windows,
                 name='static_analyzer_windows'),
         # Shared
-        re_path(fr'^pdf/{checksum_regex}/$', pdf.pdf, name='pdf'),
+        re_path(fr'^pdf/{checksum_regex}/$',
+                require_permission('scan.export.pdf')(pdf.pdf),
+                name='pdf'),
         re_path(fr'^appsec_dashboard/{checksum_regex}/$',
                 appsec.appsec_dashboard,
                 name='appsec_dashboard'),

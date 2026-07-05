@@ -57,6 +57,7 @@ from mobsf.MobSF.views.authorization import (
     Permissions,
     permission_required,
 )
+from mobsf.RBAC.decorators import require_permission
 
 
 logger = logging.getLogger(__name__)
@@ -388,6 +389,7 @@ def url_n_email_extract(dat, relative_path):
 
 # This is just the first sanity check that triggers generic_compare
 @login_required
+@require_permission('scan.view')
 def compare_apps(request, hash1: str, hash2: str, api=False):
     if hash1 == hash2:
         error_msg = 'Results with same hash cannot be compared'
@@ -402,6 +404,7 @@ def compare_apps(request, hash1: str, hash2: str, api=False):
 
 
 @login_required
+@require_permission('scan.view')
 def compare_versions(request, checksum, api=False):
     """List other scanned versions of the same app to compare against.
 

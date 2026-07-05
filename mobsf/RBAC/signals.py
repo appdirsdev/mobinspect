@@ -111,13 +111,16 @@ def sync_legacy_group_permissions(
     for code in codenames:
         mapping = LEGACY_PERMISSION_MAP.get(code)
         if mapping:
-            try:
-                legacy.append(AuthPermission.objects.get(
-                    content_type__app_label=mapping[0],
-                    codename=mapping[1],
-                ))
-            except AuthPermission.DoesNotExist:
-                continue
+            # filter() (not get()): can_scan/can_delete are declared in
+            # Meta.permissions of several StaticAnalyzer models, so each
+            # codename resolves to multiple auth.Permission rows (one per
+            # content type). get() would raise MultipleObjectsReturned and
+            # 500 the role create/edit view. Holding any one row satisfies
+            # user.has_perm('StaticAnalyzer.can_scan').
+            legacy.extend(AuthPermission.objects.filter(
+                content_type__app_label=mapping[0],
+                codename=mapping[1],
+            ))
     instance.group.permissions.set(legacy)
 
 

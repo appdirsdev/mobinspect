@@ -5,16 +5,29 @@
 
 {% block extra_head %}
 <style>
-  @media print {
-    body { -webkit-print-color-adjust: exact; }
-    aside, header.h-topbar, footer { display: none !important; }
-  }
   .pre-finding {
     white-space: pre-wrap;
     word-wrap: break-word;
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 13px;
     line-height: 1.5;
+  }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    aside, header.h-topbar, footer, .btn { display: none !important; }
+    /* Collapse all multi-col grids to single column */
+    .grid { display: block !important; }
+    .grid > * { margin-bottom: 0.75rem; width: 100% !important; }
+    /* Don't break cards across pages */
+    .card { break-inside: avoid; page-break-inside: avoid; margin-bottom: 0.75rem; }
+    /* Expand all collapsed findings so they are visible in print */
+    [x-show], [x-cloak] { display: block !important; opacity: 1 !important; }
+    /* Remove max-height transitions that cut content */
+    * { max-height: none !important; overflow: visible !important; }
+    /* Ensure full-width content area */
+    main { padding: 1rem !important; }
+    /* SVG score circle — keep it compact */
+    svg.w-32 { width: 80px !important; height: 80px !important; }
   }
 </style>
 {% endblock %}

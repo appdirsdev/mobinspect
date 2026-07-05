@@ -64,8 +64,14 @@ def record_anon(
 def _request_user(request):
     if request is None:
         return None
+    # Prefer the API-key owner (api_user) over the session user so that
+    # actions performed via an API key are attributed to the key's owner,
+    # not to whoever happens to hold an open browser session.
+    api_user = getattr(request, 'api_user', None)
+    if api_user is not None and getattr(api_user, 'is_authenticated', False):
+        return api_user
     user = getattr(request, 'user', None)
-    if user is not None and user.is_authenticated:
+    if user is not None and getattr(user, 'is_authenticated', False):
         return user
     return None
 

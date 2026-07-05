@@ -28,12 +28,14 @@ from mobsf.StaticAnalyzer.views.ios.ipa import (
 from mobsf.MobSF.views.authentication import (
     login_required,
 )
+from mobsf.RBAC.decorators import require_permission
 
 logger = logging.getLogger(__name__)
 register.filter('relative_path', relative_path)
 
 
 @login_required
+@require_permission('scan.view')
 def static_analyzer_ios(request, checksum, api=False):
     """Module that performs iOS IPA/ZIP Static Analysis."""
     try:

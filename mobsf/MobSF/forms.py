@@ -41,9 +41,21 @@ class FormUtil(object):
 class RegisterForm(UserCreationForm):
 
     role = forms.ChoiceField(
-        choices=(('viewer', 'Viewer'), ('maintainer', 'Maintainer')),
+        choices=[],  # populated dynamically in __init__
         required=True,
-        help_text='User Role')
+        help_text='Initial RBAC role assigned to the user')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            from mobsf.RBAC.models import Role
+            roles = Role.objects.all().order_by('name')
+            self.fields['role'].choices = [
+                (str(r.pk), r.name) for r in roles
+            ]
+        except Exception:
+            # Fallback if RBAC not yet migrated
+            self.fields['role'].choices = []
 
     def clean_email(self):
         email = self.cleaned_data.get('email')

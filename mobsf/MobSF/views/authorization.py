@@ -17,11 +17,11 @@ from django.shortcuts import (
 )
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import (
     login_required,
     permission_required as pr,
 )
+from mobsf.RBAC.decorators import require_permission
 from django.views.decorators.http import require_http_methods
 from django.template.defaulttags import register
 from django.conf import settings
@@ -86,7 +86,11 @@ def permission_required(perm):
             principal = getattr(request, 'api_user', None) or request.user
             allowed = False
             try:
-                if getattr(principal, 'is_staff', False):
+                # Only superusers get a blanket bypass — aligns with the
+                # RBAC path (get_user_permissions), which grants all perms to
+                # is_superuser only. is_staff is NOT a bypass: a staff user
+                # with no role/permission must be denied, same as RBAC.
+                if getattr(principal, 'is_superuser', False):
                     allowed = True
                 elif getattr(principal, 'is_authenticated', False):
                     allowed = principal.has_perm(perm.value)
@@ -141,7 +145,9 @@ def has_permission(request, permission, api):
         if settings.DISABLE_AUTHENTICATION == '1':
             return True
         principal = getattr(request, 'api_user', None) or request.user
-        if getattr(principal, 'is_staff', False):
+        # Superuser-only bypass (see permission_required): is_staff is not a
+        # blanket grant — it must resolve an actual permission like RBAC does.
+        if getattr(principal, 'is_superuser', False):
             return True
         if getattr(principal, 'is_authenticated', False) and \
                 principal.has_perm(permission.value):
@@ -167,12 +173,46 @@ def create_authorization_roles():
         all_perms = list(chain(
             scan_permissions, suppress_permissions, delete_permissions))
         maintainer.permissions.set(all_perms)
+        _mirror_rbac_role_groups()
     except Exception:
         logger.exception('[ERROR] Failed to create roles and permissions')
 
 
-@login_required
-@staff_member_required
+def _mirror_rbac_role_groups():
+    """Mirror each RBAC Role's mapped codenames into its wrapped Django
+    Group's auth.Permission set.
+
+    The RBAC seed migration (0003) sets ``role.permissions`` via historical
+    models, so the runtime ``sync_legacy_group_permissions`` m2m signal never
+    fires for the seeded roles — leaving every role group with EMPTY Django
+    permissions. As a result any non-superuser assigned an RBAC role is
+    denied by the legacy ``@permission_required(Permissions.SCAN/DELETE/
+    SUPPRESS)`` guards (upload, delete_scan, suppress, dynamic analysis).
+
+    This runs at startup via the ``create_roles`` command — AFTER migrate,
+    so the ``can_scan``/``can_delete``/``can_suppress`` auth.Permission rows
+    exist. Uses ``filter()`` because each legacy codename spans several
+    StaticAnalyzer content types. Idempotent.
+    """
+    try:
+        from mobsf.RBAC.models import Role
+        from mobsf.RBAC.signals import LEGACY_PERMISSION_MAP
+    except Exception:
+        logger.exception('[ERROR] RBAC role-group mirror unavailable')
+        return
+    for role in Role.objects.all():
+        legacy = []
+        for code in role.codenames():
+            mapping = LEGACY_PERMISSION_MAP.get(code)
+            if mapping:
+                legacy.extend(Permission.objects.filter(
+                    content_type__app_label=mapping[0],
+                    codename=mapping[1],
+                ))
+        role.group.permissions.set(legacy)
+
+
+@require_permission('admin.user.view')
 def users(request):
     """Show all users with their MobInspect role assignments."""
     if settings.DISABLE_AUTHENTICATION == '1':
@@ -207,15 +247,14 @@ def users(request):
     return render(request, 'auth/users.html', context)
 
 
-@login_required
-@staff_member_required
+@require_permission('admin.user.create')
 def create_user(request):
     if settings.DISABLE_AUTHENTICATION == '1':
         return redirect('/')
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():
-            role = request.POST.get('role')
+            role_pk = form.cleaned_data.get('role')
             username = request.POST.get('username')
             if not username:
                 messages.error(request, 'No Username Provided')
@@ -225,10 +264,22 @@ def create_user(request):
                 return redirect('create_user')
             user = form.save()
             user.is_staff = False
-            if role == 'maintainer':
-                user.groups.add(Group.objects.get(name=MAINTAINER_GROUP))
-            else:
-                user.groups.add(Group.objects.get(name=VIEWER_GROUP))
+            user.save(update_fields=['is_staff'])
+            # Assign the selected RBAC role.
+            rbac_role = None
+            try:
+                from mobsf.RBAC.models import Role, RoleAssignment
+                rbac_role = Role.objects.get(pk=role_pk)
+                RoleAssignment.objects.get_or_create(
+                    user=user,
+                    role=rbac_role,
+                    defaults={'granted_by': request.user},
+                )
+                # Mirror into the role's backing Django Group for legacy
+                # permission checks (e.g. @permission_required(Permissions.SCAN)).
+                user.groups.add(rbac_role.group)
+            except Exception:
+                logger.exception('[WARN] Could not assign RBAC role for new user %s', user.username)
             audit.record(
                 request,
                 'admin.user.create',
@@ -236,7 +287,7 @@ def create_user(request):
                 target_id=user.id,
                 metadata={
                     'username': user.username,
-                    'role': role or 'viewer',
+                    'role': rbac_role.name if rbac_role else str(role_pk),
                 },
             )
             messages.success(
@@ -257,8 +308,7 @@ def create_user(request):
     return render(request, 'auth/register.html', context)
 
 
-@login_required
-@staff_member_required
+@require_permission('admin.user.delete')
 @require_http_methods(['POST'])
 def delete_user(request):
     data = {'deleted': 'Failed to delete user'}
@@ -278,15 +328,29 @@ def delete_user(request):
             return send_response(data)
         # Capture identity BEFORE delete — once the row is gone the
         # id/username attributes still exist on the in-memory instance
-        # but the audit record is more useful when emitted post-delete
-        # with the values we captured here.
+        # but the audit record is more useful when emitted with the
+        # values we captured here.
         deleted_id = u.id
         deleted_username = u.username
+
+        # A user referenced by the audit log CANNOT be hard-deleted: the
+        # actor FK is on_delete=SET_NULL, which issues an UPDATE against the
+        # append-only audit_event table and is blocked by its immutability
+        # trigger. Deactivate such users instead — this revokes all access
+        # (login + permissions) while preserving the audit trail intact.
+        from mobsf.RBAC.models import AuditEvent, RoleAssignment
         u.groups.clear()
-        u.delete()
+        RoleAssignment.objects.filter(user=u).delete()
+        if AuditEvent.objects.filter(actor=u).exists():
+            u.is_active = False
+            u.save(update_fields=['is_active'])
+            action = 'admin.user.deactivate'
+        else:
+            u.delete()
+            action = 'admin.user.delete'
         audit.record(
             request,
-            'admin.user.delete',
+            action,
             target_type='user',
             target_id=deleted_id,
             metadata={'username': deleted_username},
@@ -295,5 +359,6 @@ def delete_user(request):
     except User.DoesNotExist:
         data = {'deleted': 'User does not exist'}
     except Exception as e:
-        data = {'deleted': e.message}
+        logger.exception('[ERROR] Failed to delete user')
+        data = {'deleted': f'Failed to delete user: {e}'}
     return send_response(data)

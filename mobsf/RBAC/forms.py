@@ -67,6 +67,19 @@ class RoleForm(forms.ModelForm):
             return self.instance.name
         if not v:
             raise forms.ValidationError('Name is required.')
+        # On CREATE, refuse a name that collides with an existing Django
+        # Group. save() does Group.get_or_create(name=...), which would
+        # otherwise silently adopt that group's members and let
+        # sync_legacy_group_permissions overwrite its curated permissions
+        # (e.g. the legacy 'Maintainer'/'Viewer' groups or a SAML-synced
+        # group). Fail closed instead.
+        if self.instance.pk is None:
+            from django.contrib.auth.models import Group
+            if Group.objects.filter(name=v).exists():
+                raise forms.ValidationError(
+                    f'A group named "{v}" already exists. Choose a different '
+                    f'role name so its members and permissions are not adopted.',
+                )
         return v
 
     def clean_permission_codenames(self):

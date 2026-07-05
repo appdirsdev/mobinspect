@@ -24,6 +24,7 @@ from mobsf.StaticAnalyzer.views.ios.db_interaction import (
 from mobsf.MobSF.views.authentication import (
     login_required,
 )
+from mobsf.RBAC.decorators import require_permission
 
 logger = logging.getLogger(__name__)
 
@@ -362,6 +363,7 @@ def get_ios_dashboard(context, from_ctx=False):
 
 
 @login_required
+@require_permission('scan.view')
 def appsec_dashboard(request, checksum, api=False):
     """Provide data for appsec dashboard."""
     try:

@@ -35,12 +35,14 @@ from mobsf.MobSF.utils import (
 from mobsf.MobSF.views.authentication import (
     login_required,
 )
+from mobsf.RBAC.decorators import require_permission
 
 logger = logging.getLogger(__name__)
 register.filter('key', key)
 
 
 @login_required
+@require_permission('scan.view')
 def view_report(request, checksum, api=False):
     """Dynamic Analysis Report Generation."""
     logger.info('Dynamic Analysis Report Generation')
