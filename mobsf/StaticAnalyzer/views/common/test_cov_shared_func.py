@@ -272,8 +272,10 @@ class ArArchiveTests(TestCase):
         self.assertTrue(new_src.endswith('_thin.a'))
 
 
+@override_settings(DISABLE_AUTHENTICATION='1')
 class CompareViewTests(TestCase):
-    """login_required is bypassed when api=True, so no auth setup needed."""
+    """DISABLE_AUTHENTICATION bypasses the login + RBAC permission
+    decorators so these tests exercise the compare logic directly."""
 
     def setUp(self):
         self.rf = RequestFactory()

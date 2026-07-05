@@ -34,8 +34,13 @@ PKG = 'com.example.app'
 
 
 def _staff_user(django_user_model):
-    return django_user_model.objects.create_user(
-        username='sup_staff', password='x', is_staff=True)
+    # A superuser: represents an authorized admin. Needed because the
+    # suppression views are gated by both the legacy permission_required
+    # (SUPPRESS/DELETE) and, for list_suppressions, the RBAC
+    # require_permission('scan.view') decorator — the latter only bypasses
+    # for is_superuser, not is_staff.
+    return django_user_model.objects.create_superuser(
+        username='sup_staff', password='x')
 
 
 def _post(user, **params):

@@ -1,0 +1,96 @@
+name: Branch tests (pytest)
+
+# Fast, deterministic pytest suite for the MobInspect fork: RBAC / permissions,
+# API auth, user management, and the static-analysis unit tests that our
+# changes touch. Runs on Postgres (matching production) with authentication
+# ENABLED so the RBAC enforcement is actually exercised.
+#
+# Intentionally excluded (need an Android emulator / Frida / real toolchain /
+# network, unsuitable for a lean runner): mobsf/DynamicAnalyzer, the dynamic &
+# device API tests, the real jadx/apktool/baksmali/apksigner conversions, the
+# full StaticAnalyzer integration scans, and the network-dependent probes
+# (Play Store, Firebase, malware-domain, downloaders). The upstream
+# mobsf-test.yml covers full integration with the toolchain.
+
+on:
+  push:
+    branches: [ release-2026.7, mobinspect, main ]
+  pull_request:
+    branches: [ release-2026.7, mobinspect, main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: branch-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mobsf
+          POSTGRES_PASSWORD: mobsf
+          POSTGRES_DB: mobsf
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # settings.py switches to Postgres only when these are all set. Leaving
+      # MOBSF_DISABLE_AUTHENTICATION unset keeps RBAC enforcement active.
+      POSTGRES_USER: mobsf
+      POSTGRES_PASSWORD: mobsf
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: mobsf
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry==1.8.4
+
+      - name: Install dependencies (main + dev)
+        run: poetry install --no-root --with dev --no-interaction --no-ansi
+
+      - name: Apply migrations and seed RBAC roles
+        run: |
+          poetry run python manage.py makemigrations --no-input
+          poetry run python manage.py makemigrations StaticAnalyzer --no-input
+          poetry run python manage.py migrate --no-input
+          poetry run python manage.py create_roles
+
+      - name: Run deterministic test suite
+        run: |
+          poetry run pytest \
+            mobsf/RBAC \
+            mobsf/Analytics/tests \
+            mobsf/MobSF/views/test_cov_authorization.py \
+            mobsf/MobSF/views/test_cov_home.py \
+            mobsf/MobSF/views/test_cov_saml2.py \
+            mobsf/MobSF/views/api/test_cov_api_static_analysis.py \
+            mobsf/StaticAnalyzer/views/common/test_cov_suppression.py \
+            mobsf/StaticAnalyzer/views/common/test_cov_shared_func.py \
+            mobsf/StaticAnalyzer/views/common/test_cov_shared_func2.py \
+            mobsf/StaticAnalyzer/views/test_cov_comparer.py \
+            -p no:cacheprovider -q

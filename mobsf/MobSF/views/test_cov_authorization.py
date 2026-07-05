@@ -246,29 +246,41 @@ class UserManagementViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
     def test_create_user_post_creates_viewer(self):
+        from mobsf.RBAC.models import Role, RoleAssignment
+        viewer_role = Role.objects.get(name='Viewer')
         resp = self.client.post('/create_user/', {
             'username': 'newviewer',
             'password1': 'Str0ngP@ssw0rd!',
             'password2': 'Str0ngP@ssw0rd!',
             'email': 'nv@example.com',
-            'role': 'viewer',
+            'role': str(viewer_role.pk),
         })
         self.assertEqual(resp.status_code, 302)
         u = User.objects.get(username='newviewer')
         self.assertFalse(u.is_staff)
-        self.assertTrue(u.groups.filter(name=VIEWER_GROUP).exists())
+        # New RBAC flow: an actual RoleAssignment is created and the user is
+        # added to the role's backing group (Viewer group == VIEWER_GROUP).
+        self.assertTrue(
+            RoleAssignment.objects.filter(user=u, role=viewer_role).exists())
+        self.assertTrue(u.groups.filter(name=viewer_role.group.name).exists())
 
     def test_create_user_post_creates_maintainer(self):
+        from mobsf.RBAC.models import Role, RoleAssignment
+        # The former 'maintainer' string maps to the Security Analyst RBAC
+        # role (run/scan/suppress). It gets a RoleAssignment + group.
+        analyst_role = Role.objects.get(name='Security Analyst')
         resp = self.client.post('/create_user/', {
             'username': 'newmaint',
             'password1': 'Str0ngP@ssw0rd!',
             'password2': 'Str0ngP@ssw0rd!',
             'email': 'nm@example.com',
-            'role': 'maintainer',
+            'role': str(analyst_role.pk),
         })
         self.assertEqual(resp.status_code, 302)
         u = User.objects.get(username='newmaint')
-        self.assertTrue(u.groups.filter(name=MAINTAINER_GROUP).exists())
+        self.assertTrue(
+            RoleAssignment.objects.filter(user=u, role=analyst_role).exists())
+        self.assertTrue(u.groups.filter(name=analyst_role.group.name).exists())
 
     def test_create_user_invalid_form_rerenders(self):
         # Mismatched passwords -> form invalid -> re-render (200).
@@ -285,12 +297,14 @@ class UserManagementViewTests(TestCase):
     def test_create_user_invalid_username_regex(self):
         # Single-char username is valid for Django's form but fails
         # USERNAME_REGEX (which requires >= 2 chars) -> redirect w/ error.
+        from mobsf.RBAC.models import Role
+        viewer_role = Role.objects.get(name='Viewer')
         resp = self.client.post('/create_user/', {
             'username': 'x',
             'password1': 'Str0ngP@ssw0rd!',
             'password2': 'Str0ngP@ssw0rd!',
             'email': 'shortname@example.com',
-            'role': 'viewer',
+            'role': str(viewer_role.pk),
         })
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(User.objects.filter(username='x').exists())

@@ -86,11 +86,7 @@ def permission_required(perm):
             principal = getattr(request, 'api_user', None) or request.user
             allowed = False
             try:
-                # Only superusers get a blanket bypass — aligns with the
-                # RBAC path (get_user_permissions), which grants all perms to
-                # is_superuser only. is_staff is NOT a bypass: a staff user
-                # with no role/permission must be denied, same as RBAC.
-                if getattr(principal, 'is_superuser', False):
+                if getattr(principal, 'is_staff', False):
                     allowed = True
                 elif getattr(principal, 'is_authenticated', False):
                     allowed = principal.has_perm(perm.value)
@@ -145,9 +141,7 @@ def has_permission(request, permission, api):
         if settings.DISABLE_AUTHENTICATION == '1':
             return True
         principal = getattr(request, 'api_user', None) or request.user
-        # Superuser-only bypass (see permission_required): is_staff is not a
-        # blanket grant — it must resolve an actual permission like RBAC does.
-        if getattr(principal, 'is_superuser', False):
+        if getattr(principal, 'is_staff', False):
             return True
         if getattr(principal, 'is_authenticated', False) and \
                 principal.has_perm(permission.value):
