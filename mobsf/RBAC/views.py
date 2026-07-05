@@ -516,6 +516,15 @@ def adb_connections_list(request):
 @require_http_methods(['POST'])
 def adb_connection_add(request):
     """Create a new ADB connection from POSTed label + host_port."""
+    # Only a single device may be configured at a time. Remove the existing
+    # one before adding another.
+    if AdbConnection.objects.exists():
+        messages.error(
+            request,
+            'Only one device can be configured. Remove the existing device '
+            'before adding a new one.',
+        )
+        return redirect('rbac:adb_connections')
     label = (request.POST.get('label', '') or '').strip()[:80]
     raw_host_port = request.POST.get('host_port', '')
     platform = (request.POST.get('platform', '') or '').strip().lower()

@@ -101,7 +101,19 @@
   {% endif %}
 
   <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
+    <div class="card-header flex items-center justify-between gap-2">
+      <h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2>
+      <button type="button"
+              x-data="{ copied: false }"
+              data-copy="File: {{ file_name }}&#10;Size: {{ size }}&#10;MD5: {{ md5 }}&#10;SHA1: {{ sha1 }}&#10;SHA256: {{ sha256 }}"
+              @click="navigator.clipboard.writeText($el.dataset.copy).then(() => { copied = true; setTimeout(() => copied = false, 1500); });"
+              :title="copied ? 'Copied!' : 'Copy all file information'"
+              class="btn btn-ghost btn-sm flex-shrink-0">
+        <span x-show="!copied">{% icon "copy" size=14 %}</span>
+        <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=14 %}</span>
+        <span class="text-tiny" x-text="copied ? 'Copied' : 'Copy'"></span>
+      </button>
+    </div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">File</span><span class="font-mono text-mono text-text-primary truncate" title="{{ file_name }}">{{ file_name }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
@@ -145,11 +157,14 @@
     <a href="{% url 'download_binary' checksum=md5 %}" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} {{ app_type|upper }}</a>
   </div>
 
-  {# Scan logs modal (Alpine) #}
+  {# Scan logs modal (Alpine) — popup overlay. Close on backdrop click via
+     @click.self (NOT @click.outside, which fires on the same click that
+     opens the modal and immediately closes it again). #}
   <div x-show="modal === 'scan_logs'" x-cloak @keydown.escape.window="modal = ''"
-       class="modal-overlay fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto"
+       @click.self="modal = ''"
+       class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
        x-transition.opacity>
-    <div class="card w-full max-w-4xl mt-12" @click.outside="modal = ''">
+    <div class="card w-full max-w-4xl my-8" @click.stop>
       <div class="card-header flex items-center justify-between">
         <h3 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Scan logs</h3>
         <button type="button" class="btn btn-ghost btn-sm" @click="modal = ''" aria-label="Close">{% icon "x" size=16 %}</button>

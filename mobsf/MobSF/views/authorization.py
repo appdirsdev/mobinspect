@@ -221,12 +221,23 @@ def users(request):
     except Exception:  # noqa: BLE001
         all_roles = []
 
+    from django.db.models import Q
+    from django.core.paginator import Paginator
+
+    query = (request.GET.get('q', '') or '').strip()[:120]
     users_qs = (
         get_user_model().objects.all()
+        .order_by('username')
         .prefetch_related('role_assignments__role')
     )
-    # Decorate each user with a `role_ids` set for the template.
-    for u in users_qs:
+    if query:
+        users_qs = users_qs.filter(
+            Q(username__icontains=query) | Q(email__icontains=query))
+
+    paginator = Paginator(users_qs, 20)
+    page = paginator.get_page(request.GET.get('page', 1))
+    # Decorate each user on this page with a `role_ids` set for the template.
+    for u in page:
         try:
             u.role_ids = {ra.role_id for ra in u.role_assignments.all()}
         except Exception:  # noqa: BLE001
@@ -234,7 +245,9 @@ def users(request):
 
     context = {
         'title': 'All Users',
-        'users': users_qs,
+        'users': page,
+        'page': page,
+        'query': query,
         'all_roles': all_roles,
         'version': settings.MOBSF_VER,
     }

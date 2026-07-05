@@ -30,9 +30,21 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-  {# ─── add form ─── #}
+  {# ─── add form (only one device may be configured at a time) ─── #}
   {% can 'settings.manage' %}
   <div class="lg:col-span-1">
+    {% if connections %}
+    <div class="card">
+      <div class="card-header"><h2 class="text-h3">Add connection</h2></div>
+      <div class="card-body">
+        <div class="flex items-start gap-2.5 text-small text-text-secondary">
+          <span class="text-text-tertiary flex-shrink-0 mt-0.5">{% icon "info" size=16 %}</span>
+          <p>Only one device can be configured at a time. Remove the existing
+          device below to add a different one.</p>
+        </div>
+      </div>
+    </div>
+    {% else %}
     <div class="card">
       <div class="card-header"><h2 class="text-h3">Add connection</h2></div>
       <form method="post" action="{% url 'rbac:adb_connection_add' %}" class="card-body space-y-4">
@@ -65,6 +77,7 @@
         </button>
       </form>
     </div>
+    {% endif %}
   </div>
   {% endcan %}
 

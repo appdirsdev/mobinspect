@@ -78,7 +78,19 @@
   </div>
 
   <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
+    <div class="card-header flex items-center justify-between gap-2">
+      <h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2>
+      <button type="button"
+              x-data="{ copied: false }"
+              data-copy="File: {{ file_name }}&#10;Size: {{ size }}&#10;MD5: {{ md5 }}&#10;SHA1: {{ sha1 }}&#10;SHA256: {{ sha256 }}"
+              @click="navigator.clipboard.writeText($el.dataset.copy).then(() => { copied = true; setTimeout(() => copied = false, 1500); });"
+              :title="copied ? 'Copied!' : 'Copy all file information'"
+              class="btn btn-ghost btn-sm flex-shrink-0">
+        <span x-show="!copied">{% icon "copy" size=14 %}</span>
+        <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=14 %}</span>
+        <span class="text-tiny" x-text="copied ? 'Copied' : 'Copy'"></span>
+      </button>
+    </div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">File</span><span class="font-mono text-mono text-text-primary truncate" title="{{ file_name }}">{{ file_name }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
@@ -1200,9 +1212,9 @@
       <h2 class="text-h3">Scan logs</h2>
       <button type="button" class="btn btn-ghost btn-sm" @click="modal = ''">{% icon "x" size=16 %}</button>
     </div>
-    <div class="overflow-x-auto">
+    <div class="overflow-auto max-h-[60vh] min-h-[16rem]">
       <table id="scan_logs" class="w-full text-small">
-        <thead>
+        <thead class="sticky top-0 z-10 bg-surface-1">
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
             <th class="text-left px-5 py-2.5 font-medium">Timestamp</th>
             <th class="text-left px-5 py-2.5 font-medium">Event</th>

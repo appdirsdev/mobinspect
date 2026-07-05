@@ -281,9 +281,21 @@ def dynamic_analysis(request):
 @login_required
 def recent_scans(request, page_size=10, page_number=1):
     """Show Recent Scans Route."""
+    from django.db.models import Q
     entries = []
-    paginator = Paginator(
-        RecentScansDB.objects.all().order_by('-TIMESTAMP').values(), page_size)
+    # Search across app name, package, file name and hash.
+    query = (request.GET.get('q', '') or '').strip()[:120]
+    # Allow query-string pagination (?page=N) alongside the legacy path arg,
+    # so search results paginate without losing the filter.
+    page_number = request.GET.get('page', page_number)
+    scans = RecentScansDB.objects.all().order_by('-TIMESTAMP')
+    if query:
+        scans = scans.filter(
+            Q(APP_NAME__icontains=query)
+            | Q(PACKAGE_NAME__icontains=query)
+            | Q(FILE_NAME__icontains=query)
+            | Q(MD5__icontains=query))
+    paginator = Paginator(scans.values(), page_size)
     page_obj = paginator.get_page(page_number)
     page_obj.page_size = page_size
     md5_list = [i['MD5'] for i in page_obj]
@@ -323,6 +335,7 @@ def recent_scans(request, page_size=10, page_number=1):
         'entries': entries,
         'version': settings.MOBSF_VER,
         'page_obj': page_obj,
+        'query': query,
         'async_scans': settings.ASYNC_ANALYSIS,
     }
     template = 'general/recent.html'
