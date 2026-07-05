@@ -81,16 +81,7 @@ jobs:
           poetry run python manage.py create_roles
 
       - name: Run deterministic test suite
-        run: |
-          poetry run pytest \
-            mobsf/RBAC \
-            mobsf/Analytics/tests \
-            mobsf/MobSF/views/test_cov_authorization.py \
-            mobsf/MobSF/views/test_cov_home.py \
-            mobsf/MobSF/views/test_cov_saml2.py \
-            mobsf/MobSF/views/api/test_cov_api_static_analysis.py \
-            mobsf/StaticAnalyzer/views/common/test_cov_suppression.py \
-            mobsf/StaticAnalyzer/views/common/test_cov_shared_func.py \
-            mobsf/StaticAnalyzer/views/common/test_cov_shared_func2.py \
-            mobsf/StaticAnalyzer/views/test_cov_comparer.py \
-            -p no:cacheprovider -q
+        # Single source of truth for the suite + the "just check Postgres is
+        # up" pre-check. The vars above put settings.py on the service's
+        # Postgres; the script verifies it before running pytest.
+        run: bash scripts/run-tests.sh
