@@ -1,0 +1,16 @@
+#!/bin/bash
+# Poll the local app health endpoint; log to journald only on real problems
+# (DB/queue/HTTP). adb-only "degraded" (no AVD) is expected and stays silent.
+set -uo pipefail
+URL="http://127.0.0.1:8000/healthz"
+resp=$(curl -s -m 15 -w $'\n%{http_code}' "$URL" 2>/dev/null) || { logger -t mobinspect-health -p daemon.err "healthz UNREACHABLE"; exit 0; }
+code=$(printf '%s' "$resp" | tail -1)
+body=$(printf '%s' "$resp" | sed '$d')
+status=$(printf '%s' "$body" | sed -n 's/.*"status": *"\([^"]*\)".*/\1/p')
+if [ "$code" != "200" ]; then
+  logger -t mobinspect-health -p daemon.err "UNHEALTHY http=$code body=$body"
+elif ! printf '%s' "$body" | grep -q '"db": *true'; then
+  logger -t mobinspect-health -p daemon.err "DB DOWN body=$body"
+elif ! printf '%s' "$body" | grep -q '"queue": *true'; then
+  logger -t mobinspect-health -p daemon.warning "QUEUE DOWN body=$body"
+fi

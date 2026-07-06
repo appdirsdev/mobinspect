@@ -1,0 +1,7 @@
+[Unit]
+Description=MobInspect health probe (logs to journald on DB/queue/HTTP failure)
+After=mobinspect-web.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mobinspect-healthcheck

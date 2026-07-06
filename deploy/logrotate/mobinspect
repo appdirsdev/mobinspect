@@ -1,0 +1,10 @@
+/home/mobinspect/.MobInspect/debug.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su mobinspect mobinspect
+}

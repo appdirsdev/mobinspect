@@ -1,16 +1,10 @@
 [Unit]
-Description=Hourly trigger for mobinspect-backup.service (RPO target ≤ 1h)
-Documentation=file:///home/ubuntu/MobInspect/deploy/RUNBOOK.md
+Description=Run MobInspect backup daily at 03:00
 
 [Timer]
-# Top of every hour.
-OnCalendar=hourly
-# If the box was off when a run was due, fire one immediately on next boot
-# so we don't silently lose a window.
+OnCalendar=*-*-* 03:00:00
+RandomizedDelaySec=300
 Persistent=true
-# Spread small jitter so multiple hosts don't all hit shared storage at :00.
-RandomizedDelaySec=2min
-Unit=mobinspect-backup.service
 
 [Install]
 WantedBy=timers.target

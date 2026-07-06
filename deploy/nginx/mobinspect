@@ -1,0 +1,51 @@
+# HTTP -> HTTPS redirect
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    http2 on;
+    server_name _;
+
+    ssl_certificate     /etc/ssl/mobinspect/mobinspect.crt;
+    ssl_certificate_key /etc/ssl/mobinspect/mobinspect.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    client_max_body_size 2g;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    proxy_connect_timeout 30s;
+
+    # defense-in-depth headers (Django also sets these)
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # static assets served directly by nginx (off the single gunicorn worker)
+    location /static/ {
+        alias /home/mobinspect/MobInspect/mobsf/static/;
+        access_log off;
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+    }
+}

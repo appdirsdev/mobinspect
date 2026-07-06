@@ -1,33 +1,8 @@
 [Unit]
-Description=MobInspect SQLite hourly backup (online .backup of ~/.MobInspect/db.sqlite3)
-Documentation=file:///home/ubuntu/MobInspect/deploy/RUNBOOK.md
-# Don't race a database write that's already underway during shutdown.
-After=mobinspect.service
-Wants=mobinspect.service
+Description=MobInspect nightly backup (Postgres + app data)
+After=postgresql.service
+Requires=postgresql.service
 
 [Service]
 Type=oneshot
-User=ubuntu
-Group=ubuntu
-# `sqlite3 .backup` is an *online* copy — it acquires a shared lock, so it is
-# safe to run while gunicorn / django-q2 are live. We keep 14 days of hourly
-# snapshots locally (~336 files); off-host shipping is handled separately by
-# the restic stub (deploy/scripts/restic-offsite.sh).
-# NOTE: `%%` escapes systemd's specifier expansion so a literal `%` reaches
-# /bin/bash, which then passes it to date(1). Don't simplify to `%Y` — systemd
-# will try to resolve it as a unit specifier and refuse to start.
-# The `+` prefix on ExecStartPre runs as root *before* User=ubuntu is applied,
-# which is the only way to create /var/backups/mobinspect (root:root 755 on a
-# stock Ubuntu host) and hand it to the ubuntu user. Without this the first
-# invocation fails with EACCES and no snapshot is ever produced — self-healing.
-ExecStartPre=+/bin/mkdir -p /var/backups/mobinspect
-ExecStartPre=+/bin/chown ubuntu:ubuntu /var/backups/mobinspect
-ExecStart=/bin/bash -c 'sqlite3 /home/ubuntu/.MobInspect/db.sqlite3 ".backup /var/backups/mobinspect/db-$(date +%%Y%%m%%d-%%H%%M%%S).sqlite3" && find /var/backups/mobinspect -name "db-*.sqlite3" -mtime +14 -delete'
-# Per-run resource ceiling — a snapshot of a multi-GB sqlite shouldn't need much.
-MemoryMax=512M
-Nice=10
-IOSchedulingClass=best-effort
-IOSchedulingPriority=7
-
-[Install]
-# Driven by mobinspect-backup.timer; no WantedBy here on purpose.
+ExecStart=/usr/local/bin/mobinspect-backup

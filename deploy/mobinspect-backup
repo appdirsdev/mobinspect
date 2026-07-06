@@ -1,0 +1,20 @@
+#!/bin/bash
+# MobInspect nightly backup: Postgres (custom-format dump) + app data (config + signing secret).
+set -euo pipefail
+BACKUP_DIR=/var/backups/mobinspect
+RETENTION_DAYS=14
+DATA_DIR=/home/mobinspect/.MobInspect
+STAMP=$(date +%Y%m%d-%H%M%S)
+mkdir -p "$BACKUP_DIR"
+# Postgres logical dump (compressed custom format -> pg_restore-able)
+runuser -u postgres -- pg_dump -Fc mobsf > "$BACKUP_DIR/db-$STAMP.dump"
+# App data: config.py + crypto/signing secret only; exclude bulky re-downloadable
+# artifacts (uploads, tools, threat-intel signatures, downloads, logs, caches).
+tar -czf "$BACKUP_DIR/data-$STAMP.tar.gz" \
+    --exclude=./uploads --exclude=./downloads --exclude=./tools \
+    --exclude=./signatures --exclude=./__pycache__ --exclude=./debug.log \
+    -C "$DATA_DIR" . 2>/dev/null || true
+chmod 600 "$BACKUP_DIR/db-$STAMP.dump" "$BACKUP_DIR/data-$STAMP.tar.gz"
+# Retention: prune older than N days
+find "$BACKUP_DIR" -type f \( -name 'db-*.dump' -o -name 'data-*.tar.gz' \) -mtime +$RETENTION_DAYS -delete
+echo "backup ok: $STAMP -> $(du -h $BACKUP_DIR/db-$STAMP.dump $BACKUP_DIR/data-$STAMP.tar.gz | awk '{printf "%s(%s) ", $2, $1}')"

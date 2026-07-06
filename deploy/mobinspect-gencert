@@ -1,0 +1,14 @@
+#!/bin/bash
+# Generate/refresh a self-signed TLS cert covering the host's current primary IPv4.
+# Idempotent; re-run after a DHCP address change to keep the SAN accurate.
+set -euo pipefail
+CERT_DIR=/etc/ssl/mobinspect
+IP=$(hostname -I | awk '{print $1}')
+mkdir -p "$CERT_DIR"
+openssl req -x509 -nodes -newkey rsa:2048 \
+  -keyout "$CERT_DIR/mobinspect.key" \
+  -out "$CERT_DIR/mobinspect.crt" \
+  -days 825 -subj "/CN=MobInspect ($IP)" \
+  -addext "subjectAltName=IP:${IP},IP:127.0.0.1,DNS:localhost" 2>/dev/null
+chmod 600 "$CERT_DIR/mobinspect.key"; chmod 644 "$CERT_DIR/mobinspect.crt"
+echo "cert generated for IP=$IP -> $CERT_DIR (valid 825d)"
