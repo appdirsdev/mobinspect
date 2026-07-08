@@ -1,0 +1,31 @@
+{% extends "base/app.html" %}
+{% load mi_icons %}
+
+{% block page_title %}AI Dashboard — {{ checksum }}{% endblock %}
+
+{% block content %}
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+  <div class="min-w-0">
+    <p class="text-tiny uppercase text-text-tertiary">AI Security Analysis</p>
+    <h1 class="text-h2 truncate">AI Dashboard</h1>
+    <p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ checksum }}</p>
+  </div>
+  <a href="/static_analyzer/{{ checksum }}/" class="btn btn-secondary btn-md">
+    {% icon "chevron-left" size=14 %} Back to report
+  </a>
+</header>
+
+{% if ai_page_status == 'disabled' %}
+  <div class="card"><div class="p-6 text-small text-text-secondary">
+    AI analysis is not enabled on this deployment.
+  </div></div>
+{% elif ai_page_status == 'invalid' %}
+  <div class="card"><div class="p-6 text-small text-text-tertiary">
+    Invalid scan reference.
+  </div></div>
+{% elif ai_page_status == 'none' %}
+  {% include "static_analysis/_ai_analysis.html" with ai_status='pending' checksum=checksum %}
+{% else %}
+  {% include "static_analysis/_ai_analysis.html" %}
+{% endif %}
+{% endblock %}

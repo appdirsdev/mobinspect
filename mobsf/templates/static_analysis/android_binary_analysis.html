@@ -1,5 +1,5 @@
 {% extends "base/app.html" %}
-{% load static %}{% load mi_icons %}
+{% load static %}{% load mi_icons %}{% load rbac %}
 
 {% block page_title %}{{ app_name|default:file_name }} — Android static analysis{% endblock %}
 
@@ -63,6 +63,7 @@
     {% if app_type not in 'so' %}
       <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-primary btn-md">{% icon "shield-check" size=14 %} Scorecard</a>
     {% endif %}
+    {% can 'admin.ai.view' %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endcan %}
     <a href="{% url 'static_analyzer' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md">{% icon "activity" size=14 %} Rescan</a>
     {% if app_type not in 'jar,aar,so' %}
       <a onclick="dynamic_loader()" href="{% url 'dynamic_analyzer' checksum=md5 %}" class="btn btn-secondary btn-md">{% icon "smartphone" size=14 %} Dynamic</a>

@@ -1,0 +1,23 @@
+---
+name: ai-integration-implemented
+description: "Granite LLM enrichment IMPLEMENTED on feature/granite-llm-integration — architecture, files, guardrails, admin-only, scan-isolation, how it was tested"
+metadata:
+  node_type: memory
+  type: project
+  originSessionId: 1ebacf8a-6b65-4ac7-98db-bfd0d3b1742f
+---
+
+Local Granite LLM enrichment **implemented + end-to-end tested** on branch `feature/granite-llm-integration` (off release-2026.7), 2026-07-08. NOT yet committed. Builds on the research in [[local-ai-enhancement]].
+
+**Architecture (all ADDITIVE — scan pipeline apk.py/ipa.py/static_analyzer.py/db_interaction.py/sast_engine.py are UNTOUCHED, verified via git diff):**
+- **Separate AI Dashboard page** (`/ai_dashboard/<md5>/`), NOT embedded in the scan report/dashboard — reached via an "AI Dashboard" button (icon `zap`) added to the 4 report headers (android/ios binary+source). If AI breaks, the scan dashboard never references it. NOT in the PDF.
+- **Background, decoupled from the scan queue:** after a scan completes, a django-q `post_execute` signal receiver (`llm/signals.py`, registered via new `StaticAnalyzer/apps.py` `ready()`) launches enrichment in a **daemon THREAD** (`tasks.enrich_in_background`), NOT on the scan queue. Local footprint is just HTTP to the remote model box, so it never occupies a scan worker. `MOBSF_ASYNC_WORKERS` default changed 2→**1** (serialize scans, one static report at a time).
+- **New files:** `mobsf/StaticAnalyzer/views/common/llm/{__init__,client,prompts,tasks,signals,views}.py`, `apps.py`, migration `StaticAnalyzer/0002_aienrichment.py`, RBAC migration `0010_add_ai_view_permission.py`, templates `_ai_analysis.html` + `ai_dashboard.html`. **Edited existing (additive only):** settings.py (MOBINSPECT_AI_* block + Q_CLUSTER workers=1), urls.py (defensive AI routes, try/except so broken AI import can't break routing), RBAC 0002 seed (+admin.ai.view), models.py (AIEnrichment: MD5 PK + STATUS + EXEC_SUMMARY + FINDING_EXPLANATIONS list + SECRETS_TRIAGE + MODEL_USED), appsec.py (1-line: `len(secrets)>1`→`>0` single-secret bugfix), 4 report templates (+`{% load rbac %}` + button).
+
+**ADMIN-ONLY:** new RBAC perm `admin.ai.view` (granted to Administrator role only). `ai_dashboard` page uses `@require_permission('admin.ai.view')` (403 for others); `ai_report` htmx endpoint returns 204 for non-admins; the button is gated `{% can 'admin.ai.view' %}`.
+
+**GUARDRAILS (input is attacker-controlled from a possibly-malicious app):** `prompts.py` `sanitize_untrusted` (NFKC + strip bidi/zero-width/control + chat tokens `<|..|>`/`### Instruction`), `<untrusted_app_data>` delimiting, secret **redaction** (masked token, never the literal); `sanitize_output` strips URLs/markdown-links/score-claims + bidi from MODEL OUTPUT too. `client.py` GraniteClient: enclave-only endpoint (loopback/RFC1918, reject public — SSRF guard), `allow_redirects=False`, `(connect,read)` timeouts, streamed `MAX_RESPONSE_BYTES` cap, `num_predict` cap, never logs bodies, returns None on any failure. Render: `_ai_analysis.html` NEVER `|safe` (autoescape → XSS payloads render escaped), text-node only, watermarked "AI-generated · unverified" card. Deterministic `security_score` NEVER touched by AI.
+
+**FAIL-CLOSED / scan-isolation:** default OFF (`MOBINSPECT_AI_ENABLED` parsed as `in ('1','true','yes','on')` — NOT `bool()`, which made `=0` truthy — fixed); aggregate wall-clock `MOBINSPECT_AI_TOTAL_BUDGET` (300s) so enrichment can't run unbounded; whole `ai_enrich_task` try/except → STATUS='failed', never raises; rescan overwrites via `update_or_create`.
+
+**Tested E2E (local, real scan of test_files/android.apk, score 37):** scan works with AI on (score unchanged 37 before/after enrichment = determinism); signal→thread produces explanations; **adversarial mock** proved XSS escaped in render + URL/score/bidi stripped at storage; fail-closed on dead host (no raise, score intact); SSRF guard rejects public host; disabled→204; admin gate (admin 200 / viewer 403 / button hidden for viewer); single-secret bugfix; RBAC suite 106 passed; no pending migrations; scan pipeline files untouched. NOTE: local Homebrew ollama 0.30.6 is BROKEN (HTTP 500, missing llama-server) — real model via user's endpoint or official Ollama app; user's endpoint is `192.168.92.1:11434` (configurable via `MOBINSPECT_AI_BASE_URL`, not reachable from this Mac's current network). Real Granite quality proven separately via llama.cpp. Adversarial code review found 4 issues (iOS secrets from wrong field, no aggregate budget, `=0` enables, 204-first-load race) — ALL FIXED.

@@ -501,6 +501,22 @@ if settings.API_ONLY == '0':
         re_path(r'^tests/$', tests.start_test),
     ])
 
+# AI enrichment endpoint (dashboard-only, additive). Guarded so any problem in
+# the optional AI package can never break URL routing or the scanner.
+if settings.API_ONLY == '0':
+    try:
+        from mobsf.StaticAnalyzer.views.common.llm import views as _ai_views
+        urlpatterns.append(
+            re_path(fr'^ai_dashboard/{checksum_regex}/$',
+                    _ai_views.ai_dashboard, name='ai_dashboard'))
+        urlpatterns.append(
+            re_path(fr'^ai/report/{checksum_regex}/$',
+                    _ai_views.ai_report, name='ai_report'))
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            'AI report route not registered; continuing without it')
+
 utils.print_version()
 init_exec_hooks()
 store_exec_hashes_at_first_run()

@@ -176,7 +176,7 @@ def common_fields(findings, data):
             })
     # Possible Hardcoded Secrets
     secrets = data['secrets']
-    if len(secrets) > 1:
+    if len(secrets) > 0:
         sec = '\n'.join(secrets)
         sev = 'hotspot' if settings.EFR_01 == '1' else 'warning'
         findings[sev].append({

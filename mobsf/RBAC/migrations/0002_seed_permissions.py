@@ -51,6 +51,7 @@ PERMISSIONS = [
     ('admin.user.create',         'Create users',       'admin', 'Create new users',                    True),
     ('admin.user.delete',         'Delete users',       'admin', 'Delete users',                        True),
     ('admin.user.reset_password', 'Reset passwords',    'admin', 'Reset another user\'s password',      True),
+    ('admin.ai.view',             'View AI analysis',   'admin', 'View the AI Security Analysis section', False),
 
     # ── rbac
     ('rbac.role.view',   'View roles',   'rbac', 'List roles and their permissions',          False),

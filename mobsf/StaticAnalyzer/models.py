@@ -183,3 +183,24 @@ class EnqueuedTask(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.status})'
+
+
+class AIEnrichment(models.Model):
+    """Cached, background-generated local-LLM enrichment for one scan.
+
+    Additive and advisory only. Never holds or influences the deterministic
+    security score. Populated by the background ai_enrich_task; read by the
+    dashboard-only AI section. TextField JSON blobs follow the repo convention
+    (native dict/list in, read back via python_dict/python_list).
+    """
+    MD5 = models.CharField(max_length=32, default='', primary_key=True)
+    STATUS = models.CharField(max_length=32, default='pending')
+    EXEC_SUMMARY = models.TextField(default='')
+    FINDING_EXPLANATIONS = models.TextField(default=[])
+    SECRETS_TRIAGE = models.TextField(default='')
+    MODEL_USED = models.CharField(max_length=128, default='')
+    CREATED_AT = models.DateTimeField(default=timezone.now)
+    UPDATED_AT = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f'{self.MD5} ({self.STATUS})'

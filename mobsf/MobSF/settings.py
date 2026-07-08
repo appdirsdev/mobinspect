@@ -431,7 +431,10 @@ ASYNC_ANALYSIS = bool(os.getenv('MOBSF_ASYNC_ANALYSIS', '0') == '1')
 ASYNC_ANALYSIS_TIMEOUT = int(os.getenv('MOBSF_ASYNC_ANALYSIS_TIMEOUT', '60'))
 Q_CLUSTER = {
     'name': 'scan_queue',
-    'workers': int(os.getenv('MOBSF_ASYNC_WORKERS', '2')),
+    # One static-analysis process at a time by default: a single worker
+    # serializes scans so concurrent (esp. large) APKs cannot exhaust the host.
+    # Override with MOBSF_ASYNC_WORKERS if the host has ample CPU/RAM.
+    'workers': int(os.getenv('MOBSF_ASYNC_WORKERS', '1')),
     'recycle': 100,
     'timeout': ASYNC_ANALYSIS_TIMEOUT * 60,
     'retry': (ASYNC_ANALYSIS_TIMEOUT * 60) + 100,
@@ -443,6 +446,52 @@ Q_CLUSTER = {
     'ack_failures': True,
 }
 QUEUE_MAX_SIZE = 100
+# =============== MobInspect Local AI (Granite) enrichment ===============
+# Dashboard-only, background, fail-closed. Default OFF. The endpoint is
+# operator-set and never hardcoded (e.g. http://192.168.92.1:11434). All AI
+# code is additive and best-effort; it can never affect a scan or the report.
+MOBINSPECT_AI_ENABLED = os.getenv(
+    'MOBINSPECT_AI_ENABLED', '').strip().lower() in ('1', 'true', 'yes', 'on')
+MOBINSPECT_AI_BASE_URL = os.getenv(
+    'MOBINSPECT_AI_BASE_URL', 'http://127.0.0.1:11434').strip().rstrip('/')
+MOBINSPECT_AI_MODEL_GENERATE = os.getenv(
+    'MOBINSPECT_AI_MODEL_GENERATE', 'granite4:8b')
+MOBINSPECT_AI_MODEL_CLASSIFY = os.getenv(
+    'MOBINSPECT_AI_MODEL_CLASSIFY', 'granite4:micro')
+# Egress pinning / TLS
+MOBINSPECT_AI_ALLOWED_HOSTS = [
+    h.strip() for h in os.getenv('MOBINSPECT_AI_ALLOWED_HOSTS', '').split(',')
+    if h.strip()]
+MOBINSPECT_AI_TLS_VERIFY = os.getenv('MOBINSPECT_AI_TLS_VERIFY', '1') == '1'
+MOBINSPECT_AI_CA_BUNDLE = os.getenv('MOBINSPECT_AI_CA_BUNDLE', '').strip()
+# Resource bounds
+MOBINSPECT_AI_CONNECT_TIMEOUT = int(os.getenv('MOBINSPECT_AI_CONNECT_TIMEOUT', '5'))
+MOBINSPECT_AI_READ_TIMEOUT = int(os.getenv('MOBINSPECT_AI_READ_TIMEOUT', '60'))
+MOBINSPECT_AI_MAX_RESPONSE_BYTES = int(
+    os.getenv('MOBINSPECT_AI_MAX_RESPONSE_BYTES', '2097152'))
+MOBINSPECT_AI_NUM_PREDICT = int(os.getenv('MOBINSPECT_AI_NUM_PREDICT', '768'))
+MOBINSPECT_AI_MAX_ITEMS = int(os.getenv('MOBINSPECT_AI_MAX_ITEMS', '25'))
+# Aggregate wall-clock budget (seconds) for one enrichment run — bounds total
+# time on the shared scan worker pool so AI can never starve real scans.
+MOBINSPECT_AI_TOTAL_BUDGET = int(os.getenv('MOBINSPECT_AI_TOTAL_BUDGET', '300'))
+MOBINSPECT_AI_STORED_TEXT_CAP = int(os.getenv('MOBINSPECT_AI_STORED_TEXT_CAP', '8000'))
+
+
+def _mobinspect_ai_url_ok(url):
+    """Format-only endpoint validation (no DNS at import). Returns bool."""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        return (parsed.scheme in ('http', 'https')
+                and bool(parsed.hostname) and bool(parsed.port))
+    except Exception:
+        return False
+
+
+# Fail-closed: a malformed endpoint disables AI rather than risking bad egress.
+if MOBINSPECT_AI_ENABLED and not _mobinspect_ai_url_ok(MOBINSPECT_AI_BASE_URL):
+    MOBINSPECT_AI_ENABLED = False
+
 MULTIPROCESSING = os.getenv('MOBSF_MULTIPROCESSING')
 JADX_TIMEOUT = int(os.getenv('MOBSF_JADX_TIMEOUT', 1000))
 SAST_TIMEOUT = int(os.getenv('MOBSF_SAST_TIMEOUT', 1000))
