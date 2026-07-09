@@ -3,55 +3,266 @@
 
 {% block page_title %}About{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero { background: var(--surface-1); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .55;
+  }
+  .mi-hero-glow::before {
+    width: 340px; height: 340px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 280px; height: 280px; bottom: -140px; left: -40px;
+    background: radial-gradient(circle at center, rgba(59,130,246,.38), transparent 70%);
+    animation: mi-float 21s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .5;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .4; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .32; }
+
+  /* ── Use-case tiles: accent glow on hover ── */
+  .mi-usecase { position: relative; overflow: hidden; border-radius: 10px;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-usecase:hover { transform: translateY(-2px);
+    box-shadow: 0 12px 28px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .mi-usecase::before { content: ''; position: absolute; inset: 0; opacity: 0;
+    background: radial-gradient(120% 120% at 0% 0%, var(--mi-accent, #2563EB), transparent 60%);
+    transition: opacity .22s ease; }
+  .mi-usecase:hover::before { opacity: .09; }
+  .mi-usecase-ico { transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+  .mi-usecase:hover .mi-usecase-ico { transform: scale(1.08) translateY(-1px); }
+
+  /* ── Feature checklist rows ── */
+  .mi-feature { transition: transform .15s ease; }
+  .mi-feature:hover { transform: translateX(2px); }
+
+  /* ── File-reference chips ── */
+  .mi-filechip { transition: background-color .15s ease, border-color .15s ease; }
+  .mi-filechip:hover { background: var(--surface-3); border-color: var(--border-default); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-usecase, .mi-usecase-ico, .mi-feature, .mi-filechip { transition: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-24px,0); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<header class="mb-6">
-  <h1 class="text-h1">About MobInspect</h1>
-  <p class="text-text-secondary mt-1">Mobile Application Security Inspector — an Appdirs project.</p>
-</header>
+<div class="space-y-6">
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  {# ══════════════════ Ambient hero ══════════════════ #}
+  <section class="mi-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
 
-  <section class="lg:col-span-2 space-y-6">
-    <div class="card" data-reveal>
-      <div class="card-body">
-        <h2 class="text-h3 mb-3 flex items-center gap-2">{% icon "shield" size=18 class="text-mobinspect-500" %} What it does</h2>
-        <p class="text-text-secondary leading-relaxed">
-          MobInspect is a security research platform for mobile applications on Android, iOS, and Windows Mobile.
-          The static analyzer supports APK, AAB, XAPK, IPA, APPX, and source-code archives. The dynamic analyzer
-          covers both Android emulators and iOS (Corellium VMs and jailbroken hardware), with Frida instrumentation,
-          live API monitoring, and network traffic capture.
-        </p>
-        <p class="text-text-secondary leading-relaxed mt-3">
-          MobInspect ships with a modern Tailwind UI, dynamic role-based access control, per-user revocable API keys,
-          and an analytics dashboard on top of a mature analyzer stack.
-        </p>
-      </div>
-    </div>
-
-    <div class="card" data-reveal>
-      <div class="card-body">
-        <h2 class="text-h3 mb-3 flex items-center gap-2">{% icon "circle-check" size=18 class="text-mobinspect-500" %} Use cases</h2>
-        <ul class="space-y-2 text-text-secondary">
-          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} Mobile application security assessments</li>
-          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} Penetration testing</li>
-          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} Malware and tracker analysis</li>
-          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} Privacy auditing</li>
-          <li class="flex items-start gap-2">{% icon "shield-check" size=16 class="mt-0.5 text-mobinspect-500" %} CI/CD security gating via REST API</li>
-        </ul>
+    <div class="relative z-10 px-6 py-8 md:px-10 md:py-10">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "shield-check" size=13 %} An Appdirs Project
+          </p>
+          <h1 class="text-display font-bold leading-tight">About <span class="text-text-brand">MobInspect</span></h1>
+          <p class="text-body text-text-secondary mt-2 max-w-xl">
+            Mobile Application Security Inspector — a security research platform for mobile
+            applications on Android, iOS, and Windows Mobile.
+          </p>
+          <div class="flex flex-wrap items-center gap-2 mt-4">
+            {% if version %}<span class="badge badge-neutral gap-1.5 font-mono">{% icon "package" size=12 %} v{{ version }}</span>{% endif %}
+            <span class="badge badge-neutral gap-1.5">{% icon "layers" size=12 %} Static + dynamic analysis</span>
+            <span class="badge badge-neutral gap-1.5">{% icon "smartphone" size=12 %} Android · iOS · Windows Mobile</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <a href="{% url 'recent' %}" class="btn btn-secondary btn-md">
+            {% icon "layers" size=14 %} Recent scans
+          </a>
+          <a href="{% url 'api_docs' %}" class="btn btn-ghost btn-md">
+            {% icon "file-text" size=14 %} API docs
+          </a>
+        </div>
       </div>
     </div>
   </section>
 
-  <aside class="space-y-6">
-    <div class="card" data-reveal>
-      <div class="card-body">
-        <h3 class="text-h4 mb-2 flex items-center gap-2">{% icon "lock" size=16 class="text-mobinspect-500" %} License</h3>
-        <p class="text-small text-text-secondary">
-          The full license text and the cumulative author roster are recorded in <code>LICENSE.md</code> at the repository root; bundled third-party tool licenses live under <code>LICENSES/</code>.
-        </p>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <section class="lg:col-span-2 space-y-6">
+
+      {# ══════════════════ What it does ══════════════════ #}
+      <div class="card" data-reveal>
+        <div class="card-body">
+          <h2 class="text-h3 mb-3 flex items-center gap-2.5">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">{% icon "shield" size=17 %}</span>
+            What it does
+          </h2>
+          <p class="text-text-secondary leading-relaxed">
+            MobInspect is a security research platform for mobile applications on Android, iOS, and Windows Mobile.
+            The static analyzer supports APK, AAB, XAPK, IPA, APPX, and source-code archives. The dynamic analyzer
+            covers both Android emulators and iOS (Corellium VMs and jailbroken hardware), with Frida instrumentation,
+            live API monitoring, and network traffic capture.
+          </p>
+          <p class="text-text-secondary leading-relaxed mt-3">
+            MobInspect ships with a modern Tailwind UI, dynamic role-based access control, per-user revocable API keys,
+            and an analytics dashboard on top of a mature analyzer stack.
+          </p>
+
+          <div class="mt-5 pt-5 border-t border-border-subtle">
+            <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2">Supported formats</p>
+            <p class="text-small text-text-secondary flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span class="font-mono">APK</span><span class="text-text-tertiary">·</span>
+              <span class="font-mono">AAB</span><span class="text-text-tertiary">·</span>
+              <span class="font-mono">XAPK</span><span class="text-text-tertiary">·</span>
+              <span class="font-mono">IPA</span><span class="text-text-tertiary">·</span>
+              <span class="font-mono">APPX</span><span class="text-text-tertiary">·</span>
+              <span class="font-mono">Source archive</span>
+            </p>
+          </div>
+
+          <div class="mt-4">
+            <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2">Dynamic targets</p>
+            <p class="text-small text-text-secondary flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Android emulators</span><span class="text-text-tertiary">·</span>
+              <span>iOS Corellium VMs</span><span class="text-text-tertiary">·</span>
+              <span>iOS jailbroken hardware</span><span class="text-text-tertiary">·</span>
+              <span>Frida instrumentation</span>
+            </p>
+          </div>
+        </div>
       </div>
-    </div>
-  </aside>
+
+      {# ══════════════════ Use cases ══════════════════ #}
+      <div class="card" data-reveal>
+        <div class="card-header">
+          <h2 class="text-h3 flex items-center gap-2.5">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-system-success/15 text-system-success flex-shrink-0">{% icon "circle-check" size=17 %}</span>
+            Use cases
+          </h2>
+        </div>
+        <div class="card-body">
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="mi-usecase card card-body" style="--mi-accent:#2563EB">
+              <div class="relative z-10 flex items-start gap-3">
+                <span class="mi-usecase-ico inline-flex items-center justify-center w-9 h-9 rounded-md bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
+                  {% icon "shield-check" size=17 %}
+                </span>
+                <p class="text-small text-text-secondary pt-1.5">Mobile application security assessments</p>
+              </div>
+            </div>
+            <div class="mi-usecase card card-body" style="--mi-accent:#1D4ED8">
+              <div class="relative z-10 flex items-start gap-3">
+                <span class="mi-usecase-ico inline-flex items-center justify-center w-9 h-9 rounded-md bg-mobinspect-600/15 text-mobinspect-600 flex-shrink-0">
+                  {% icon "search" size=17 %}
+                </span>
+                <p class="text-small text-text-secondary pt-1.5">Penetration testing</p>
+              </div>
+            </div>
+            <div class="mi-usecase card card-body" style="--mi-accent:#3B82F6">
+              <div class="relative z-10 flex items-start gap-3">
+                <span class="mi-usecase-ico inline-flex items-center justify-center w-9 h-9 rounded-md bg-mobinspect-400/15 text-mobinspect-400 flex-shrink-0">
+                  {% icon "alert-triangle" size=17 %}
+                </span>
+                <p class="text-small text-text-secondary pt-1.5">Malware and tracker analysis</p>
+              </div>
+            </div>
+            <div class="mi-usecase card card-body" style="--mi-accent:#2563EB">
+              <div class="relative z-10 flex items-start gap-3">
+                <span class="mi-usecase-ico inline-flex items-center justify-center w-9 h-9 rounded-md bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
+                  {% icon "eye" size=17 %}
+                </span>
+                <p class="text-small text-text-secondary pt-1.5">Privacy auditing</p>
+              </div>
+            </div>
+            <div class="mi-usecase card card-body sm:col-span-2" style="--mi-accent:#1D4ED8">
+              <div class="relative z-10 flex items-start gap-3">
+                <span class="mi-usecase-ico inline-flex items-center justify-center w-9 h-9 rounded-md bg-mobinspect-600/15 text-mobinspect-600 flex-shrink-0">
+                  {% icon "git-compare" size=17 %}
+                </span>
+                <p class="text-small text-text-secondary pt-1.5">CI/CD security gating via REST API</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <aside class="space-y-6">
+
+      {# ══════════════════ License ══════════════════ #}
+      <div class="card" data-reveal>
+        <div class="card-body">
+          <h3 class="text-h4 mb-2 flex items-center gap-2.5">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-secondary/15 text-text-secondary flex-shrink-0">{% icon "lock" size=15 %}</span>
+            License
+          </h3>
+          <p class="text-small text-text-secondary leading-relaxed">
+            The full license text and the cumulative author roster are recorded in <code>LICENSE.md</code> at the repository root; bundled third-party tool licenses live under <code>LICENSES/</code>.
+          </p>
+          <div class="mt-4 flex flex-col gap-2">
+            <div class="mi-filechip flex items-center gap-2 rounded-md border border-border-subtle bg-surface-2/60 px-3 py-2">
+              {% icon "file-text" size=14 class="text-text-tertiary flex-shrink-0" %}
+              <span class="text-tiny font-mono text-text-secondary truncate">LICENSE.md</span>
+            </div>
+            <div class="mi-filechip flex items-center gap-2 rounded-md border border-border-subtle bg-surface-2/60 px-3 py-2">
+              {% icon "package" size=14 class="text-text-tertiary flex-shrink-0" %}
+              <span class="text-tiny font-mono text-text-secondary truncate">LICENSES/</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ══════════════════ Platform ══════════════════ #}
+      <div class="card" data-reveal>
+        <div class="card-body">
+          <h3 class="text-h4 mb-3 flex items-center gap-2.5">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-mobinspect-400/15 text-mobinspect-400 flex-shrink-0">{% icon "zap" size=15 %}</span>
+            Platform
+          </h3>
+          <ul class="space-y-2.5">
+            <li class="mi-feature flex items-center gap-2.5 text-small text-text-secondary">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-system-success/15 text-system-success flex-shrink-0">{% icon "check" size=12 %}</span>
+              Modern Tailwind UI
+            </li>
+            <li class="mi-feature flex items-center gap-2.5 text-small text-text-secondary">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-system-success/15 text-system-success flex-shrink-0">{% icon "check" size=12 %}</span>
+              Dynamic role-based access control
+            </li>
+            <li class="mi-feature flex items-center gap-2.5 text-small text-text-secondary">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-system-success/15 text-system-success flex-shrink-0">{% icon "check" size=12 %}</span>
+              Per-user revocable API keys
+            </li>
+            <li class="mi-feature flex items-center gap-2.5 text-small text-text-secondary">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-system-success/15 text-system-success flex-shrink-0">{% icon "check" size=12 %}</span>
+              Analytics dashboard
+            </li>
+            <li class="mi-feature flex items-center gap-2.5 text-small text-text-secondary">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-system-success/15 text-system-success flex-shrink-0">{% icon "check" size=12 %}</span>
+              Mature analyzer stack
+            </li>
+          </ul>
+        </div>
+      </div>
+
+    </aside>
+
+  </div>
 
 </div>
 {% endblock %}

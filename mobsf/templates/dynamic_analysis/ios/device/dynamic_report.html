@@ -1,1071 +1,960 @@
 {% extends "base/legacy_app.html" %}
-   {% load static %}
+{% load static %}
 {% block extra_css %}
     <!-- DataTables -->
     <link href="{% static "datatables/css/datatables.combined.min.css" %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static "enlighterjs/enlighterjs.min.css" %}" />
     <style type="text/css" media="print">
         @page { size: landscape; }
         @media print {
-          .btn, #scan_options  {
-            display: none;
-          }
+          .btn, #scan_options, .report-nav { display: none; }
         }
     </style>
+    <style>
+    pre {
+      white-space: pre-wrap;       /* css-3 */
+      white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+      white-space: -pre-wrap;      /* Opera 4-6 */
+      white-space: -o-pre-wrap;    /* Opera 7 */
+      word-wrap: break-word;       /* Internet Explorer 5.5+ */
+      }
 
-<link rel="stylesheet" href="{% static "enlighterjs/enlighterjs.min.css" %}" />
-<style>
-pre {
-  white-space: pre-wrap;       /* css-3 */
-  white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
-  white-space: -pre-wrap;      /* Opera 4-6 */
-  white-space: -o-pre-wrap;    /* Opera 7 */
-  word-wrap: break-word;       /* Internet Explorer 5.5+ */
-  }
+      /* custom yellow line highlight */
+      .enlighter-t-enlighter div.enlighter>div.enlighter-special {
+        background-color: rgb(var(--text-brand) / 0.18);
+      }
 
-  /* custom yellow line highlight */
-  .enlighter-t-enlighter div.enlighter>div.enlighter-special {
-    background-color: rgb(var(--text-brand) / 0.18);
-  }
+    /* ═══════════════ MobInspect report chrome (presentational only) ═══════════════ */
+    #chartdiv { width: 100%; height: 460px; overflow: hidden; background: rgb(var(--surface-2) / 0.4); border-radius: 0.75rem; }
 
-</style>
+    /* Data cells that can hold long values */
+    .cell-wrap { word-wrap: break-word; min-width: 160px; max-width: 360px; }
+
+    /* Report tables — DataTables still enhances every table generically */
+    .mi-table { width: 100%; font-size: 0.8125rem; border-collapse: collapse; }
+    .mi-table thead th {
+      text-align: left; padding: 0.5rem 0.75rem; font-weight: 500;
+      text-transform: uppercase; font-size: 0.6875rem; letter-spacing: 0.03em;
+      color: rgb(var(--text-secondary));
+      border-bottom: 1px solid rgb(var(--border-strong));
+      background: rgb(var(--surface-2) / 0.35);
+    }
+    .mi-table tbody td { padding: 0.625rem 0.75rem; border-bottom: 1px solid rgb(var(--border-subtle)); vertical-align: top; }
+    .mi-table tbody tr { transition: background-color 0.12s ease; }
+    .mi-table tbody tr:hover td { background: rgb(var(--surface-2) / 0.45); }
+    .mi-table tbody tr:last-child td { border-bottom: 0; }
+
+    .mi-badge { display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.375rem; font-size: 0.6875rem; font-weight: 500; }
+
+    /* Card-header icon chip */
+    .mi-chip {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; flex-shrink: 0;
+      background: rgb(var(--surface-2)); color: rgb(var(--text-secondary));
+      font-size: 0.95rem;
+    }
+
+    /* Sticky in-page section navigation */
+    .report-nav {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; gap: 0.25rem; flex-wrap: nowrap; overflow-x: auto;
+      padding: 0.5rem; margin-bottom: 1.5rem;
+      border: 1px solid rgb(var(--border-subtle)); border-radius: 0.75rem;
+      background: rgb(var(--surface-1) / 0.92);
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+      scrollbar-width: thin;
+    }
+    .report-nav .nav-link {
+      white-space: nowrap; padding: 0.375rem 0.75rem; border-radius: 0.5rem;
+      font-size: 0.8125rem; font-weight: 500; color: rgb(var(--text-secondary));
+      text-decoration: none; transition: background-color 0.12s ease, color 0.12s ease;
+    }
+    .report-nav .nav-link:hover { background: rgb(var(--surface-2)); color: rgb(var(--text-primary)); }
+    .report-nav .nav-link.active { background: rgb(var(--surface-2)); color: rgb(var(--text-primary)); }
+
+    /* Monospace value lists (urls / emails / logs / keystrokes / queries) */
+    .mono-list { display: flex; flex-direction: column; gap: 0.25rem; max-height: 22rem; overflow-y: auto; }
+    .mono-list > div {
+      padding: 0.375rem 0.625rem; border-radius: 0.375rem;
+      background: rgb(var(--surface-2) / 0.4);
+      word-break: break-all;
+    }
+
+    /* KPI overview tiles */
+    .mi-kpi { display: flex; align-items: center; gap: 0.75rem; }
+    .mi-kpi .mi-chip { width: 2.5rem; height: 2.5rem; }
+
+    /* Definition-style key/value grid inside the Keychain table */
+    .kv-grid { display: grid; grid-template-columns: 1fr; gap: 0.25rem 1rem; font-size: 0.75rem; }
+    @media (min-width: 640px) { .kv-grid { grid-template-columns: 1fr 1fr; } }
+    .kv-grid .kv-label { color: rgb(var(--text-tertiary)); }
+    </style>
     {% endblock %}
 {% block content %}
-  <!-- Content Wrapper. Contains page content -->
-<div class="content-wrapper">
-  <!-- Content Header (Page header) -->
-  <div class="content-header">
-  
-    <div class="container-fluid">
-      <div class="row mb-2">
-        <div class="col-lg-12">
-        <div id="mobsf_header" align="center">
-          <h2>Dynamic Analysis Report - <strong>{{ bundleid }}</strong></h2>
+
+{# ─────────────────── Page header ─────────────────── #}
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-4 min-w-0">
+    <span class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-chart-amber/15 text-chart-amber flex-shrink-0">
+      <i class="fas fa-mobile-alt text-xl"></i>
+    </span>
+    <div class="min-w-0">
+      <p class="text-tiny uppercase text-text-tertiary">Dynamic · iOS Device · Report</p>
+      <h1 class="text-h2 truncate" title="{{ bundleid }}">{{ bundleid|default:"iOS Dynamic Analysis Report" }}</h1>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+        {% if hash %}<p class="text-small text-text-secondary font-mono truncate mb-0">{{ hash }}</p>{% endif %}
+        {% if device_id %}
+        <span class="badge badge-passed gap-1.5">
+          <span class="inline-block w-1.5 h-1.5 rounded-full bg-severity-passed dark:bg-severity-passed-dark animate-pulse"></span>
+          {{ device_id }}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="flex items-center gap-2 flex-shrink-0">
+    <a href="{% url 'dynamic_ios_device' %}" class="btn btn-ghost btn-md"><i class="fas fa-chevron-left"></i> All devices</a>
+  </div>
+</header>
+
+{# ─────────────────── Overview KPIs (animated count-up) ─────────────────── #}
+<section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
+  <div class="card mi-glass card-body" data-reveal x-data="counter({{ keychain|length }})">
+    <div class="mi-kpi">
+      <span class="mi-chip"><i class="fas fa-key"></i></span>
+      <div><p class="text-tiny uppercase text-text-tertiary">Keychain Items</p><p class="text-h3 tabular" x-text="shown">0</p></div>
+    </div>
+  </div>
+  <div class="card mi-glass card-body" data-reveal x-data="counter({{ userdefaults|length }})">
+    <div class="mi-kpi">
+      <span class="mi-chip"><i class="fas fa-shapes"></i></span>
+      <div><p class="text-tiny uppercase text-text-tertiary">UserDefaults</p><p class="text-h3 tabular" x-text="shown">0</p></div>
+    </div>
+  </div>
+  <div class="card mi-glass card-body" data-reveal x-data="counter({{ network|length }})">
+    <div class="mi-kpi">
+      <span class="mi-chip"><i class="fas fa-project-diagram"></i></span>
+      <div><p class="text-tiny uppercase text-text-tertiary">Network Calls</p><p class="text-h3 tabular" x-text="shown">0</p></div>
+    </div>
+  </div>
+  <div class="card mi-glass card-body" data-reveal x-data="counter({{ screenshots|length }})">
+    <div class="mi-kpi">
+      <span class="mi-chip"><i class="fas fa-images"></i></span>
+      <div><p class="text-tiny uppercase text-text-tertiary">Screenshots</p><p class="text-h3 tabular" x-text="shown">0</p></div>
+    </div>
+  </div>
+  <div class="card mi-glass card-body" data-reveal x-data="counter({{ domains|length }})">
+    <div class="mi-kpi">
+      <span class="mi-chip"><i class="fas fa-globe-asia"></i></span>
+      <div><p class="text-tiny uppercase text-text-tertiary">Domains</p><p class="text-h3 tabular" x-text="shown">0</p></div>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Section navigation ─────────────────── #}
+<nav class="report-nav" aria-label="Report sections">
+  <a class="nav-link active" href="#information">Information</a>
+  <a class="nav-link" href="#userdefaults">UserDefaults</a>
+  <a class="nav-link" href="#keychain">Keychain</a>
+  <a class="nav-link" href="#fileaccess">File Access</a>
+  <a class="nav-link" href="#appdata">App Data</a>
+  <a class="nav-link" href="#network">Network</a>
+  <a class="nav-link" href="#jsondata">JSON Data</a>
+  <a class="nav-link" href="#logs">App Logs</a>
+  <a class="nav-link" href="#textinput">Text Inputs</a>
+  <a class="nav-link" href="#pasteboard">Pasteboard</a>
+  <a class="nav-link" href="#cookies">Cookies</a>
+  <a class="nav-link" href="#crypto">Crypto</a>
+  <a class="nav-link" href="#credentials">Credentials</a>
+  <a class="nav-link" href="#sql">SQLite Queries</a>
+  <a class="nav-link" href="#screenshots">Screenshots</a>
+  <a class="nav-link" href="#serverlocations">Server Locations</a>
+  <a class="nav-link" href="#malware_check">Malware</a>
+  <a class="nav-link" href="#urls">URLs</a>
+  <a class="nav-link" href="#emails">Emails</a>
+  <a class="nav-link" href="#trackers">Trackers</a>
+  <a class="nav-link" href="#sqlitedb">SQLite DB</a>
+  <a class="nav-link" href="#plistfiles">Plist Files</a>
+  <a class="nav-link" href="#other_files">Other Files</a>
+</nav>
+
+{# ─────────────────── Information / actions ─────────────────── #}
+<section class="mb-6" id="information">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-info-circle"></i></span>
+      <div>
+        <h2 class="text-h3">Information</h2>
+        <p class="text-tiny text-text-tertiary">Live views and raw instrumentation logs</p>
+      </div>
+    </div>
+    <div class="card-body space-y-5">
+      <div>
+        <h6 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Live Views</h6>
+        <div class="flex flex-wrap gap-2">
+          {% if frida_logs %}
+          <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'ios_api_monitor' %}?checksum={{ hash }}&bundle_id={{ bundleid }}"><i class="fa fa-search"></i> API Monitor Logs</a>
+          <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'frida_logs' %}?hash={{ hash }}"><i class="fas fa-spider"></i> Frida Logs View</a>
+          {% endif %}
+          <a class="btn btn-secondary btn-sm" target="_blank" role="button" href="{% url 'httptools' %}?project={{bundleid}}"><i class="fab fa-hire-a-helper"></i> Start HTTPTools</a>
         </div>
+      </div>
+      <div class="border-t border-border-subtle pt-4">
+        <h6 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Raw Logs</h6>
+        <div class="flex flex-wrap gap-2">
+          <a target="_blank" class="btn btn-ghost btn-sm" role="button" href="{% url 'download' %}{{ hash }}-web_traffic.txt"><i class="fas fa-water"></i> HTTP(S) Traffic</a>
+          <a class="btn btn-ghost btn-sm" role="button" href="{% url 'download' %}{{ hash }}-app_data.tar"><i class="fas fa-download"></i> Application Data</a>
         </div>
       </div>
     </div>
   </div>
-  <!-- /.content-header -->
-
-
- <!-- Main content -->
-<a id="information" class="anchor"></a>
-<section class="content">
-    <div class="container-fluid">
-      <div class="row">
-        <div class="col-lg-12">
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title"></h5>
-                <div class="row">
-                <div class="col-12">
-                  <p><strong><i class="fas fa-info-circle"></i> INFORMATION</strong></p>
-                   <div align="center">
-                      <p>
-                      {% if frida_logs %}
-                          <a target="_blank" class="btn btn-primary" role="button" href="{% url 'ios_api_monitor' %}?checksum={{ hash }}&bundle_id={{ bundleid }}"><i class="fa fa-search"></i> API Monitor Logs</a>
-                          <a target="_blank" class="btn btn-primary" role="button" href="{% url 'frida_logs' %}?hash={{ hash }}"><i class="fas fa-spider"></i> Frida Logs View</a>
-                      {% endif %}
-                        <a class="btn btn-success" target="_blank" role="button" href="{% url 'httptools' %}?project={{bundleid}}"><i class="fab fa-hire-a-helper"></i> Start HTTPTools</a>
-                      </p>
-                      <p><h6><strong>Raw Logs</strong></h6></p>
-                      <p>
-                      <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'download' %}{{ hash }}-web_traffic.txt"><i class="fas fa-water"></i> HTTP(S) Traffic</a>
-                      <a class="btn btn-primary btn-sm" role="button" href="{% url 'download' %}{{ hash }}-app_data.tar"><i class="fas fa-download"></i> Application Data</a>
-                    </p>
-                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-      </div>
-      <!-- /.col -->
-      <!-- row and container-->
-      </div>
-  </div>
-  </section>
+</section>
 <!-- =========================end information==================================== -->
 
- <a id="userdefaults" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-shapes"></i> USERDEFAULTS DATA</strong>
-             </p>
-              <div class="table-responsive">
-              {% if userdefaults %}
-               <table id="table_userdefaults" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                    <th>KEY</th> 
-                    <th>VALUE</th>
-                  </tr>
-                </thead>
-               <tbody>
-                {% for k, v in userdefaults.items %}
-                <tr>
-                  <td>
-                    {{k}}
-                  </td>
-                  <td>
-                    {{v | base64_decode }}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
+{# ─────────────────── UserDefaults ─────────────────── #}
+<section class="mb-6" id="userdefaults">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-shapes"></i></span>
+      <h2 class="text-h3">UserDefaults Data</h2>
     </div>
-</section>
- <!-- ===========================end userdefaults ================================== -->
-
- <a id="keychain" class="anchor"></a>
- <section class="content">
-   <div class="container-fluid">
-     <div class="row">
-         <div class="col-lg-12">
-         <div class="card">
-           <div class="card-body">
-              <p>
-              <strong><i class="fas fa-key"></i> KEYCHAIN DATA</strong>
-              </p>
-               <div class="table-responsive">
-               {% if keychain %}
-                <table id="table_keychain" class="table table-bordered table-hover table-striped">
-                 <thead>
-                   <tr>
-                     <th>ITEM</th>
-                     <th>DATA</th>
-                     <th>CREATE DATE</th>
-                     <th>MODIFICATION DATE</th>
-                     
-                   </tr>
-                 </thead>
-                <tbody>
-                 {% for item in keychain %}
-                 <tr>
-                   <td>
-                    <strong>Entitlement Group:</strong> {{item.entitlement_group}} </br>
-                    <strong>Item Class:</strong> {{item.item_class}} </br>
-                    <strong>Accessible Attribute:</strong> {{item.accessible_attribute}} </br>
-                    <strong>Generic:</strong> {{item.generic}} </br>
-                    <strong>Service:</strong> {{item.service}} </br>
-                    <strong>Account:</strong> {{item.account}} </br>
-                    <hr>
-                    <strong>Protected:</strong>  {{item.protected}} </br>
-                    <strong>Label:</strong> {{item.label}} </br>
-                    <strong>Access Control:</strong> {{item.access_control}} </br>
-                    <strong>Description:</strong> {{item.description}} </br>
-                    <strong>Comment:</strong> {{item.comment}} </br>
-                    <strong>Creator:</strong>  {{item.creator}} </br>
-                    <strong>Type:</strong> {{item.type}} </br>
-                    <strong>Script Code:</strong>  {{item.script_code}} </br>
-                    <strong>Alias:</strong>  {{item.alias}} </br>
-                    <strong>Invisible:</strong> {{item.invisible}} </br>
-                    <strong>Negative:</strong>  {{item.negative}} </br>
-                    <strong>Custom Icon:</strong> {{item.custom_icon}} </br>
-                   </td>
-                   <td>
-                    <pre>{{item.data | pretty_json | base64_decode}}</pre>
-                   </td>
-                  <td>
-                    {{item.create_date}}
-                  </td>
-                  <td>
-                    {{item.modification_date}}
-                  </td>
-                 </tr>
-                 {% endfor %}
-               </tbody>
-             </table>
-              {% endif %}
-             </div>
-           </div>
-         </div><!-- /.card -->
-         </div>
-         <!-- end row -->
-         </div>
-     </div>
- </section>
-  <!-- ===========================end keychain ================================== -->
-
-<a id="fileaccess" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-file-signature"></i> FILE ACCESS</strong>
-             </p>
-              <div class="table-responsive">
-              {% if files %}
-               <table id="table_fileaccess" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                    <th>FILE PATH</th>
-                    <th>DOWNLOAD</th>
-                  </tr>
-                </thead>
-               <tbody>
-                {% for item in files %}
-                <tr>
-                  <td>
-                    <a href="#" onclick="cat_file('{{ item|escapejs }}'); return false;">{{item}}</a>
-                  </td>
-                  <td>
-                    <a class="btn btn-info btn-sm" href="#" onclick="download_file('{{ item|escapejs }}'); return false;"><i class="fa fa-solid fa-download"></i></a>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
+    <div class="card-body overflow-x-auto">
+      {% if userdefaults %}
+      <table id="table_userdefaults" class="mi-table">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for k, v in userdefaults.items %}
+        <tr>
+          <td class="font-mono text-mono text-text-secondary">{{k}}</td>
+          <td class="cell-wrap">{{v | base64_decode }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No UserDefaults data captured.</p>{% endif %}
     </div>
+  </div>
 </section>
+<!-- ===========================end userdefaults ================================== -->
 
- <!-- ===========================end files ================================== -->
-
-<a id="appdata" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-folder-open"></i> APP DATA DIRECTORY</strong>
-             </p>
-              <div class="table-responsive">
-              {% if datadir %}
-               <table id="table_files" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                    <th>FILE PATH</th>
-                    <th>DOWNLOAD</th>
-                    <th>FILE PROTECTION</th>
-                  </tr>
-                </thead>
-               <tbody>
-                {% for item in datadir %}
-                <tr>
-                  <td>
-                    <a href="#" onclick="cat_file('{{ item.path|escapejs }}'); return false;">{{ item.path | replace:"/private/var/mobile/Containers/Data/Application/|" }}</a>
-                  </td>
-                  <td>
-                    <a class="btn btn-info btn-sm" href="#" onclick="download_file('{{ item.path|escapejs }}'); return false;"><i class="fa fa-solid fa-download"></i></a>
-                  </td>
-                  <td>
-                    {{ item.fileProtectionKey }}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
+{# ─────────────────── Keychain ─────────────────── #}
+<section class="mb-6" id="keychain">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-key"></i></span>
+      <h2 class="text-h3">Keychain Data</h2>
     </div>
-</section>
- <!-- ===========================end data dir ================================== -->
-
- <a id="network" class="anchor"></a>
- <section class="content">
-   <div class="container-fluid">
-     <div class="row">
-         <div class="col-lg-12">
-         <div class="card">
-           <div class="card-body">
-              <p>
-              <strong><i class="fas fa-project-diagram"></i> URLS INVOKED</strong>
-              </p>
-               <div class="table-responsive">
-               {% if network %}
-                <table id="table_network" class="table table-bordered table-hover table-striped">
-                 <thead>
-                   <tr>
-                     <th>SOURCE</th> 
-                     <th>URL</th>
-                   </tr>
-                 </thead>
-                <tbody>
-                 {% for item in network %}
-                 <tr>
-                   <td>
-                     {{item.source}}
-                   </td>
-                   <td>
-                     {{item.url}}
-                   </td>
-                 </tr>
-                 {% endfor %}
-               </tbody>
-             </table>
-              {% endif %}
-             </div>
-           </div>
-         </div><!-- /.card -->
-         </div>
-         <!-- end row -->
-         </div>
-     </div>
- </section>
-  <!-- ===========================end network calls ================================== -->
-  <a id="jsondata" class="anchor"></a>
-  <section class="content">
-    <div class="container-fluid">
-      <div class="row">
-          <div class="col-lg-12">
-          <div class="card">
-            <div class="card-body">
-               <p>
-               <strong><i class="fas fa-code"></i> JSON DATA</strong>
-               </p>
-                <div class="table-responsive">
-                {% if json %}
-                 <table id="table_jsondata" class="table table-bordered table-hover table-striped">
-                  <thead>
-                    <tr>
-                      <th>JSON</th>
-                    </tr>
-                  </thead>
-                 <tbody>
-                  {% for item in json %}
-                  <tr>
-                    <td>
-                      <pre>{{item | pretty_json}}</pre>
-                    </td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-               {% endif %}
-              </div>
+    <div class="card-body overflow-x-auto">
+      {% if keychain %}
+      <table id="table_keychain" class="mi-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Data</th>
+            <th>Create Date</th>
+            <th>Modification Date</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in keychain %}
+        <tr>
+          <td class="cell-wrap">
+            <div class="kv-grid">
+              <div><span class="kv-label">Entitlement Group:</span> {{item.entitlement_group}}</div>
+              <div><span class="kv-label">Item Class:</span> {{item.item_class}}</div>
+              <div><span class="kv-label">Accessible Attribute:</span> {{item.accessible_attribute}}</div>
+              <div><span class="kv-label">Generic:</span> {{item.generic}}</div>
+              <div><span class="kv-label">Service:</span> {{item.service}}</div>
+              <div><span class="kv-label">Account:</span> {{item.account}}</div>
             </div>
-          </div><!-- /.card -->
-          </div>
-          <!-- end row -->
-          </div>
+            <hr class="my-2 border-border-subtle">
+            <div class="kv-grid">
+              <div><span class="kv-label">Protected:</span> {{item.protected}}</div>
+              <div><span class="kv-label">Label:</span> {{item.label}}</div>
+              <div><span class="kv-label">Access Control:</span> {{item.access_control}}</div>
+              <div><span class="kv-label">Description:</span> {{item.description}}</div>
+              <div><span class="kv-label">Comment:</span> {{item.comment}}</div>
+              <div><span class="kv-label">Creator:</span> {{item.creator}}</div>
+              <div><span class="kv-label">Type:</span> {{item.type}}</div>
+              <div><span class="kv-label">Script Code:</span> {{item.script_code}}</div>
+              <div><span class="kv-label">Alias:</span> {{item.alias}}</div>
+              <div><span class="kv-label">Invisible:</span> {{item.invisible}}</div>
+              <div><span class="kv-label">Negative:</span> {{item.negative}}</div>
+              <div><span class="kv-label">Custom Icon:</span> {{item.custom_icon}}</div>
+            </div>
+          </td>
+          <td class="cell-wrap">
+            <pre class="font-mono text-mono text-text-secondary text-tiny whitespace-pre-wrap break-all m-0">{{item.data | pretty_json | base64_decode}}</pre>
+          </td>
+          <td class="whitespace-nowrap text-text-secondary">{{item.create_date}}</td>
+          <td class="whitespace-nowrap text-text-secondary">{{item.modification_date}}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No Keychain data captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end keychain ================================== -->
+
+{# ─────────────────── File Access ─────────────────── #}
+<section class="mb-6" id="fileaccess">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-file-signature"></i></span>
+      <h2 class="text-h3">File Access</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if files %}
+      <table id="table_fileaccess" class="mi-table">
+        <thead>
+          <tr>
+            <th>File Path</th>
+            <th>Download</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in files %}
+        <tr>
+          <td class="font-mono text-mono text-text-secondary cell-wrap">
+            <a class="text-text-brand hover:underline" href="#" onclick="cat_file('{{ item|escapejs }}'); return false;">{{item}}</a>
+          </td>
+          <td>
+            <a class="btn btn-ghost btn-sm" href="#" onclick="download_file('{{ item|escapejs }}'); return false;"><i class="fa fa-solid fa-download"></i></a>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No file access captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end files ================================== -->
+
+{# ─────────────────── App Data Directory ─────────────────── #}
+<section class="mb-6" id="appdata">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-folder-open"></i></span>
+      <h2 class="text-h3">App Data Directory</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if datadir %}
+      <table id="table_files" class="mi-table">
+        <thead>
+          <tr>
+            <th>File Path</th>
+            <th>Download</th>
+            <th>File Protection</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in datadir %}
+        <tr>
+          <td class="font-mono text-mono text-text-secondary cell-wrap">
+            <a class="text-text-brand hover:underline" href="#" onclick="cat_file('{{ item.path|escapejs }}'); return false;">{{ item.path | replace:"/private/var/mobile/Containers/Data/Application/|" }}</a>
+          </td>
+          <td>
+            <a class="btn btn-ghost btn-sm" href="#" onclick="download_file('{{ item.path|escapejs }}'); return false;"><i class="fa fa-solid fa-download"></i></a>
+          </td>
+          <td class="whitespace-nowrap">{{ item.fileProtectionKey }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No app data directory files captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end data dir ================================== -->
+
+{# ─────────────────── URLs Invoked (Network) ─────────────────── #}
+<section class="mb-6" id="network">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-project-diagram"></i></span>
+      <h2 class="text-h3">URLs Invoked</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if network %}
+      <table id="table_network" class="mi-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>URL</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in network %}
+        <tr>
+          <td class="whitespace-nowrap">{{item.source}}</td>
+          <td class="font-mono text-mono text-text-secondary cell-wrap">{{item.url}}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No URLs invoked captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end network calls ================================== -->
+
+{# ─────────────────── JSON Data ─────────────────── #}
+<section class="mb-6" id="jsondata">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-code"></i></span>
+      <h2 class="text-h3">JSON Data</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if json %}
+      <table id="table_jsondata" class="mi-table">
+        <thead>
+          <tr>
+            <th>JSON</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in json %}
+        <tr>
+          <td><pre class="font-mono text-mono text-text-secondary text-tiny whitespace-pre-wrap break-all m-0">{{item | pretty_json}}</pre></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No JSON data captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end jsondata ================================== -->
+
+{# ─────────────────── App Logs ─────────────────── #}
+<section class="mb-6" id="logs">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-sticky-note"></i></span>
+      <h2 class="text-h3">App Logs</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if logs %}
+      <table id="table_logs" class="mi-table">
+        <thead>
+          <tr>
+            <th>Logs</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in logs %}
+        <tr>
+          <td class="font-mono text-mono text-text-secondary text-tiny whitespace-pre-wrap break-words">{{item}}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No app logs captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end files ================================== -->
+
+{# ─────────────────── Text Inputs ─────────────────── #}
+<section class="mb-6" id="textinput">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="far fa-keyboard"></i></span>
+      <h2 class="text-h3">Text Inputs</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if textinputs %}
+      <table id="table_textinput" class="mi-table">
+        <thead>
+          <tr>
+            <th>Keystrokes</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in textinputs %}
+        <tr>
+          <td class="font-mono text-mono text-text-secondary text-tiny whitespace-pre-wrap break-words">{{item}}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No text inputs captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end textinputs ================================== -->
+
+{# ─────────────────── Pasteboard ─────────────────── #}
+<section class="mb-6" id="pasteboard">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-clipboard-list"></i></span>
+      <h2 class="text-h3">Pasteboard</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if pasteboard %}
+      <table id="table_textinput" class="mi-table">
+        <thead>
+          <tr>
+            <th>Items in Pasteboard</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in pasteboard %}
+        <tr>
+          <td class="font-mono text-mono text-text-secondary text-tiny whitespace-pre-wrap break-words">{{item}}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No pasteboard data captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end pasteboard ================================== -->
+
+{# ─────────────────── App Cookies ─────────────────── #}
+<section class="mb-6" id="cookies">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-cookie"></i></span>
+      <h2 class="text-h3">App Cookies</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if cookies %}
+      <table id="table_cookies" class="mi-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Value</th>
+            <th>Domain</th>
+            <th>Path</th>
+            <th>Expiry</th>
+            <th>HttpOnly</th>
+            <th>Secure</th>
+            <th>Version</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in cookies %}
+        <tr>
+          <td>{{item.name}}</td>
+          <td class="cell-wrap">{{item.value}}</td>
+          <td>{{item.domain}}</td>
+          <td>{{item.path}}</td>
+          <td class="whitespace-nowrap">{{item.expiry}}</td>
+          <td>{{item.httponly}}</td>
+          <td>{{item.secure}}</td>
+          <td>{{item.version}}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No app cookies captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end cookies ================================== -->
+
+{# ─────────────────── Crypto Operations ─────────────────── #}
+<section class="mb-6" id="crypto">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-lock"></i></span>
+      <h2 class="text-h3">Crypto Operations</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if crypto %}
+      <table id="table_files" class="mi-table">
+        <thead>
+          <tr>
+          </tr>
+        </thead>
+        <tbody>
+      {% for item in crypto %}
+        <tr>
+        {% for k, v in item.items %}
+          {% if v %}
+            <td class="cell-wrap">
+              <strong>{{ k }}: </strong><code><pre class="font-mono text-mono text-text-secondary text-tiny whitespace-pre-wrap break-all m-0"> {{ v | base64_decode | pretty_json}}</pre></code>
+            </td>
+          {% endif %}
+        {% endfor %}
+        </tr>
+      {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No crypto operations captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end crypto ================================== -->
+
+{# ─────────────────── Credential Storage ─────────────────── #}
+<section class="mb-6" id="credentials">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-asterisk"></i></span>
+      <h2 class="text-h3">Credential Storage</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if credentials %}
+      <table id="table_credentials" class="mi-table">
+        <thead>
+          <tr>
+            <th>Host</th>
+            <th>Authentication Method</th>
+            <th>Protocol</th>
+            <th>Port</th>
+            <th>User</th>
+            <th>Password</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in credentials %}
+        <tr>
+          <td class="font-mono text-mono text-text-secondary cell-wrap">{{item.host}}</td>
+          <td>{{item.authenticationMethod}}</td>
+          <td>{{item.protocol}}</td>
+          <td>{{item.port}}</td>
+          <td>{{item.user}}</td>
+          <td class="font-mono text-mono">{{item.password}}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No stored credentials captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end credentials ================================== -->
+
+{# ─────────────────── SQLite Queries ─────────────────── #}
+<section class="mb-6" id="sql">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-database"></i></span>
+      <h2 class="text-h3">SQLite Queries</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if sql %}
+      <table id="table_sql" class="mi-table">
+        <thead>
+          <tr>
+            <th>Queries</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in sql %}
+        <tr>
+          <td class="font-mono text-mono text-text-secondary text-tiny whitespace-pre-wrap break-words">{{item}}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No SQLite queries captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end textinputs ================================== -->
+
+{# ─────────────────── Screenshots ─────────────────── #}
+<section class="mb-6" id="screenshots">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-images"></i></span>
+      <h2 class="text-h3">Screenshots</h2>
+    </div>
+    <div class="card-body">
+      {% if screenshots %}
+      <div class="flex flex-wrap gap-3">
+        {% for i in screenshots %}
+          <img alt="Screenshot" src="{% url 'download' %}{{ i }}" class="img-thumbnail rounded-md" height="300" width="175">
+        {% endfor %}
       </div>
-  </section>
-  
-   <!-- ===========================end jsondata ================================== -->
-  
- <a id="logs" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-sticky-note"></i> APP LOGS</strong>
-             </p>
-              <div class="table-responsive">
-              {% if logs %}
-               <table id="table_logs" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                    <th>LOGS</th>
-                  </tr>
-                </thead>
-               <tbody>
-                {% for item in logs %}
-                <tr>
-                  <td>
-                    {{item}}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
+      {% else %}<p class="text-text-tertiary text-small">No screenshots captured.</p>{% endif %}
     </div>
+  </div>
 </section>
- <!-- ===========================end files ================================== -->
-<a id="textinput" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="far fa-keyboard"></i> TEXT INPUTS</strong>
-             </p>
-              <div class="table-responsive">
-              {% if textinputs %}
-               <table id="table_textinput" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                    <th>KEYSTROKES</th>
-                  </tr>
-                </thead>
-               <tbody>
-                {% for item in textinputs %}
-                <tr>
-                  <td>
-                    {{item}}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
+<!-- ===========================end screenshots ================================== -->
 
- <!-- ===========================end textinputs ================================== -->
- <a id="pasteboard" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-clipboard-list"></i> PASTEBOARD</strong>
-             </p>
-              <div class="table-responsive">
-              {% if pasteboard %}
-               <table id="table_textinput" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                    <th>ITEMS IN PASTEBOARD</th>
-                  </tr>
-                </thead>
-               <tbody>
-                {% for item in pasteboard %}
-                <tr>
-                  <td>
-                    {{item}}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
-
- <!-- ===========================end pasteboard ================================== -->
- <a id="cookies" class="anchor"></a>
- <section class="content">
-   <div class="container-fluid">
-     <div class="row">
-         <div class="col-lg-12">
-         <div class="card">
-           <div class="card-body">
-              <p>
-              <strong><i class="fas fa-cookie"></i> APP COOKIES</strong>
-              </p>
-               <div class="table-responsive">
-               {% if cookies %}
-                <table id="table_cookies" class="table table-bordered table-hover table-striped">
-                 <thead>
-                   <tr>
-                     <th>NAME</th>
-                     <th>VALUE</th>
-                     <th>DOMAIN</th>
-                     <th>PATH</th>
-                     <th>EXPIRY</th>
-                     <th>HTTPONLY</th>
-                     <th>SECURE</th>
-                     <th>VERSION</th>
-                   </tr>
-                 </thead>
-                <tbody>
-                 {% for item in cookies %}
-                 <tr>
-                   <td>
-                     {{item.name}}
-                  </td>
-                  <td>
-                    {{item.value}}
-                  </td>
-                  <td>
-                    {{item.domain}}
-                  </td>
-                  <td>
-                      {{item.path}}
-                  </td>
-                  <td>
-                    {{item.expiry}}
-                 </td>
-                 <td>
-                   {{item.httponly}}
-                 </td>
-                 <td>
-                   {{item.secure}}
-                 </td>
-                 <td>
-                     {{item.version}}
-                 </td>
-
-                 </tr>
-                 {% endfor %}
-               </tbody>
-             </table>
-              {% endif %}
-             </div>
-           </div>
-         </div><!-- /.card -->
-         </div>
-         <!-- end row -->
-         </div>
-     </div>
- </section>
-  <!-- ===========================end cookies ================================== -->
- 
-  <a id="crypto" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-lock"></i> CRYPTO OPERATIONS</strong>
-             </p>
-              <div class="table-responsive">
-              {% if crypto %}
-               <table id="table_files" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                  </tr>
-                </thead>
-               <tbody>
-              {% for item in crypto %}
-                <tr>
-                {% for k, v in item.items %}
-                  {% if v %}
-                    <td>
-                      <strong>{{ k }}: </strong><code><pre> {{ v | base64_decode | pretty_json}}</pre></code>
-                    </td>
-                  {% endif %}
-                {% endfor %}
-                </tr>
-              {% endfor %}
-
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end crypto ================================== -->
-
-  <a id="credentials" class="anchor"></a>
-  <section class="content">
-    <div class="container-fluid">
-      <div class="row">
-          <div class="col-lg-12">
-          <div class="card">
-            <div class="card-body">
-               <p>
-               <strong><i class="fas fa-asterisk"></i> CREDENTIAL STORAGE</strong>
-               </p>
-                <div class="table-responsive">
-                {% if credentials %}
-                 <table id="table_credentials" class="table table-bordered table-hover table-striped">
-                  <thead>
-                    <tr>
-                      <th>HOST</th>
-                      <th>AUTHENTICATION METHOD</th>
-                      <th>PROTOCOL</th>
-                      <th>PORT</th>
-                      <th>USER</th>
-                      <th>PASSWORD</th>
-                    </tr>
-                  </thead>
-                 <tbody>
-                  {% for item in credentials %}
-                  <tr>
-                    <td>
-                      {{item.host}}
-                   </td>
-                   <td>
-                     {{item.authenticationMethod}}
-                   </td>
-                   <td>
-                     {{item.protocol}}
-                   </td>
-                   <td>
-                      {{item.port}}
-                   </td>
-                   <td>
-                     {{item.user}}
-                  </td>
-                  <td>
-                    {{item.password}}
-                  </td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-               {% endif %}
-              </div>
-            </div>
-          </div><!-- /.card -->
-          </div>
-          <!-- end row -->
-          </div>
+{# ─────────────────── Server Locations ─────────────────── #}
+<section class="mb-6" id="serverlocations">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-globe-asia"></i></span>
+      <div>
+        <h2 class="text-h3">Server Locations</h2>
+        <p class="text-tiny text-text-tertiary">Geolocation of contacted endpoints</p>
       </div>
-  </section>
-   <!-- ===========================end credentials ================================== -->
-
-<a id="sql" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-database"></i> SQLITE QUERIES</strong>
-             </p>
-              <div class="table-responsive">
-              {% if sql %}
-               <table id="table_sql" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                    <th>QUERIES</th>
-                  </tr>
-                </thead>
-               <tbody>
-                {% for item in sql %}
-                <tr>
-                  <td>
-                    {{item}}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
     </div>
-</section>
-
- <!-- ===========================end textinputs ================================== -->
-
-<a id="screenshots" class="anchor"></a>
- <section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-              <p>
-             <strong><i class="fas fa-images"></i> SCREENSHOTS</strong>
-             </p>
-               <div >
-                {% for i in screenshots %}
-                  <img alt="Screenshot" src="{% url 'download' %}{{ i }}" class="img-thumbnail" height="300" width="175">
-                {% endfor %}
-              </div>
-              
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
+    <div class="card-body space-y-4">
+      <div id="chartdiv"></div>
+      {% if domains %}
+      <div class="overflow-x-auto">
+        <p class="text-small text-text-secondary mb-2">This app may communicate with the following OFAC sanctioned list of countries.</p>
+        <table id="table_ofac" class="mi-table">
+          <thead>
+            <tr>
+              <th>Domain</th>
+              <th>Country/Region</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for domain, details in domains.items %}
+          {% if details|key:"ofac" == True %}
+          <tr>
+            <td class="font-mono text-mono text-text-secondary">{{domain}}</td>
+            <td>
+              <strong>IP: </strong>{{details|key:"geolocation"|key:"ip"}}<br/>
+              <strong>Country: </strong>{{details|key:"geolocation"|key:"country_long"}}<br/>
+              <strong>Region: </strong>{{details|key:"geolocation"|key:"region"}}<br/>
+              <strong>City: </strong>{{details|key:"geolocation"|key:"city"}}<br/>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </div>
+  </div>
 </section>
- <!-- ===========================end screenshots ================================== -->
+<!-- ===========================end server locations ================================== -->
 
- <style>
-  #chartdiv {
-  width: 100%;
-  height: 500px;
-  overflow: hidden;
-}
-</style>
- <a id="serverlocations" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-            <p>
-             <strong><i class="fas fa-globe-asia"></i> SERVER LOCATIONS</strong>
-             </p>
-              <div class="table-responsive">
-                <div id="chartdiv"></div>
-            </div>
-
-            <div class="table-responsive">
-              {% if domains %}
-              <p></br>This app may communicate with the following OFAC sanctioned list of countries.</p>
-             <table id="table_ofac" class="table table-bordered table-hover table-striped">
-                  <thead>
-                  <tr>
-                     <th>DOMAIN</th>
-                     <th>COUNTRY/REGION</th>
-                  </tr>
-                 </thead>
-                 <tbody>
-                 {% for domain, details in domains.items %}
-                 {% if details|key:"ofac" == True %}
-                  <tr><td>{{domain}}</td>
-                  <td>
-                    <strong>IP: </strong>{{details|key:"geolocation"|key:"ip"}}  <br/>
-                    <strong>Country: </strong>{{details|key:"geolocation"|key:"country_long"}} <br/>
-                    <strong>Region: </strong>{{details|key:"geolocation"|key:"region"}} <br/>
-                    <strong>City: </strong>{{details|key:"geolocation"|key:"city"}} <br/>
-                  </td>
-                  </tr>
-                  {% endif %}
-                  {% endfor %}
-                </tbody>
-            </table>
-             {% endif %}
-            </div>
-  
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
+{# ─────────────────── Domain Malware Check ─────────────────── #}
+<section class="mb-6" id="malware_check">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fab fa-searchengin"></i></span>
+      <h2 class="text-h3">Domain Malware Check</h2>
     </div>
-</section>
- <!-- ===========================end server locations ================================== -->
- <a id="malware_check" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fab fa-searchengin"></i> DOMAIN MALWARE CHECK</strong>
-             </p>
-              <div class="table-responsive">
-              {% if domains %} 
-                <table id="table_malware" class="table table-bordered table-hover table-striped">
-                  <thead>
-                  <tr>
-                     <th>DOMAIN</th>
-                     <th>STATUS</th>
-                     <th>GEOLOCATION</th>
-                  </tr>
-                 </thead>
-                 <tbody>
-                 {% for domain, details in domains.items %}
-                  <tr><td>{{domain}}</td><td> 
-
-                    {% if details|key:"bad" == "yes" %}
-                    <span class="badge bg-danger">malware</span><br/>
-                      <pre>
-                      <strong>URL: </strong>{{details|key:"domain_or_url"}}
-                      <strong>IP: </strong><span class="badge bg-danger">{{details|key:"ip"}}</span>
-                      <strong>Description: </strong>{{details|key:"desc"}}
-                      </pre>
-                  {% else %}
-                    <span class="badge bg-success">good</span><br/>
-                  {% endif %}
-                  </td>
-                  <td>
-                    {% if details|key:"geolocation" %}
-                      <strong>IP: </strong>{{details|key:"geolocation"|key:"ip"}}  <br/>
-                      <strong>Country: </strong>{{details|key:"geolocation"|key:"country_long"}} <br/>
-                      <strong>Region: </strong>{{details|key:"geolocation"|key:"region"}} <br/>
-                      <strong>City: </strong>{{details|key:"geolocation"|key:"city"}} <br/>
-                      <strong>Latitude: </strong>{{details|key:"geolocation"|key:"latitude"}} <br/>
-                      <strong>Longitude: </strong>{{details|key:"geolocation"|key:"longitude"}} <br/>
-                      <strong>View: <a target="_blank" href="http://maps.google.com/maps?q={{details|key:"geolocation"|key:"latitude"}},{{details|key:"geolocation"|key:"longitude"}}">Google Map</a>
-
-                    {% else %}
-                    No Geolocation information available.
-                    {% endif %}
-                  </td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-            </table>    
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
+    <div class="card-body overflow-x-auto">
+      {% if domains %}
+      <table id="table_malware" class="mi-table">
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Status</th>
+            <th>Geolocation</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for domain, details in domains.items %}
+        <tr>
+          <td class="font-mono text-mono text-text-secondary">{{domain}}</td>
+          <td>
+            {% if details|key:"bad" == "yes" %}
+            <span class="mi-badge bg-severity-critical/10 text-severity-critical dark:bg-severity-critical-dark/15 dark:text-severity-critical-dark">malware</span><br/>
+            <pre class="font-mono text-mono text-tiny whitespace-pre-wrap break-all mt-1">
+            <strong>URL: </strong>{{details|key:"domain_or_url"}}
+            <strong>IP: </strong><span class="mi-badge bg-severity-critical/10 text-severity-critical dark:bg-severity-critical-dark/15 dark:text-severity-critical-dark">{{details|key:"ip"}}</span>
+            <strong>Description: </strong>{{details|key:"desc"}}
+            </pre>
+            {% else %}
+            <span class="mi-badge bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark">good</span><br/>
+            {% endif %}
+          </td>
+          <td>
+            {% if details|key:"geolocation" %}
+              <strong>IP: </strong>{{details|key:"geolocation"|key:"ip"}}<br/>
+              <strong>Country: </strong>{{details|key:"geolocation"|key:"country_long"}}<br/>
+              <strong>Region: </strong>{{details|key:"geolocation"|key:"region"}}<br/>
+              <strong>City: </strong>{{details|key:"geolocation"|key:"city"}}<br/>
+              <strong>Latitude: </strong>{{details|key:"geolocation"|key:"latitude"}}<br/>
+              <strong>Longitude: </strong>{{details|key:"geolocation"|key:"longitude"}}<br/>
+              <strong>View: </strong><a class="text-text-brand hover:underline" target="_blank" href="http://maps.google.com/maps?q={{details|key:"geolocation"|key:"latitude"}},{{details|key:"geolocation"|key:"longitude"}}">Google Map</a>
+            {% else %}
+            No Geolocation information available.
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No domains captured.</p>{% endif %}
     </div>
+  </div>
 </section>
- <!-- ===========================end domain malware check ================================== -->
- <a id="urls" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-globe"></i> URLS</strong>
-             </p>
-                {% if urls %} 
-                <div class="list-group">
-                  {% for f in urls %}
-                        {{ f}} <br>
-                  {% endfor %}
+<!-- ===========================end domain malware check ================================== -->
 
-              {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
+{# ─────────────────── URLs ─────────────────── #}
+<section class="mb-6" id="urls">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-globe"></i></span>
+      <h2 class="text-h3">URLs</h2>
     </div>
+    <div class="card-body">
+      {% if urls %}
+      <div class="mono-list font-mono text-mono text-text-secondary">
+        {% for f in urls %}<div>{{ f}}</div>{% endfor %}
+      </div>
+      {% else %}<p class="text-text-tertiary text-small">No URLs captured.</p>{% endif %}
+    </div>
+  </div>
 </section>
- <!-- ===========================end urls ================================== -->
-<a id="emails" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-envelope"></i> EMAILS</strong>
-             </p>
-                 {% if emails %} 
-                <div class="list-group">
-                  {% for f in emails %}
-                        {{ f}} <br>
-                  {% endfor %}
+<!-- ===========================end urls ================================== -->
 
-              {% endif %}
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
+{# ─────────────────── Emails ─────────────────── #}
+<section class="mb-6" id="emails">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-envelope"></i></span>
+      <h2 class="text-h3">Emails</h2>
     </div>
-</section>
- <!-- ===========================end emails ================================== -->
- <a id="trackers" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-user-secret"></i> TRACKERS</strong>
-             </p>
-              <div class="table-responsive">
-              {% if trackers %}
-               <table id="table_trackers" class="table table-bordered table-hover table-striped">
-                <thead>
-                  <tr>
-                    <th>TRACKER NAME</th>
-                    <th>CATEGORIES</th>
-                    <th>URL</th>
-                  </tr>
-                </thead>
-               <tbody>
-                {% for trk in trackers|key:"trackers" %}
-                <tr>
-                  <td>
-                    {{trk.name}}
-                  </td>
-                  <td>
-                    {{trk.categories}}
-                  </td>
-                  <td>
-                    <a target="_blank" href="{{trk.url}}" rel="noopener noreferrer">{{trk.url}}</a>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-             {% endif %}
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
+    <div class="card-body">
+      {% if emails %}
+      <div class="mono-list font-mono text-mono text-text-secondary">
+        {% for f in emails %}<div>{{ f}}</div>{% endfor %}
+      </div>
+      {% else %}<p class="text-text-tertiary text-small">No emails captured.</p>{% endif %}
     </div>
+  </div>
 </section>
- <!-- ===========================end trackers ================================== -->
- <a id="sqlitedb" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-database"></i> SQLITE DATABASE</strong>
-             </p>
-              <div class="table-responsive">
-                    <table class="table table-bordered table-hover table-striped">
-                      <thead>
-                        <tr>
-                          <th>FILES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                     {% for file in sqlite %}
-                     <tr><td><a href="{% url 'dynamic_view_file' %}?file={{file|key:"file"}}&amp;hash={{hash}}&amp;type={{file|key:"type"}}">{{file|key:"file"}}</a></td></tr>
-                    {% endfor %}
-                     </tbody>
-                    </table>
-              </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end sqlite ================================== -->
- <a id="plistfiles" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-file-code"></i> PLIST FILES</strong>
-             </p>
-               <div class="table-responsive">
-                    <table class="table table-bordered table-hover table-striped">
-                      <thead>
-                        <tr>
-                          <th>FILES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                     {% for file in plist %}
-                     <tr><td><a href="{% url 'dynamic_view_file' %}?file={{file|key:"file"}}&amp;hash={{hash}}&amp;type={{file|key:"type"}}">{{file|key:"file"}}</a></td></tr>
-                    {% endfor %}
-                     </tbody>
-                    </table>
-              </div>
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-</section>
- <!-- ===========================end plist files ================================== -->
- <a id="other_files" class="anchor"></a>
-<section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-             <p>
-             <strong><i class="fas fa-file-contract"></i> OTHER FILES</strong>
-             </p>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover table-striped">
-                      <thead>
-                        <tr>
-                          <th>FILES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                     {% for file in others %}
-                     <tr><td><a href="{% url 'dynamic_view_file' %}?file={{file|key:"file"}}&amp;hash={{hash}}&amp;type={{file|key:"type"}}">{{file|key:"file"}}</a></td></tr>
-                    {% endfor %}
-                    </tbody>
-                    </table>
-                </div>
-            </div>
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-</section>
- <!-- ===========================end other files ================================== -->
+<!-- ===========================end emails ================================== -->
 
+{# ─────────────────── Trackers ─────────────────── #}
+<section class="mb-6" id="trackers">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-user-secret"></i></span>
+      <div>
+        <h2 class="text-h3">Trackers</h2>
+        <p class="text-tiny text-text-tertiary">Third-party analytics and advertising signatures</p>
+      </div>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if trackers %}
+      <table id="table_trackers" class="mi-table">
+        <thead>
+          <tr>
+            <th>Tracker Name</th>
+            <th>Categories</th>
+            <th>URL</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for trk in trackers|key:"trackers" %}
+        <tr>
+          <td>{{trk.name}}</td>
+          <td>{{trk.categories}}</td>
+          <td><a class="text-text-brand hover:underline" target="_blank" href="{{trk.url}}" rel="noopener noreferrer">{{trk.url}}</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No trackers detected.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end trackers ================================== -->
 
-<!-- end of contents -->
-</div>
+{# ─────────────────── SQLite Database ─────────────────── #}
+<section class="mb-6" id="sqlitedb">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-database"></i></span>
+      <h2 class="text-h3">SQLite Database</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if sqlite %}
+      <table class="mi-table">
+        <thead>
+          <tr>
+            <th>Files</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for file in sqlite %}
+        <tr><td><a class="text-text-brand hover:underline" href="{% url 'dynamic_view_file' %}?file={{file|key:"file"}}&amp;hash={{hash}}&amp;type={{file|key:"type"}}">{{file|key:"file"}}</a></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No SQLite database files captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end sqlite ================================== -->
+
+{# ─────────────────── Plist Files ─────────────────── #}
+<section class="mb-6" id="plistfiles">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-file-code"></i></span>
+      <h2 class="text-h3">Plist Files</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if plist %}
+      <table class="mi-table">
+        <thead>
+          <tr>
+            <th>Files</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for file in plist %}
+        <tr><td><a class="text-text-brand hover:underline" href="{% url 'dynamic_view_file' %}?file={{file|key:"file"}}&amp;hash={{hash}}&amp;type={{file|key:"type"}}">{{file|key:"file"}}</a></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No plist files captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end plist files ================================== -->
+
+{# ─────────────────── Other Files ─────────────────── #}
+<section class="mb-6" id="other_files">
+  <div class="card mi-glass" data-reveal>
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-file-contract"></i></span>
+      <h2 class="text-h3">Other Files</h2>
+    </div>
+    <div class="card-body overflow-x-auto">
+      {% if others %}
+      <table class="mi-table">
+        <thead>
+          <tr>
+            <th>Files</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for file in others %}
+        <tr><td><a class="text-text-brand hover:underline" href="{% url 'dynamic_view_file' %}?file={{file|key:"file"}}&amp;hash={{hash}}&amp;type={{file|key:"type"}}">{{file|key:"file"}}</a></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-text-tertiary text-small">No other files captured.</p>{% endif %}
+    </div>
+  </div>
+</section>
+<!-- ===========================end other files ================================== -->
 
 
 <!-- Modal -->
-
 <div class="modal fade" id="cat" tabindex="-1" role="dialog" aria-labelledby="catlabel" aria-hidden="true">
-  <div class="modal-dialog modal-xl">
-        <div class="content-header">
-        </div>
-         <div class="container-fluid">
-              <div class="row">
-                  <div class="col-lg-12">
-                  <div class="card">
-                    <div class="card-body">
-                       <div class="box box-default">
-                         <div class="box-body">
-                            <h3 id="cat_title"> </h3>
-                            <br />
-                              <pre id="code_block"></pre>
-                              </div>
-                              <!-- /.box-body -->
-                            </div>
-                </div>
-              </div>
-             </div>
+  <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-content">
+      <div class="modal-header flex items-center justify-between gap-3 px-5 py-4 border-b border-border-subtle">
+        <h3 id="cat_title" class="text-h3 truncate mb-0"></h3>
+        <button type="button" class="text-text-tertiary hover:text-text-primary transition-colors duration-fast" data-dismiss="modal" aria-label="Close">
+          <i class="fas fa-times"></i>
+        </button>
       </div>
-
-
+      <div class="modal-body px-5 py-4">
+        <pre id="code_block" class="font-mono text-mono text-text-secondary text-tiny whitespace-pre-wrap break-all overflow-y-auto m-0" style="max-height:70vh;"></pre>
+      </div>
     </div>
   </div>
 </div>
@@ -1247,4 +1136,54 @@ function action(url, data, on_success){
   }
 
   </script>
+<script>
+  // Presentational-only additions: animated count-up for the KPI tiles, and
+  // active-section highlighting in the sticky report nav while scrolling.
+  // Does not alter any logic above; the existing click handler
+  // ($(".nav-link")...) still runs on click.
+
+  // Animated count-up (same pattern used on the dashboard / Android analyzer).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+
+  (function () {
+    var sections = Array.prototype.slice.call(
+      document.querySelectorAll('.report-nav a.nav-link[href^="#"]')
+    ).map(function (a) {
+      var el = document.getElementById(a.getAttribute('href').slice(1));
+      return el ? { link: a, el: el } : null;
+    }).filter(Boolean);
+    if (!sections.length || typeof IntersectionObserver === 'undefined') return;
+
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var match = sections.find(function (s) { return s.el === entry.target; });
+        if (!match) return;
+        sections.forEach(function (s) { s.link.classList.remove('active'); });
+        match.link.classList.add('active');
+      });
+    }, { rootMargin: '-15% 0px -75% 0px', threshold: 0 });
+
+    sections.forEach(function (s) { io.observe(s.el); });
+  })();
+</script>
 {% endblock %}

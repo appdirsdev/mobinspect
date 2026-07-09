@@ -7,67 +7,44 @@
   only (never into an attribute, href, style, or Alpine-evaluated region).
 {% endcomment %}
 <section id="ai-analysis"
-         class="card mt-8 border border-dashed border-border-strong bg-surface-1"
+         class="card border border-dashed border-border-strong bg-surface-1"
          data-ai-untrusted>
   <div class="card-header flex items-center justify-between">
-    <h2 class="text-h4">AI Security Analysis</h2>
+    <h2 class="text-h3">AI Security Analysis</h2>
     <span class="badge badge-medium text-tiny">AI-generated · unverified</span>
   </div>
-  <div class="p-5 space-y-4">
+  <div class="p-5 space-y-5">
     {% if ai_status == 'running' or ai_status == 'pending' %}
       <p class="text-small text-text-secondary"
          hx-get="/ai/report/{{ checksum }}/"
          hx-trigger="load delay:5s"
          hx-target="#ai-analysis"
          hx-swap="outerHTML">
-        Analyzing findings with the local AI model… this section will update automatically.
+        Analyzing the complete static-analysis results with the local AI model…
+        this section updates automatically.
       </p>
     {% elif ai_status == 'failed' %}
       <p class="text-small text-text-tertiary">
-        AI analysis is currently unavailable. The scan report above is complete and unaffected.
+        AI analysis is currently unavailable. The scan report and score are complete and unaffected.
       </p>
     {% else %}
       <p class="text-tiny text-text-tertiary">
-        Generated locally{% if ai_model %} by {{ ai_model }}{% endif %} from scanned
-        (untrusted) app content. Advisory only — it does not change the security score
-        and may be influenced by a malicious app. Verify against the findings above
-        before acting on it.
+        Generated locally{% if ai_model %} by {{ ai_model }}{% endif %} from the app's
+        complete static-analysis results (untrusted content). Advisory only — it does not
+        change the security score and may be influenced by a malicious app. Verify against
+        the findings before acting on it.
       </p>
 
-      {% if ai_summary %}
-        <div>
-          <h3 class="text-small font-semibold text-text-primary mb-1">Executive summary</h3>
-          <p class="ai-prose text-small text-text-secondary">{{ ai_summary }}</p>
+      {% for s in ai_findings %}
+        <div class="border-l-2 border-border-strong pl-4">
+          <h3 class="text-small font-semibold uppercase tracking-wide text-text-primary mb-1">
+            {{ s.heading }}
+          </h3>
+          <p class="ai-prose text-small text-text-secondary" style="white-space:pre-wrap; word-wrap:break-word;">{{ s.body }}</p>
         </div>
-      {% endif %}
-
-      {% if ai_findings %}
-        <div>
-          <h3 class="text-small font-semibold text-text-primary mb-2">Finding explanations</h3>
-          <div class="space-y-3">
-            {% for f in ai_findings %}
-              <div class="border-l-2 border-border-strong pl-3">
-                <p class="text-small font-medium text-text-primary">
-                  <span class="badge badge-{{ f.severity }} text-tiny">{{ f.severity }}</span>
-                  {{ f.title }}{% if f.cwe %} <span class="text-tiny text-text-tertiary">{{ f.cwe }}</span>{% endif %}
-                </p>
-                <p class="ai-prose text-small text-text-secondary mt-1">{{ f.explanation }}</p>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      {% endif %}
-
-      {% if ai_secrets %}
-        <div>
-          <h3 class="text-small font-semibold text-text-primary mb-1">Secrets triage (advisory)</h3>
-          <p class="ai-prose text-small text-text-secondary">{{ ai_secrets }}</p>
-        </div>
-      {% endif %}
-
-      {% if not ai_summary and not ai_findings and not ai_secrets %}
+      {% empty %}
         <p class="text-small text-text-tertiary">No AI analysis was produced for this scan.</p>
-      {% endif %}
+      {% endfor %}
     {% endif %}
   </div>
 </section>

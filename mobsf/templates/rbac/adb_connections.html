@@ -1,195 +1,257 @@
 {% extends "base/app.html" %}
 {% load mi_icons %}{% load rbac %}
 
+{% block page_title %}Integrations{% endblock %}
+
 {% comment %}
-  Integrations · ADB Connections
-  Wire a remote/network adb device for dynamic analysis through the dashboard
-  instead of the MOBSF_ANALYZER_IDENTIFIER env var. Mutating actions are
-  guarded server-side by @require_permission('settings.manage'); we mirror
-  that here with {% can 'settings.manage' %} so users without it never see the
-  buttons. host_port is validated server-side before any adb invocation.
+  Integrations — four fixed, self-contained cards:
+    • Android device   (adb host:port)     → rbac:device_save 'android'
+    • iOS device       (host:port)         → rbac:device_save 'ios'
+    • AI Generation model   (endpoint+model) → rbac:model_save 'generate'
+    • AI Classification model (endpoint+model) → rbac:model_save 'classify'
+  Each card prefills its stored values (or the env fallback), lets an operator
+  edit + "Save & Test", and re-probe with an inline "Test" button. All mutating
+  routes are guarded server-side by @require_permission('settings.manage');
+  the |can:request filter mirrors that so view-only users get a read-only card.
+  host_port / endpoint are validated (and endpoint enclave-checked) server-side
+  before any adb / HTTP probe runs.
 {% endcomment %}
 
 {% block content %}
-<header class="mb-6">
-  <div class="flex items-center gap-2.5">
-    <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
-      {% icon "smartphone" size=18 %}
+<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-8">
+  <div class="flex items-start gap-3 min-w-0">
+    <span class="w-10 h-10 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+      {% icon "sliders" size=20 %}
     </span>
-    <div>
-      <h1 class="text-h1">Dynamic Analysis · ADB Connections</h1>
-      <p class="text-text-secondary mt-1">
-        Add remote Android devices for dynamic analysis. The active connection
-        is used as the analyzer target; the
-        <code class="code">MOBSF_ANALYZER_IDENTIFIER</code> env var still takes
-        precedence as a fallback for headless setups.
+    <div class="min-w-0">
+      <p class="text-tiny uppercase tracking-wide text-text-tertiary">Configuration</p>
+      <h1 class="text-h1">Integrations</h1>
+      <p class="text-small text-text-secondary mt-0.5 max-w-2xl">
+        Point MobInspect at the external systems it drives — dynamic-analysis
+        devices and local AI model endpoints. Enter each system's address,
+        then test connectivity. Values are stored in the database; environment
+        variables act as headless fallbacks.
       </p>
     </div>
   </div>
+  {% if not 'settings.manage'|can:request %}
+  <span class="badge badge-unknown self-start">{% icon "shield-check" size=12 %} Read-only</span>
+  {% endif %}
 </header>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+{# ═══════════════════════ four fixed integration cards ═══════════════════════ #}
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-  {# ─── add form (only one device may be configured at a time) ─── #}
-  {% can 'settings.manage' %}
-  <div class="lg:col-span-1">
-    {% if connections %}
-    <div class="card">
-      <div class="card-header"><h2 class="text-h3">Add connection</h2></div>
-      <div class="card-body">
-        <div class="flex items-start gap-2.5 text-small text-text-secondary">
-          <span class="text-text-tertiary flex-shrink-0 mt-0.5">{% icon "info" size=16 %}</span>
-          <p>Only one device can be configured at a time. Remove the existing
-          device below to add a different one.</p>
+  {# ─────────────── 1 · Android device ─────────────── #}
+  <div class="card" data-reveal id="card-android">
+    <div class="card-header flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="w-9 h-9 rounded-md bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+          {% icon "smartphone" size=18 %}
+        </span>
+        <div class="min-w-0">
+          <h3 class="text-h4">Android device</h3>
+          <p class="text-tiny text-text-tertiary">Dynamic-analysis target · adb over network</p>
         </div>
       </div>
+      <span data-cell="status">{% include "rbac/_integration_status.html" with status=android.last_status|default:"notset" %}</span>
     </div>
-    {% else %}
-    <div class="card">
-      <div class="card-header"><h2 class="text-h3">Add connection</h2></div>
-      <form method="post" action="{% url 'rbac:adb_connection_add' %}" class="card-body space-y-4">
-        {% csrf_token %}
-        <div>
-          <label class="label" for="id_label">Label</label>
-          <input id="id_label" name="label" type="text" maxlength="80" required
-                 class="input" placeholder="My Emulator" />
-        </div>
-        <div>
-          <label class="label" for="id_host_port">Device address</label>
-          <input id="id_host_port" name="host_port" type="text" maxlength="255" required
-                 class="input font-mono text-mono"
-                 placeholder="192.168.1.100:5555" />
-          <p class="text-tiny text-text-tertiary mt-1">
-            Format <code class="code">host:port</code> or
-            <code class="code">[ipv6]:port</code> (e.g.
-            <code class="code">192.168.1.100:5555</code>).
-          </p>
-        </div>
-        <div>
-          <label class="label" for="id_platform">Platform</label>
-          <select id="id_platform" name="platform" class="input">
-            <option value="android" selected>Android</option>
-            <option value="ios">iOS</option>
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary btn-md w-full">
-          {% icon "plus" size=14 %} Add connection
-        </button>
-      </form>
-    </div>
-    {% endif %}
-  </div>
-  {% endcan %}
-
-  {# ─── list ─── #}
-  <div class="{% if 'settings.manage'|can:request %}lg:col-span-2{% else %}lg:col-span-3{% endif %}">
-    <div class="card">
-      <div class="card-header"><h2 class="text-h3">Configured devices</h2></div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-small">
-          <thead>
-            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-              <th class="text-left px-5 py-2.5 font-medium">Label</th>
-              <th class="text-left px-5 py-2.5 font-medium">Host:Port</th>
-              <th class="text-left px-5 py-2.5 font-medium">Platform</th>
-              <th class="text-left px-5 py-2.5 font-medium">Active</th>
-              <th class="text-left px-5 py-2.5 font-medium">Status</th>
-              <th class="text-left px-5 py-2.5 font-medium">Last checked</th>
-              <th class="text-left px-5 py-2.5 font-medium">Added by</th>
-              <th class="px-5 py-2.5"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for c in connections %}
-              <tr id="adb-row-{{ c.id }}"
-                  class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
-                <td class="px-5 py-3 text-text-primary">{{ c.label }}</td>
-                <td class="px-5 py-3">
-                  <code class="font-mono text-mono text-text-secondary">{{ c.host_port }}</code>
-                </td>
-                <td class="px-5 py-3 text-text-secondary">{{ c.get_platform_display }}</td>
-                <td class="px-5 py-3">
-                  {% if c.is_active %}
-                    <span class="badge badge-passed">{% icon "check" size=12 %} Active</span>
-                  {% else %}
-                    <span class="text-text-tertiary">—</span>
-                  {% endif %}
-                </td>
-                <td class="px-5 py-3" data-cell="status">
-                  {% if c.last_status == 'connected' %}
-                    <span class="badge badge-passed">Connected</span>
-                  {% elif c.last_status == 'failed' %}
-                    <span class="badge badge-critical">Failed</span>
-                  {% elif c.last_status == 'timeout' %}
-                    <span class="badge badge-high">Timeout</span>
-                  {% else %}
-                    <span class="badge badge-unknown">Unknown</span>
-                  {% endif %}
-                </td>
-                <td class="px-5 py-3 text-text-secondary" data-cell="last-checked">
-                  {% if c.last_status_at %}{{ c.last_status_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
-                </td>
-                <td class="px-5 py-3 text-text-secondary">
-                  {% if c.created_by %}{{ c.created_by.username }}{% else %}—{% endif %}
-                </td>
-                <td class="px-5 py-3 text-right whitespace-nowrap">
-                  {% can 'settings.manage' %}
-                    {% if not c.is_active %}
-                      <form method="post" action="{% url 'rbac:adb_connection_set_active' c.id %}" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-ghost btn-sm" title="Use this device for dynamic analysis">
-                          {% icon "zap" size=14 %} Set active
-                        </button>
-                      </form>
-                    {% endif %}
-                    <button type="button"
-                            class="btn btn-ghost btn-sm js-adb-test"
-                            data-url="{% url 'rbac:adb_connection_test' c.id %}"
-                            data-row="adb-row-{{ c.id }}"
-                            title="Run adb connect + adb devices">
-                      {% icon "activity" size=14 %} <span class="js-adb-test-label">Test</span>
-                    </button>
-                    <form method="post" action="{% url 'rbac:adb_connection_remove' c.id %}"
-                          onsubmit="return confirm('Remove connection &quot;{{ c.label|escapejs }}&quot;?');"
-                          class="inline">
-                      {% csrf_token %}
-                      <button type="submit" class="btn btn-ghost btn-sm text-system-error" title="Delete connection">
-                        {% icon "trash" size=14 %} Remove
-                      </button>
-                    </form>
-                  {% endcan %}
-                  {% if not 'settings.manage'|can:request %}
-                    <span class="text-text-tertiary">—</span>
-                  {% endif %}
-                </td>
-              </tr>
-            {% empty %}
-              <tr>
-                <td colspan="8" class="px-5 py-12 text-center">
-                  <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-2 text-text-tertiary mx-auto">
-                    {% icon "smartphone" size=24 %}
-                  </div>
-                  <h3 class="text-h3 mt-3">No connections configured</h3>
-                  <p class="text-text-secondary mt-1">
-                    Add a remote device on the left to make it available for dynamic analysis.
-                  </p>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+    <form method="post" action="{% url 'rbac:device_save' 'android' %}" class="card-body space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="label" for="id_android_host">Device address</label>
+        <input id="id_android_host" name="host_port" type="text" maxlength="255"
+               class="input font-mono text-mono"
+               value="{{ android.host_port|default:android_identifier_default }}"
+               placeholder="192.168.1.100:5555"
+               {% if not 'settings.manage'|can:request %}disabled{% endif %} />
+        <p class="text-tiny text-text-tertiary mt-1">
+          <code class="code">host:port</code> or <code class="code">[ipv6]:port</code>.
+          Runs <code class="code">adb connect</code> on test.
+        </p>
       </div>
-    </div>
+      <div class="flex items-center justify-between gap-2 pt-1">
+        <span class="text-tiny text-text-tertiary" data-cell="last-checked">
+          {% if android.last_status_at %}Checked {{ android.last_status_at|date:"Y-m-d H:i" }}{% else %}Never tested{% endif %}
+        </span>
+        {% can 'settings.manage' %}
+        <div class="flex gap-2 flex-shrink-0">
+          <button type="button" class="btn btn-secondary btn-sm js-int-test"
+                  data-url="{% url 'rbac:device_test' 'android' %}" data-card="card-android">
+            {% icon "activity" size=14 %} <span class="js-int-test-label">Test</span>
+          </button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            {% icon "check" size=14 %} Save &amp; Test
+          </button>
+        </div>
+        {% endcan %}
+      </div>
+    </form>
   </div>
+
+  {# ─────────────── 2 · iOS device ─────────────── #}
+  <div class="card" data-reveal id="card-ios">
+    <div class="card-header flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="w-9 h-9 rounded-md bg-text-secondary/15 text-text-secondary inline-flex items-center justify-center flex-shrink-0">
+          {% icon "smartphone" size=18 %}
+        </span>
+        <div class="min-w-0">
+          <h3 class="text-h4">iOS device</h3>
+          <p class="text-tiny text-text-tertiary">Dynamic-analysis target · SSH host:port</p>
+        </div>
+      </div>
+      <span data-cell="status">{% include "rbac/_integration_status.html" with status=ios.last_status|default:"notset" %}</span>
+    </div>
+    <form method="post" action="{% url 'rbac:device_save' 'ios' %}" class="card-body space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="label" for="id_ios_host">Device address</label>
+        <input id="id_ios_host" name="host_port" type="text" maxlength="255"
+               class="input font-mono text-mono"
+               value="{{ ios.host_port }}"
+               placeholder="192.168.1.120:22"
+               {% if not 'settings.manage'|can:request %}disabled{% endif %} />
+        <p class="text-tiny text-text-tertiary mt-1">
+          <code class="code">host:port</code> of the jailbroken device / iOS runner.
+        </p>
+      </div>
+      <div class="flex items-center justify-between gap-2 pt-1">
+        <span class="text-tiny text-text-tertiary" data-cell="last-checked">
+          {% if ios.last_status_at %}Checked {{ ios.last_status_at|date:"Y-m-d H:i" }}{% else %}Never tested{% endif %}
+        </span>
+        {% can 'settings.manage' %}
+        <div class="flex gap-2 flex-shrink-0">
+          <button type="button" class="btn btn-secondary btn-sm js-int-test"
+                  data-url="{% url 'rbac:device_test' 'ios' %}" data-card="card-ios">
+            {% icon "activity" size=14 %} <span class="js-int-test-label">Test</span>
+          </button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            {% icon "check" size=14 %} Save &amp; Test
+          </button>
+        </div>
+        {% endcan %}
+      </div>
+    </form>
+  </div>
+
+  {# ─────────────── 3 · AI Generation model ─────────────── #}
+  <div class="card" data-reveal id="card-generate">
+    <div class="card-header flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="w-9 h-9 rounded-md bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+          {% icon "zap" size=18 %}
+        </span>
+        <div class="min-w-0">
+          <h3 class="text-h4">AI · Generation model</h3>
+          <p class="text-tiny text-text-tertiary">Writes the AI Dashboard report</p>
+        </div>
+      </div>
+      <span data-cell="status">{% include "rbac/_integration_status.html" with status=gen_model.last_status|default:"notset" %}</span>
+    </div>
+    <form method="post" action="{% url 'rbac:model_save' 'generate' %}" class="card-body space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="label" for="id_gen_url">Endpoint URL</label>
+        <input id="id_gen_url" name="base_url" type="text" maxlength="255"
+               class="input font-mono text-mono"
+               value="{{ gen_model.base_url|default:ai_base_url_default }}"
+               placeholder="http://127.0.0.1:11434"
+               {% if not 'settings.manage'|can:request %}disabled{% endif %} />
+        <p class="text-tiny text-text-tertiary mt-1">
+          <code class="code">http(s)://host:port</code> — must be a loopback / private (in-enclave) host.
+        </p>
+      </div>
+      <div>
+        <label class="label" for="id_gen_model">Model</label>
+        <input id="id_gen_model" name="model_name" type="text" maxlength="128"
+               class="input font-mono text-mono"
+               value="{{ gen_model.model_name|default:gen_model_default }}"
+               placeholder="granite4:3b"
+               {% if not 'settings.manage'|can:request %}disabled{% endif %} />
+      </div>
+      <div class="flex items-center justify-between gap-2 pt-1">
+        <span class="text-tiny text-text-tertiary" data-cell="last-checked">
+          {% if gen_model.last_status_at %}Checked {{ gen_model.last_status_at|date:"Y-m-d H:i" }}{% else %}Never tested{% endif %}
+        </span>
+        {% can 'settings.manage' %}
+        <div class="flex gap-2 flex-shrink-0">
+          <button type="button" class="btn btn-secondary btn-sm js-int-test"
+                  data-url="{% url 'rbac:model_test' 'generate' %}" data-card="card-generate">
+            {% icon "activity" size=14 %} <span class="js-int-test-label">Test</span>
+          </button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            {% icon "check" size=14 %} Save &amp; Test
+          </button>
+        </div>
+        {% endcan %}
+      </div>
+    </form>
+  </div>
+
+  {# ─────────────── 4 · AI Classification model ─────────────── #}
+  <div class="card" data-reveal id="card-classify">
+    <div class="card-header flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="w-9 h-9 rounded-md bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+          {% icon "sliders" size=18 %}
+        </span>
+        <div class="min-w-0">
+          <h3 class="text-h4">AI · Classification model</h3>
+          <p class="text-tiny text-text-tertiary">Short, structured triage calls</p>
+        </div>
+      </div>
+      <span data-cell="status">{% include "rbac/_integration_status.html" with status=classify_model.last_status|default:"notset" %}</span>
+    </div>
+    <form method="post" action="{% url 'rbac:model_save' 'classify' %}" class="card-body space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="label" for="id_clf_url">Endpoint URL</label>
+        <input id="id_clf_url" name="base_url" type="text" maxlength="255"
+               class="input font-mono text-mono"
+               value="{{ classify_model.base_url|default:ai_base_url_default }}"
+               placeholder="http://127.0.0.1:11434"
+               {% if not 'settings.manage'|can:request %}disabled{% endif %} />
+        <p class="text-tiny text-text-tertiary mt-1">
+          <code class="code">http(s)://host:port</code> — must be a loopback / private (in-enclave) host.
+        </p>
+      </div>
+      <div>
+        <label class="label" for="id_clf_model">Model</label>
+        <input id="id_clf_model" name="model_name" type="text" maxlength="128"
+               class="input font-mono text-mono"
+               value="{{ classify_model.model_name|default:classify_model_default }}"
+               placeholder="granite4:3b"
+               {% if not 'settings.manage'|can:request %}disabled{% endif %} />
+      </div>
+      <div class="flex items-center justify-between gap-2 pt-1">
+        <span class="text-tiny text-text-tertiary" data-cell="last-checked">
+          {% if classify_model.last_status_at %}Checked {{ classify_model.last_status_at|date:"Y-m-d H:i" }}{% else %}Never tested{% endif %}
+        </span>
+        {% can 'settings.manage' %}
+        <div class="flex gap-2 flex-shrink-0">
+          <button type="button" class="btn btn-secondary btn-sm js-int-test"
+                  data-url="{% url 'rbac:model_test' 'classify' %}" data-card="card-classify">
+            {% icon "activity" size=14 %} <span class="js-int-test-label">Test</span>
+          </button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            {% icon "check" size=14 %} Save &amp; Test
+          </button>
+        </div>
+        {% endcan %}
+      </div>
+    </form>
+  </div>
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script defer>
-  // Progressive enhancement: the Test button POSTs to the test endpoint and
-  // patches the row's status / last-checked cells in place. The server
-  // enforces permissions and input validation; this is presentation only.
-  // The button is only rendered for users with settings.manage.
+  // Inline "Test" — POSTs to the key-based test endpoint and patches this card's
+  // status pill + last-checked line in place. Server enforces permission +
+  // validation; this is presentation only, and the button only renders for
+  // users with settings.manage.
   document.addEventListener('DOMContentLoaded', function () {
     function toast(msg) {
       var region = document.getElementById('mi-toasts');
@@ -210,7 +272,7 @@
         failed:    ['badge badge-critical', 'Failed'],
         timeout:   ['badge badge-high', 'Timeout'],
       };
-      var spec = map[status] || ['badge badge-unknown', 'Unknown'];
+      var spec = map[status] || ['badge badge-unknown', 'Untested'];
       var span = document.createElement('span');
       span.className = spec[0];
       span.textContent = spec[1];
@@ -222,11 +284,11 @@
       return input ? input.value : '';
     }
 
-    document.querySelectorAll('.js-adb-test').forEach(function (btn) {
+    document.querySelectorAll('.js-int-test').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var url = btn.getAttribute('data-url');
-        var row = document.getElementById(btn.getAttribute('data-row'));
-        var label = btn.querySelector('.js-adb-test-label');
+        var card = document.getElementById(btn.getAttribute('data-card'));
+        var label = btn.querySelector('.js-int-test-label');
         var original = label ? label.textContent : 'Test';
         if (label) { label.textContent = 'Testing…'; }
         btn.disabled = true;
@@ -241,16 +303,16 @@
         })
           .then(function (r) { return r.json(); })
           .then(function (data) {
-            if (row) {
-              var statusCell = row.querySelector('[data-cell="status"]');
+            if (card) {
+              var statusCell = card.querySelector('[data-cell="status"]');
               if (statusCell && data.status) {
                 statusCell.innerHTML = '';
                 statusCell.appendChild(badge(data.status));
               }
-              var checkedCell = row.querySelector('[data-cell="last-checked"]');
+              var checkedCell = card.querySelector('[data-cell="last-checked"]');
               if (checkedCell && data.last_status_at) {
                 checkedCell.textContent =
-                  data.last_status_at.replace('T', ' ').slice(0, 16);
+                  'Checked ' + data.last_status_at.replace('T', ' ').slice(0, 16);
               }
             }
             toast((data.success ? 'Connected: ' : 'Test failed: ') +

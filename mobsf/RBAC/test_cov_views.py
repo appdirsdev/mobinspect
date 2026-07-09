@@ -444,7 +444,10 @@ def test_adb_connections_list_ok(su_client):
         platform=AdbConnection.PLATFORM_ANDROID)
     resp = su_client.get(reverse('rbac:adb_connections'))
     assert resp.status_code == 200
-    assert b'Cov Emu' in resp.content
+    # The Integrations page is now four fixed cards (no listing table); the
+    # configured Android device prefills its host:port into the Android card.
+    assert b'Android device' in resp.content
+    assert b'127.0.0.1:5555' in resp.content
 
 
 @pytest.mark.django_db

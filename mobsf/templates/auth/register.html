@@ -3,153 +3,399 @@
 
 {% block page_title %}Create user{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* ── Ambient header: soft brand glow + faint grid, theme-aware ── */
+  .mi-auth-hero { background: var(--surface-1); }
+  .mi-auth-glow, .mi-auth-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-auth-glow::before {
+    content: ''; position: absolute; border-radius: 9999px; filter: blur(60px); opacity: .5;
+    width: 280px; height: 280px; top: -110px; right: -60px;
+    background: radial-gradient(circle at center, rgba(254,74,35,.5), transparent 70%);
+    animation: mi-auth-float 16s ease-in-out infinite;
+  }
+  .mi-auth-glow::after {
+    content: ''; position: absolute; border-radius: 9999px; filter: blur(60px); opacity: .35;
+    width: 220px; height: 220px; bottom: -120px; left: 8%;
+    background: radial-gradient(circle at center, rgba(141,92,252,.4), transparent 70%);
+    animation: mi-auth-float 20s ease-in-out infinite reverse;
+  }
+  .mi-auth-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .4;
+    -webkit-mask-image: radial-gradient(ellipse 70% 100% at 100% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 100% at 100% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-auth-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-auth-glow::after  { opacity: .26; }
+
+  /* ── Role quick-pick pills (mirror the real <select> options) ── */
+  .mi-role-pill {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .3rem .65rem; border-radius: 9999px;
+    font-size: .72rem; font-weight: 500; line-height: 1;
+    border: 1px solid var(--border-subtle); color: var(--text-secondary);
+    background: var(--surface-1);
+    transition: border-color .15s ease, color .15s ease, background .15s ease, transform .15s ease;
+  }
+  .mi-role-pill:hover { border-color: var(--border-default); color: var(--text-primary); transform: translateY(-1px); }
+  .mi-role-pill.is-active { border-color: #FE4A23; color: #FE4A23; background: rgba(254,74,35,.1); }
+
+  /* ── Preview / recap card: accent bar + gentle lift ── */
+  .mi-recap { position: relative; overflow: hidden; transition: transform .18s ease, box-shadow .18s ease; }
+  .mi-recap:hover { transform: translateY(-2px); box-shadow: 0 14px 34px -18px rgba(0,0,0,.35); }
+  .mi-recap::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #8D5CFC, transparent 85%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-auth-glow::before, .mi-auth-glow::after { animation: none; }
+    .mi-role-pill, .mi-recap { transition: none; }
+  }
+  @keyframes mi-auth-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-18px,0); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<header class="mb-6">
-  <a href="{% url 'users' %}" class="text-small text-text-secondary hover:text-text-primary inline-flex items-center gap-1">
-    {% icon "chevron-left" size=14 %} All users
-  </a>
-  <h1 class="text-h1 mt-2">Create user</h1>
-  <p class="text-text-secondary mt-1">
-    The new account starts with a single base role. Finer-grained role
-    assignment is available from the <a href="{% url 'users' %}" class="text-text-brand hover:underline">Users page</a> after creation.
-  </p>
-</header>
+<div class="max-w-5xl mx-auto space-y-6" x-data="createUserForm()">
 
-<div class="max-w-xl">
-  <div class="card">
-    <form method="post" class="card-body space-y-4" autocomplete="off">
-      {% csrf_token %}
-
-      {% if messages %}
-        {% for message in messages %}
-          <div class="px-3 py-2 rounded-md text-small border
-                      {% if message.tags == 'error' %}bg-system-error/10 text-system-error border-system-error/30
-                      {% elif message.tags == 'success' %}bg-system-success/10 text-system-success border-system-success/30
-                      {% else %}bg-system-info/10 text-system-info border-system-info/30{% endif %}">
-            {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
-
-      {% if form.non_field_errors %}
-        <div class="px-3 py-2 rounded-md text-small bg-system-error/10 text-system-error border border-system-error/30">
-          {{ form.non_field_errors }}
+  {# ══════════════════ Ambient header ══════════════════ #}
+  <header class="mi-auth-hero card mi-glass relative overflow-hidden p-0" data-reveal>
+    <div class="mi-auth-grid" aria-hidden="true"></div>
+    <div class="mi-auth-glow" aria-hidden="true"></div>
+    <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-6 md:px-8">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="w-11 h-11 rounded-xl bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0 shadow-elevation-1">
+          {% icon "user" size=20 %}
+        </span>
+        <div class="min-w-0">
+          <a href="{% url 'users' %}" class="text-tiny uppercase tracking-wide text-text-tertiary hover:text-text-secondary inline-flex items-center gap-1 transition-colors duration-fast">
+            {% icon "chevron-left" size=12 %} All users
+          </a>
+          <h1 class="text-h1">Create user</h1>
+          <p class="text-small text-text-secondary mt-0.5 max-w-xl">
+            The new account starts with a single base role. Finer-grained role
+            assignment is available from the <a href="{% url 'users' %}" class="text-text-brand hover:underline">Users page</a> after creation.
+          </p>
         </div>
-      {% endif %}
-
-      <div>
-        <label class="label" for="id_username">Username</label>
-        <div class="relative">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
-            {% icon "user" size=16 %}
-          </span>
-          <input
-            id="id_username" type="text" name="username"
-            maxlength="150" required autofocus
-            class="input pl-9"
-            placeholder="analyst"
-            aria-describedby="id_username_helptext"
-          />
-        </div>
-        {% for err in form.username.errors %}
-          <p class="text-tiny text-system-error mt-1">{{ err }}</p>
-        {% endfor %}
       </div>
-
-      <div>
-        <label class="label" for="id_email">Email</label>
-        <div class="relative">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
-            {% icon "info" size=16 %}
-          </span>
-          <input
-            id="id_email" type="email" name="email"
-            maxlength="254" required
-            class="input pl-9"
-            placeholder="analyst@example.com"
-          />
-        </div>
-        {% for err in form.email.errors %}
-          <p class="text-tiny text-system-error mt-1">{{ err }}</p>
-        {% endfor %}
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="badge badge-unknown gap-1.5">{% icon "shield-check" size=12 %} RBAC-enforced</span>
+        <span class="badge badge-passed gap-1.5">{% icon "activity" size=12 %} Audit logged</span>
       </div>
+    </div>
+  </header>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="label" for="id_password1">Password</label>
-          <div class="relative" x-data="{ show: false }">
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
-              {% icon "lock" size=16 %}
-            </span>
-            <input
-              id="id_password1"
-              :type="show ? 'text' : 'password'"
-              name="password1"
-              autocomplete="new-password" required
-              class="input pl-9 pr-10"
-            />
-            <button type="button"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors"
-                    @click="show = !show" aria-label="Toggle password visibility">
-              <span x-show="!show">{% icon "eye" size=16 %}</span>
-              <span x-show="show" x-cloak>{% icon "eye-off" size=16 %}</span>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+    {# ══════════════════ Form column ══════════════════ #}
+    <div class="lg:col-span-2">
+      <div class="card mi-glass" data-reveal>
+        <div class="card-header">
+          <h3 class="text-h3">Account details</h3>
+        </div>
+        <form method="post" class="card-body space-y-6" autocomplete="off">
+          {% csrf_token %}
+
+          {% if messages %}
+            <div class="space-y-2">
+              {% for message in messages %}
+                <div class="flex items-start gap-2 px-3 py-2 rounded-md text-small border
+                            {% if message.tags == 'error' %}bg-system-error/10 text-system-error border-system-error/30
+                            {% elif message.tags == 'success' %}bg-system-success/10 text-system-success border-system-success/30
+                            {% else %}bg-system-info/10 text-system-info border-system-info/30{% endif %}">
+                  <span class="flex-shrink-0 mt-0.5">
+                    {% if message.tags == 'error' %}{% icon "alert-triangle" size=14 %}
+                    {% elif message.tags == 'success' %}{% icon "circle-check" size=14 %}
+                    {% else %}{% icon "info" size=14 %}{% endif %}
+                  </span>
+                  <span>{{ message }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if form.non_field_errors %}
+            <div class="flex items-start gap-2 px-3 py-2 rounded-md text-small bg-system-error/10 text-system-error border border-system-error/30">
+              <span class="flex-shrink-0 mt-0.5">{% icon "alert-triangle" size=14 %}</span>
+              <span>{{ form.non_field_errors }}</span>
+            </div>
+          {% endif %}
+
+          {# ── Identity ── #}
+          <fieldset class="space-y-4">
+            <legend class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-1 inline-flex items-center gap-1.5">
+              {% icon "user" size=12 %} Identity
+            </legend>
+
+            <div>
+              <label class="label" for="id_username">Username</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+                  {% icon "user" size=16 %}
+                </span>
+                <input
+                  id="id_username" type="text" name="username"
+                  maxlength="150" required autofocus
+                  class="input pl-9"
+                  placeholder="analyst"
+                  aria-describedby="id_username_helptext"
+                  @input="username = $event.target.value"
+                />
+              </div>
+              <p id="id_username_helptext" class="text-tiny text-text-tertiary mt-1">Used to sign in — letters, numbers, and safe symbols only.</p>
+              {% for err in form.username.errors %}
+                <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+              {% endfor %}
+            </div>
+
+            <div>
+              <label class="label" for="id_email">Email</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+                  {% icon "info" size=16 %}
+                </span>
+                <input
+                  id="id_email" type="email" name="email"
+                  maxlength="254" required
+                  class="input pl-9"
+                  placeholder="analyst@example.com"
+                  @input="email = $event.target.value"
+                />
+              </div>
+              {% for err in form.email.errors %}
+                <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+              {% endfor %}
+            </div>
+          </fieldset>
+
+          {# ── Security ── #}
+          <fieldset class="space-y-4 pt-4 border-t border-border-subtle">
+            <legend class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-1 inline-flex items-center gap-1.5">
+              {% icon "lock" size=12 %} Security
+            </legend>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="label" for="id_password1">Password</label>
+                <div class="relative" x-data="{ show: false }">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+                    {% icon "lock" size=16 %}
+                  </span>
+                  <input
+                    id="id_password1"
+                    :type="show ? 'text' : 'password'"
+                    name="password1"
+                    autocomplete="new-password" required
+                    class="input pl-9 pr-10"
+                    @input="pw1 = $event.target.value"
+                  />
+                  <button type="button"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors"
+                          @click="show = !show" aria-label="Toggle password visibility">
+                    <span x-show="!show">{% icon "eye" size=16 %}</span>
+                    <span x-show="show" x-cloak>{% icon "eye-off" size=16 %}</span>
+                  </button>
+                </div>
+                {% for err in form.password1.errors %}
+                  <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+                {% endfor %}
+                {# live strength meter — presentational only, does not gate submission #}
+                <div class="mt-2" x-show="pw1.length > 0" x-cloak>
+                  <span class="block w-full bg-surface-2 rounded-full h-1.5 overflow-hidden">
+                    <span class="block h-full rounded-full transition-[width] duration-fast"
+                          :style="`width:${pwStrength().pct}%; background:${pwStrength().color}`"></span>
+                  </span>
+                  <p class="text-tiny mt-1 font-medium" :style="`color:${pwStrength().color}`" x-text="pwStrength().label"></p>
+                </div>
+              </div>
+
+              <div>
+                <label class="label" for="id_password2">Confirm password</label>
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+                    {% icon "lock" size=16 %}
+                  </span>
+                  <input
+                    id="id_password2" type="password" name="password2"
+                    autocomplete="new-password" required
+                    class="input pl-9 pr-9"
+                    @input="pw2 = $event.target.value"
+                  />
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-severity-passed" x-show="pw2.length > 0 && pw1 === pw2" x-cloak>
+                    {% icon "check" size=16 %}
+                  </span>
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-severity-medium" x-show="pw2.length > 0 && pw1 !== pw2" x-cloak>
+                    {% icon "x" size=16 %}
+                  </span>
+                </div>
+                {% for err in form.password2.errors %}
+                  <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+                {% endfor %}
+                <p class="text-tiny mt-1 text-severity-medium" x-show="pw2.length > 0 && pw1 !== pw2" x-cloak>Passwords do not match yet.</p>
+              </div>
+            </div>
+
+            {% if form.password1.help_text %}
+              <details class="text-tiny text-text-tertiary">
+                <summary class="cursor-pointer text-text-secondary hover:text-text-primary inline-flex items-center gap-1">
+                  {% icon "info" size=12 %} Password requirements
+                </summary>
+                <div class="mt-2 pl-4 prose-tiny">{{ form.password1.help_text|safe }}</div>
+              </details>
+            {% endif %}
+          </fieldset>
+
+          {# ── Access ── #}
+          <fieldset class="space-y-3 pt-4 border-t border-border-subtle">
+            <legend class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-1 inline-flex items-center gap-1.5">
+              {% icon "key" size=12 %} Access
+            </legend>
+
+            <div>
+              <label class="label" for="id_role">Initial role</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none z-10">
+                  {% icon "key" size=16 %}
+                </span>
+                <select id="id_role" name="role" required class="input pl-9"
+                        x-model="role" @change="onRoleChange($event)">
+                  <option value="" disabled selected>Select role</option>
+                  {% for value, label in form.fields.role.choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              {% for err in form.role.errors %}
+                <p class="text-tiny text-system-error mt-1">{{ err }}</p>
+              {% endfor %}
+
+              {% if form.fields.role.choices %}
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                  {% for value, label in form.fields.role.choices %}
+                    <button type="button"
+                            class="mi-role-pill"
+                            :class="role === '{{ value|escapejs }}' ? 'is-active' : ''"
+                            @click="selectRole('{{ value|escapejs }}', '{{ label|escapejs }}')">
+                      {% icon "shield" size=11 %} {{ label }}
+                    </button>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              <p class="text-tiny text-text-tertiary mt-2">
+                Additional roles can be granted from the Users page after creating this account.
+              </p>
+            </div>
+          </fieldset>
+
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+            <a href="{% url 'users' %}" class="btn btn-ghost btn-md">Cancel</a>
+            <button type="submit" class="mi-pillbtn btn btn-md">
+              {% icon "user" size=14 %} Create user
             </button>
           </div>
-          {% for err in form.password1.errors %}
-            <p class="text-tiny text-system-error mt-1">{{ err }}</p>
-          {% endfor %}
-        </div>
+        </form>
+      </div>
+    </div>
 
-        <div>
-          <label class="label" for="id_password2">Confirm password</label>
-          <div class="relative">
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
-              {% icon "lock" size=16 %}
-            </span>
-            <input
-              id="id_password2" type="password" name="password2"
-              autocomplete="new-password" required
-              class="input pl-9"
-            />
+    {# ══════════════════ Sidebar: live preview + info ══════════════════ #}
+    <div class="space-y-4 lg:sticky lg:top-6">
+
+      <div class="card mi-recap mi-glass" data-reveal>
+        <div class="card-header">
+          <h3 class="text-h4">Preview</h3>
+        </div>
+        <div class="card-body space-y-3">
+          <div class="flex items-center gap-3">
+            <span class="w-10 h-10 rounded-full bg-chart-violet/15 text-text-primary flex items-center justify-center font-semibold text-small flex-shrink-0"
+                  x-text="(username ? username.slice(0,1).toUpperCase() : '?')"></span>
+            <div class="min-w-0">
+              <p class="font-medium text-text-primary truncate" x-text="username || 'New account'"></p>
+              <p class="text-tiny text-text-tertiary truncate" x-text="email || 'no email yet'"></p>
+            </div>
           </div>
-          {% for err in form.password2.errors %}
-            <p class="text-tiny text-system-error mt-1">{{ err }}</p>
-          {% endfor %}
+          <div class="flex items-center gap-2 flex-wrap pt-3 border-t border-border-subtle">
+            <span class="text-tiny text-text-tertiary uppercase">Role</span>
+            <span class="badge badge-unknown" x-show="!role" x-cloak>Not selected</span>
+            <span class="badge badge-low gap-1" x-show="role" x-cloak>
+              {% icon "key" size=10 %} <span x-text="roleLabelText"></span>
+            </span>
+          </div>
         </div>
       </div>
 
-      <div>
-        <label class="label" for="id_role">Initial role</label>
-        <select id="id_role" name="role" required class="input">
-          <option value="" disabled selected>Select role</option>
-          {% for value, label in form.fields.role.choices %}
-            <option value="{{ value }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-        {% for err in form.role.errors %}
-          <p class="text-tiny text-system-error mt-1">{{ err }}</p>
-        {% endfor %}
-        <p class="text-tiny text-text-tertiary mt-1">
-          Additional roles can be granted from the Users page after creating this account.
-        </p>
+      <div class="card mi-glass" data-reveal>
+        <div class="card-header">
+          <h3 class="text-h4">About this action</h3>
+        </div>
+        <div class="card-body">
+          <ul class="space-y-3 text-small text-text-secondary">
+            <li class="flex items-start gap-2">
+              <span class="text-severity-passed flex-shrink-0 mt-0.5">{% icon "circle-check" size=14 %}</span>
+              Account creation is recorded in the audit log with the granting admin and assigned role.
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-severity-passed flex-shrink-0 mt-0.5">{% icon "circle-check" size=14 %}</span>
+              Passwords are validated against the configured password policy before the account is saved.
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-severity-passed flex-shrink-0 mt-0.5">{% icon "circle-check" size=14 %}</span>
+              The selected role is mirrored to a backing permission group for legacy scan-permission checks.
+            </li>
+          </ul>
+        </div>
       </div>
 
-      {% if form.password1.help_text %}
-        <details class="text-tiny text-text-tertiary">
-          <summary class="cursor-pointer text-text-secondary hover:text-text-primary inline-flex items-center gap-1">
-            {% icon "info" size=12 %} Password requirements
-          </summary>
-          <div class="mt-2 pl-4 prose-tiny">{{ form.password1.help_text|safe }}</div>
-        </details>
-      {% endif %}
-
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
-        <a href="{% url 'users' %}" class="btn btn-ghost btn-md">Cancel</a>
-        <button type="submit" class="btn btn-primary btn-md">
-          {% icon "user" size=14 %} Create user
-        </button>
-      </div>
-    </form>
+    </div>
   </div>
 </div>
+
+<script>
+  // Presentational-only enhancement layer: password strength meter, live
+  // match indicator, role quick-pick pills and a live preview card. Reads
+  // the same fields the form already submits — it never alters field
+  // names/ids, validation, or submission behavior.
+  function createUserForm() {
+    return {
+      username: '',
+      email: '',
+      pw1: '',
+      pw2: '',
+      role: '',
+      roleLabelText: '',
+      selectRole(value, label) {
+        this.role = value;
+        this.roleLabelText = label;
+      },
+      onRoleChange(ev) {
+        const opt = ev.target.selectedOptions && ev.target.selectedOptions[0];
+        this.roleLabelText = opt ? opt.textContent : '';
+      },
+      pwStrength() {
+        const v = this.pw1 || '';
+        let score = 0;
+        if (v.length >= 8) score++;
+        if (v.length >= 12) score++;
+        if (/[a-z]/.test(v) && /[A-Z]/.test(v)) score++;
+        if (/\d/.test(v)) score++;
+        if (/[^A-Za-z0-9]/.test(v)) score++;
+        const levels = [
+          { pct: 20, color: '#DC2626', label: 'Very weak' },
+          { pct: 40, color: '#EA580C', label: 'Weak' },
+          { pct: 60, color: '#D97706', label: 'Fair' },
+          { pct: 80, color: '#2563EB', label: 'Good' },
+          { pct: 100, color: '#16A34A', label: 'Strong' },
+        ];
+        return levels[Math.min(score, levels.length - 1)];
+      },
+    };
+  }
+</script>
 {% endblock %}

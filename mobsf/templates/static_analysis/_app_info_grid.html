@@ -5,28 +5,165 @@
         target_sdk, min_sdk, max_sdk, version_name, version_code,
         app_type (Android), and platform-specific extras through {% block info_extras %}.
 {% endcomment %}
+<style>
+  /* Scoped, namespaced helpers for this fragment — hand-authored so they
+     render correctly even against a not-yet-rebuilt Tailwind bundle, and
+     safe to include on any page (unique "mi-ig" prefix, no global leakage).
+     Tokens are "R G B" triplets (see docs/design/tokens.json), so plain CSS
+     must wrap them in rgb(...) — Tailwind utilities already do this for us. */
+  [x-cloak] { display: none !important; }
+
+  .mi-ig-card { position: relative; overflow: hidden; }
+  .mi-ig-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--mi-ig-accent, #2563EB), transparent 85%);
+  }
+
+  .mi-ig-copy {
+    width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: rgb(var(--text-tertiary)); background: transparent; cursor: pointer;
+    transition: background-color .15s ease, color .15s ease, transform .15s ease;
+  }
+  .mi-ig-copy:hover  { background: rgb(var(--surface-2)); color: rgb(var(--text-brand)); transform: translateY(-1px); }
+  .mi-ig-copy:active { transform: translateY(0); }
+
+  .mi-ig-chip { transition: transform .15s ease, box-shadow .15s ease; }
+  .mi-ig-chip:hover { transform: translateY(-2px); box-shadow: 0 6px 16px -8px rgba(0,0,0,.35); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-ig-copy, .mi-ig-chip { transition: none; }
+  }
+</style>
+
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
 
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
-    <div class="card-body space-y-2 text-small">
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">File name</span><span class="font-mono text-mono text-text-primary truncate">{{ file_name }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">MD5</span><span class="font-mono text-mono text-text-secondary truncate">{{ md5 }}</span></div>
-      {% if sha1 %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">SHA1</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha1 }}</span></div>{% endif %}
-      {% if sha256 %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">SHA256</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha256 }}</span></div>{% endif %}
-      {% if app_type %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Type</span><span class="text-text-primary uppercase">{{ app_type }}</span></div>{% endif %}
+  {# ══════════════════ File information ══════════════════ #}
+  <div class="mi-ig-card card card-hover" style="--mi-ig-accent:#2563EB" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h4 flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+          {% icon "package" size=16 %}
+        </span>
+        File information
+      </h2>
+      <button type="button"
+              x-data="{ copied: false }"
+              data-copy="File: {{ file_name }}&#10;Size: {{ size }}&#10;MD5: {{ md5 }}{% if sha1 %}&#10;SHA1: {{ sha1 }}{% endif %}{% if sha256 %}&#10;SHA256: {{ sha256 }}{% endif %}{% if app_type %}&#10;Type: {{ app_type }}{% endif %}"
+              @click="navigator.clipboard.writeText($el.dataset.copy).then(() => { copied = true; setTimeout(() => copied = false, 1500); });"
+              :title="copied ? 'Copied!' : 'Copy all file information'"
+              class="btn btn-ghost btn-sm flex-shrink-0">
+        <span x-show="!copied">{% icon "copy" size=14 %}</span>
+        <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=14 %}</span>
+        <span class="text-tiny hidden sm:inline" x-text="copied ? 'Copied' : 'Copy'"></span>
+      </button>
+    </div>
+    <div class="card-body space-y-1 text-small">
+      <div class="flex items-center gap-2 py-1">
+        <span class="text-text-tertiary w-24 flex-shrink-0">File name</span>
+        <span class="font-mono text-mono text-text-primary truncate min-w-0 flex-1" title="{{ file_name }}">{{ file_name }}</span>
+      </div>
+      <div class="flex items-center gap-2 py-1">
+        <span class="text-text-tertiary w-24 flex-shrink-0">Size</span>
+        <span class="text-text-primary min-w-0 flex-1">{{ size }}</span>
+      </div>
+      <div class="flex items-center gap-2 py-1">
+        <span class="text-text-tertiary w-24 flex-shrink-0">MD5</span>
+        <span class="font-mono text-mono text-text-secondary truncate min-w-0 flex-1" title="{{ md5 }}">{{ md5 }}</span>
+        <button type="button" x-data="{ copied: false }" data-copy="{{ md5 }}"
+                @click="navigator.clipboard.writeText($el.dataset.copy).then(() => { copied = true; setTimeout(() => copied = false, 1200); });"
+                :title="copied ? 'Copied!' : 'Copy MD5'" aria-label="Copy MD5 hash" class="mi-ig-copy">
+          <span x-show="!copied">{% icon "copy" size=13 %}</span>
+          <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=13 %}</span>
+        </button>
+      </div>
+      {% if sha1 %}
+      <div class="flex items-center gap-2 py-1">
+        <span class="text-text-tertiary w-24 flex-shrink-0">SHA1</span>
+        <span class="font-mono text-mono text-text-secondary truncate min-w-0 flex-1" title="{{ sha1 }}">{{ sha1 }}</span>
+        <button type="button" x-data="{ copied: false }" data-copy="{{ sha1 }}"
+                @click="navigator.clipboard.writeText($el.dataset.copy).then(() => { copied = true; setTimeout(() => copied = false, 1200); });"
+                :title="copied ? 'Copied!' : 'Copy SHA1'" aria-label="Copy SHA1 hash" class="mi-ig-copy">
+          <span x-show="!copied">{% icon "copy" size=13 %}</span>
+          <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=13 %}</span>
+        </button>
+      </div>
+      {% endif %}
+      {% if sha256 %}
+      <div class="flex items-center gap-2 py-1">
+        <span class="text-text-tertiary w-24 flex-shrink-0">SHA256</span>
+        <span class="font-mono text-mono text-text-secondary truncate min-w-0 flex-1" title="{{ sha256 }}">{{ sha256 }}</span>
+        <button type="button" x-data="{ copied: false }" data-copy="{{ sha256 }}"
+                @click="navigator.clipboard.writeText($el.dataset.copy).then(() => { copied = true; setTimeout(() => copied = false, 1200); });"
+                :title="copied ? 'Copied!' : 'Copy SHA256'" aria-label="Copy SHA256 hash" class="mi-ig-copy">
+          <span x-show="!copied">{% icon "copy" size=13 %}</span>
+          <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=13 %}</span>
+        </button>
+      </div>
+      {% endif %}
+      {% if app_type %}
+      <div class="flex items-center gap-2 pt-2 mt-1 border-t border-border-subtle">
+        <span class="text-text-tertiary w-24 flex-shrink-0">Type</span>
+        <span class="badge badge-unknown uppercase">{{ app_type }}</span>
+      </div>
+      {% endif %}
     </div>
   </div>
 
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "info" size=16 %} App information</h2></div>
-    <div class="card-body space-y-2 text-small">
-      {% if app_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>{% endif %}
-      {% if package_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Package</span><span class="font-mono text-mono text-text-primary truncate">{{ package_name }}</span></div>{% endif %}
-      {% if main_activity %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Main activity</span><span class="font-mono text-mono text-text-secondary truncate">{{ main_activity }}</span></div>{% endif %}
-      {% if version_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Version</span><span class="text-text-primary">{{ version_name }} {% if version_code %}<span class="text-text-tertiary">({{ version_code }})</span>{% endif %}</span></div>{% endif %}
-      {% if min_sdk %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">SDK range</span><span class="text-text-primary">{{ min_sdk }} – {{ max_sdk|default:"—" }} (target {{ target_sdk|default:"?" }})</span></div>{% endif %}
+  {# ══════════════════ App information ══════════════════ #}
+  <div class="mi-ig-card card card-hover" style="--mi-ig-accent:#16A34A" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h4 flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+          {% icon "info" size=16 %}
+        </span>
+        App information
+      </h2>
+    </div>
+    <div class="card-body space-y-1 text-small">
+      {% if app_name %}
+      <div class="flex items-baseline gap-2 py-1">
+        <span class="text-text-tertiary w-32 flex-shrink-0">App name</span>
+        <span class="text-text-primary truncate min-w-0 flex-1">{{ app_name }}</span>
+      </div>
+      {% endif %}
+      {% if package_name %}
+      <div class="flex items-baseline gap-2 py-1">
+        <span class="text-text-tertiary w-32 flex-shrink-0">Package</span>
+        <span class="font-mono text-mono text-text-primary truncate min-w-0 flex-1" title="{{ package_name }}">{{ package_name }}</span>
+      </div>
+      {% endif %}
+      {% if main_activity %}
+      <div class="flex items-baseline gap-2 py-1">
+        <span class="text-text-tertiary w-32 flex-shrink-0">Main activity</span>
+        <span class="font-mono text-mono text-text-secondary truncate min-w-0 flex-1" title="{{ main_activity }}">{{ main_activity }}</span>
+      </div>
+      {% endif %}
+      {% if version_name %}
+      <div class="flex items-baseline gap-2 py-1">
+        <span class="text-text-tertiary w-32 flex-shrink-0">Version</span>
+        <span class="text-text-primary">{{ version_name }} {% if version_code %}<span class="text-text-tertiary">({{ version_code }})</span>{% endif %}</span>
+      </div>
+      {% endif %}
+      {% if min_sdk %}
+      <div class="pt-2 mt-1 border-t border-border-subtle">
+        <span class="text-tiny uppercase tracking-wide text-text-tertiary">SDK range</span>
+        <div class="flex flex-wrap items-center gap-2 mt-2">
+          <span class="mi-ig-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-2">
+            <span class="text-tiny text-text-tertiary">Min</span>
+            <span class="font-mono text-small text-text-primary font-medium">{{ min_sdk }}</span>
+          </span>
+          <span class="mi-ig-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-mobinspect-500/10">
+            <span class="text-tiny text-mobinspect-500">Target</span>
+            <span class="font-mono text-small text-text-primary font-medium">{{ target_sdk|default:"?" }}</span>
+          </span>
+          <span class="mi-ig-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-2">
+            <span class="text-tiny text-text-tertiary">Max</span>
+            <span class="font-mono text-small text-text-primary font-medium">{{ max_sdk|default:"—" }}</span>
+          </span>
+        </div>
+      </div>
+      {% endif %}
       {% block info_extras %}{% endblock %}
     </div>
   </div>

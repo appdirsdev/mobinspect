@@ -1,45 +1,177 @@
 {% extends "base/legacy_app.html" %}
-{% load static %}
+{% load static %}{% load mi_icons %}
 
 {% block page_title %}iOS API Monitor — {{ bundle_id }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'adminlte/plugins/datatables-bs4/dataTables.bootstrap4.min.css' %}">
 <style>
-  table.dataTable thead th { background: rgb(var(--surface-2) / 0.5); border-color: rgb(var(--border-subtle)) !important; }
-  table.dataTable tbody td  { border-color: rgb(var(--border-subtle)) !important; }
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero { background: rgb(var(--surface-1)); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .55;
+  }
+  .mi-hero-glow::before {
+    width: 320px; height: 320px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.55), transparent 70%);
+    animation: mi-float 15s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 260px; height: 260px; bottom: -130px; left: -40px;
+    background: radial-gradient(circle at center, rgba(59,130,246,.4), transparent 70%);
+    animation: mi-float 20s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .5;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .4; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .32; }
+
+  /* ── Mini stat chips in the hero ── */
+  .mi-chip { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-chip:hover { transform: translateY(-2px); box-shadow: 0 10px 26px -16px rgba(0,0,0,.4); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Copy-to-clipboard micro-interaction ── */
+  .mi-copy-btn { position: relative; }
+  .mi-copy-flash {
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translate(-50%, 4px);
+    background: rgb(var(--surface-4)); color: rgb(var(--text-inverse));
+    font-size: 11px; line-height: 1; padding: 4px 8px; border-radius: 6px;
+    white-space: nowrap; opacity: 0;
+    transition: opacity .15s ease, transform .15s ease; pointer-events: none;
+  }
+  .mi-copy-flash.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ── DataTable polish (styling only — columns/data untouched) ── */
+  #autotbl_wrapper { font-size: 13px; }
+  table.dataTable thead th {
+    background: rgb(var(--surface-2) / 0.6) !important; border-color: rgb(var(--border-subtle)) !important;
+    font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: rgb(var(--text-secondary));
+  }
+  table.dataTable tbody td {
+    border-color: rgb(var(--border-subtle)) !important; vertical-align: top;
+    padding-top: .65rem !important; padding-bottom: .65rem !important;
+  }
+  table.dataTable tbody tr { transition: background-color .12s ease; }
   table.dataTable tbody tr:hover td { background: rgb(var(--surface-2) / 0.4); }
+  table.dataTable tbody td:first-child { font-weight: 600; color: rgb(var(--text-brand)); white-space: nowrap; }
+  table.dataTable tbody td:nth-child(2) {
+    font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; color: rgb(var(--text-secondary)); line-height: 1.7; word-break: break-word;
+  }
+  table.dataTable td.dataTables_empty {
+    padding: 3rem 1rem !important; text-align: center; color: rgb(var(--text-tertiary)); font-size: 13px;
+  }
+  div.dataTables_wrapper div.dataTables_filter input,
+  div.dataTables_wrapper div.dataTables_length select {
+    border-radius: 6px;
+  }
+
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-24px,0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-chip, .mi-copy-flash { transition: none; }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<header class="flex items-center justify-between gap-4 mb-6">
-  <div>
-    <p class="text-tiny uppercase text-text-tertiary">Dynamic · iOS</p>
-    <h1 class="text-h2 mt-1">iOS API monitor</h1>
-    <p class="text-small text-text-secondary mt-1 font-mono">{{ bundle_id }}</p>
-  </div>
-  <div class="flex items-center gap-2">
-    <label class="text-small text-text-secondary">Snip:</label>
-    <input id="snip" type="number" min="100" max="20000" value="5000"
-           oninput="change_snip(this.value)" class="input h-8 w-28 text-right" />
-  </div>
-</header>
+<div class="space-y-6">
 
-<div class="card">
-  <div class="card-header">
-    <span class="text-small text-text-secondary">Calls</span>
-    <span class="text-tiny text-text-tertiary">refreshes every 10s</span>
-  </div>
-  <div class="card-body">
-    <div id="messages" class="text-tiny text-text-tertiary mb-3"></div>
-    <div class="table-responsive">
-      <table id="autotbl" class="table table-hover table-striped" style="width:100%">
-        <thead><tr><th>API</th><th>DATA</th></tr></thead>
-        <tfoot><tr><th>API</th><th>DATA</th></tr></tfoot>
-      </table>
+  {# ══════════════════ Ambient hero ══════════════════ #}
+  <section class="mi-hero card mi-glass relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-7 md:px-8 md:py-8">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "activity" size=13 %} Dynamic Analysis · iOS
+          </p>
+          <h1 class="text-display font-bold leading-tight flex flex-wrap items-center gap-3">
+            API monitor
+            <span class="badge badge-passed gap-1.5">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-severity-passed dark:bg-severity-passed-dark animate-pulse"></span>
+              Live
+            </span>
+          </h1>
+          <p class="text-small text-text-secondary mt-2 max-w-xl">
+            Streaming intercepted network calls from the running instrumentation session.
+            The table below refreshes automatically every 10 seconds.
+          </p>
+          <div class="mi-copy-btn inline-flex items-center gap-2 mt-4" data-copy="{{ bundle_id }}">
+            <code class="text-small font-mono text-text-secondary bg-surface-2 border border-border-subtle rounded-md px-2.5 py-1.5">{{ bundle_id }}</code>
+            <button type="button" class="btn btn-ghost btn-sm" aria-label="Copy bundle identifier">
+              {% icon "copy" size=13 %}
+            </button>
+            <span class="mi-copy-flash" aria-live="polite"></span>
+          </div>
+        </div>
+
+        {# real, live-derived mini stats — no mock data: sourced from the actual DataTables response/interval #}
+        <div class="grid grid-cols-3 gap-3 flex-shrink-0 w-full lg:w-auto lg:min-w-[300px]">
+          <div class="mi-chip card mi-glass card-body py-3 px-3 text-center">
+            <p class="mi-num text-h2 font-bold tabular" id="statCalls">0</p>
+            <p class="text-tiny text-text-secondary mt-0.5">Calls</p>
+          </div>
+          <div class="mi-chip card mi-glass card-body py-3 px-3 text-center">
+            <p class="mi-num text-h2 font-bold tabular">10s</p>
+            <p class="text-tiny text-text-secondary mt-0.5">Refresh</p>
+          </div>
+          <div class="mi-chip card mi-glass card-body py-3 px-3 text-center">
+            <p class="mi-num text-h4 font-bold tabular" id="statUpdated">—</p>
+            <p class="text-tiny text-text-secondary mt-0.5">Updated</p>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
+  </section>
+
+  {# ══════════════════ Captured calls ══════════════════ #}
+  <section class="card mi-glass overflow-hidden" data-reveal>
+    <div class="card-header flex-wrap gap-3">
+      <div class="flex items-center gap-2.5">
+        <span class="inline-flex items-center justify-center w-9 h-9 rounded-md bg-chart-amber/15 text-chart-amber flex-shrink-0">
+          {% icon "database" size=16 %}
+        </span>
+        <div>
+          <h2 class="text-h4 leading-tight">Captured calls</h2>
+          <p class="text-tiny text-text-tertiary">Auto-refreshes every 10 seconds</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="snip" class="text-small text-text-secondary inline-flex items-center gap-1.5 whitespace-nowrap">
+          {% icon "sliders" size=14 %} Preview length
+        </label>
+        <input id="snip" type="number" min="100" max="20000" value="5000"
+               oninput="change_snip(this.value)" class="input h-9 w-24 text-right tabular" />
+        <span class="text-tiny text-text-tertiary" id="snipValue">5,000</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="messages" class="text-tiny text-text-tertiary mb-3 empty:hidden"></div>
+      <div class="table-responsive rounded-lg border border-border-subtle overflow-x-auto">
+        <table id="autotbl" class="table table-hover table-striped mb-0" style="width:100%">
+          <thead><tr><th>API</th><th>DATA</th></tr></thead>
+          <tfoot><tr><th>API</th><th>DATA</th></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </section>
+
 </div>
 {% endblock %}
 
@@ -97,5 +229,79 @@ $(document).ready(function () {
   });
   setInterval(function () { tbl.ajax.reload(null, false); }, 10000);
 });
+</script>
+<script>
+(function () {
+  // Presentational-only enhancements. Never touches change_snip()/tbl/ajax
+  // logic above — only reads DataTables' own row count after each redraw
+  // and reflects real, already-fetched data in the hero stat chips.
+  var statCalls = document.getElementById('statCalls');
+  var statUpdated = document.getElementById('statUpdated');
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var lastDraw = null;
+
+  function animateNumber(el, to) {
+    if (!el) return;
+    var from = parseInt((el.textContent || '0').replace(/,/g, ''), 10) || 0;
+    if (reduceMotion || from === to) { el.textContent = to.toLocaleString(); return; }
+    var start = performance.now(), dur = 500;
+    function tick(t) {
+      var p = Math.min((t - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(from + (to - from) * eased).toLocaleString();
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function tickUpdated() {
+    if (!statUpdated || !lastDraw) return;
+    var secs = Math.round((Date.now() - lastDraw) / 1000);
+    statUpdated.textContent = secs <= 1 ? 'just now' : secs + 's ago';
+  }
+  setInterval(tickUpdated, 1000);
+
+  if (window.jQuery) {
+    jQuery('#autotbl').on('draw.dt', function () {
+      lastDraw = Date.now();
+      tickUpdated();
+      try {
+        var info = jQuery('#autotbl').DataTable().page.info();
+        animateNumber(statCalls, info.recordsDisplay || 0);
+      } catch (e) { /* table not ready yet */ }
+    });
+  }
+
+  // Copy bundle identifier to clipboard.
+  document.querySelectorAll('.mi-copy-btn[data-copy]').forEach(function (wrap) {
+    var btn = wrap.querySelector('button');
+    var flash = wrap.querySelector('.mi-copy-flash');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var value = wrap.getAttribute('data-copy') || '';
+      var done = function (msg) {
+        if (!flash) return;
+        flash.textContent = msg;
+        flash.classList.add('show');
+        setTimeout(function () { flash.classList.remove('show'); }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(function () { done('Copied'); }).catch(function () { done('Failed'); });
+      } else {
+        done('Unsupported');
+      }
+    });
+  });
+
+  // Live "chars" readout next to the snip control (visual only — the real
+  // value is still read by change_snip()/getElementById('snip') above).
+  var snipEl = document.getElementById('snip');
+  var snipOut = document.getElementById('snipValue');
+  if (snipEl && snipOut) {
+    var syncSnip = function () { snipOut.textContent = (Number(snipEl.value) || 0).toLocaleString(); };
+    snipEl.addEventListener('input', syncSnip);
+    syncSnip();
+  }
+})();
 </script>
 {% endblock %}

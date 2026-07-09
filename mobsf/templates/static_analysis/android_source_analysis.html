@@ -1,5 +1,5 @@
 {% extends "base/app.html" %}
-{% load static %}{% load mi_icons %}{% load rbac %}
+{% load static %}{% load mi_icons %}{% load rbac %}{% load mi_score %}
 
 {% block page_title %}{{ app_name|default:file_name }} — Android source analysis{% endblock %}
 
@@ -27,62 +27,146 @@
     aside, header.h-topbar, footer, .no-print, .btn { display: none !important; }
     body { -webkit-print-color-adjust: exact; }
   }
+
+  /* ── Report hero: ambient glow (theme-aware, matches dashboard language) ── */
+  .mi-report-hero { position: relative; }
+  .mi-report-glow { position: absolute; inset: 0; pointer-events: none; }
+  .mi-report-glow::before {
+    content: ''; position: absolute; width: 320px; height: 320px; top: -150px; right: -60px;
+    border-radius: 9999px; filter: blur(60px); opacity: .5;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  :root[data-theme="dark"] .mi-report-glow::before { opacity: .36; }
+
+  /* ── Stat tiles: accent top-bar + hover lift, driven by --mi-accent ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px); box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Section header icon-chip ── */
+  .mi-chip { transition: transform .18s ease; flex-shrink: 0; }
+  .card:hover > .card-header .mi-chip { transform: scale(1.06); }
+
+  /* ── Quick-jump nav ── */
+  .mi-quicknav a { transition: background .15s ease, color .15s ease, border-color .15s ease; white-space: nowrap; }
+  .mi-quicknav a.is-active { background: rgba(37,99,235,.12); border-color: rgba(37,99,235,.35); color: #2563EB; }
+  :root[data-theme="dark"] .mi-quicknav a.is-active { color: #60A5FA; }
+  .mi-quicknav-scroll::-webkit-scrollbar { height: 5px; }
+  .mi-quicknav-scroll::-webkit-scrollbar-thumb { background: rgb(var(--border-default)); border-radius: 9999px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-report-glow::before { animation: none !important; }
+    .mi-stat, .mi-chip, .mi-quicknav a { transition: none !important; }
+    .mi-stat:hover { transform: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-22px,0); }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 
 {# ─────────── Page header ─────────── #}
-<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-  <div class="flex items-center gap-4 min-w-0">
-    <img id="app_icon"
-         src="{% if icon_path %}/download/{{ icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
-         onerror="this.src='{% static 'img/no_icon.png' %}'" alt=""
-         class="w-14 h-14 rounded-lg bg-surface-2 object-contain flex-shrink-0" />
-    <div class="min-w-0">
-      <p class="text-tiny uppercase text-text-tertiary">Static · Android source</p>
-      <h1 class="text-h2 truncate">{{ app_name|default:file_name }}{% if version_name %} <span class="text-text-tertiary">v{{ version_name }}</span>{% endif %}</h1>
-      {% if package_name %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ package_name }}</p>{% endif %}
-      <p class="text-tiny text-text-tertiary mt-0.5 font-mono truncate">{{ md5 }}</p>
+<header class="mi-report-hero card mi-glass relative overflow-hidden p-0 mb-4" data-reveal>
+  <div class="mi-report-glow" aria-hidden="true"></div>
+  <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-6 py-6">
+    <div class="flex items-center gap-4 min-w-0">
+      <img id="app_icon"
+           src="{% if icon_path %}/download/{{ icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+           onerror="this.src='{% static 'img/no_icon.png' %}'" alt=""
+           class="w-16 h-16 rounded-xl bg-surface-2 object-contain flex-shrink-0 shadow-elevation-1" />
+      <div class="min-w-0">
+        <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1 inline-flex items-center gap-1.5">{% icon "smartphone" size=12 %} Static · Android source</p>
+        <h1 class="text-h2 truncate">{{ app_name|default:file_name }}{% if version_name %} <span class="text-text-tertiary font-normal">v{{ version_name }}</span>{% endif %}</h1>
+        {% if package_name %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ package_name }}</p>{% endif %}
+        <p class="text-tiny text-text-tertiary mt-0.5 font-mono truncate">{{ md5 }}</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 no-print">
+      <a href="{% url 'recent' %}" class="btn btn-ghost btn-md">{% icon "chevron-left" size=14 %} Back</a>
+      <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="mi-pillbtn btn btn-md">{% icon "shield-check" size=14 %} Scorecard</a>
+      {% can 'admin.ai.view' %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endcan %}
+      <a href="{% url 'static_analyzer' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md">{% icon "activity" size=14 %} Rescan</a>
+      <a href="{% url 'compare_versions' checksum=md5 %}" class="btn btn-secondary btn-md">{% icon "git-compare" size=14 %} Compare</a>
+      <button onclick="window.print()" class="btn btn-ghost btn-md">{% icon "file-text" size=14 %} Print / PDF</button>
     </div>
   </div>
-  <div class="flex flex-wrap items-center gap-2 no-print">
-    <a href="{% url 'recent' %}" class="btn btn-ghost btn-md">{% icon "chevron-left" size=14 %} Back</a>
-    <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-primary btn-md">{% icon "shield-check" size=14 %} Scorecard</a>
-    {% can 'admin.ai.view' %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endcan %}
-    <a href="{% url 'static_analyzer' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md">{% icon "activity" size=14 %} Rescan</a>
-    <a href="{% url 'compare_versions' checksum=md5 %}" class="btn btn-secondary btn-md">{% icon "git-compare" size=14 %} Compare</a>
-    <button onclick="window.print()" class="btn btn-ghost btn-md">{% icon "file-text" size=14 %} Print / PDF</button>
-  </div>
 </header>
+
+{# ─────────── Quick-jump nav (new: pure navigation aid over existing anchors) ─────────── #}
+<nav class="mi-quicknav sticky top-0 z-10 mb-6 no-print" data-quicknav aria-label="Report sections">
+  <div class="mi-quicknav-scroll flex items-center gap-1 overflow-x-auto py-2 px-2 rounded-lg border border-border-subtle bg-surface-1/90 backdrop-blur shadow-elevation-1">
+    <a href="#information" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Info</a>
+    <a href="#permissions" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Permissions</a>
+    <a href="#android_api" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">API</a>
+    <a href="#browsable" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Browsable</a>
+    <a href="#network_security" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Network</a>
+    <a href="#manifest" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Manifest</a>
+    <a href="#code_analysis" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Code</a>
+    <a href="#niap_analysis" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">NIAP</a>
+    <a href="#file_analysis" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">File checks</a>
+    <a href="#firebase" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Firebase</a>
+    <a href="#behaviour" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Behaviour</a>
+    <a href="#malware_permissions" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Abused perms</a>
+    <a href="#serverlocations" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Servers</a>
+    <a href="#malware_check" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Malware</a>
+    <a href="#urls" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">URLs</a>
+    <a href="#emails" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Emails</a>
+    <a href="#trackers" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Trackers</a>
+    <a href="#secrets" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Secrets</a>
+    <a href="#strings" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Strings</a>
+    <a href="#activities" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Activities</a>
+    <a href="#services" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Services</a>
+    <a href="#receivers" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Receivers</a>
+    <a href="#providers" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Providers</a>
+    <a href="#libraries" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Libraries</a>
+    <a href="#sbom" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">SBOM</a>
+    <a href="#files" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">All files</a>
+  </div>
+</nav>
 
 {# ─────────── Scores & info ─────────── #}
 <a id="information" class="anchor"></a>
 <section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
 
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "shield-check" size=16 %} App scores</h2></div>
-    <div class="card-body space-y-2 text-small">
-      {% if average_cvss %}
-        <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Avg CVSS</span><span class="text-text-primary font-medium tabular">{{ average_cvss }}</span></div>
-      {% endif %}
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Security score</span>
-        {% if appsec.security_score < 40 %}<span class="badge badge-critical">{{ appsec.security_score }}/100</span>
-        {% elif appsec.security_score == 100 %}<span class="badge badge-passed">{{ appsec.security_score }}/100</span>
-        {% else %}<span class="badge badge-medium">{{ appsec.security_score }}/100</span>{% endif %}
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "shield-check" size=14 %}</span> App scores</h2></div>
+    <div class="card-body">
+      <div class="flex items-center gap-5">
+        {# Security score — the visual anchor, rendered as the shared arc gauge #}
+        {% if appsec.security_score is not None %}
+        <div class="flex-shrink-0 flex flex-col items-center gap-1.5">
+          {% include "components/gauge_arc.html" with value=appsec.security_score color=appsec.security_score|score_color sub_label="/ 100" size_class="w-28 h-28" animate=True %}
+          <span class="text-tiny uppercase text-text-tertiary">Security score</span>
+        </div>
+        {% endif %}
+        {# Secondary scores #}
+        <div class="flex-1 min-w-0 space-y-2.5 text-small">
+          {% if average_cvss %}
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "activity" size=13 %} Avg CVSS</span>
+            <span class="text-text-primary font-medium tabular">{{ average_cvss }}</span>
+          </div>
+          {% endif %}
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "eye" size=13 %} Trackers</span>
+            {% if trackers.detected_trackers > 0 %}<span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
+            {% else %}<span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>{% endif %}
+          </div>
+        </div>
       </div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Trackers</span>
-        {% if trackers.detected_trackers > 0 %}<span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
-        {% else %}<span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>{% endif %}
-      </div>
-      <div class="pt-1">
+      <div class="pt-3 mt-3 border-t border-border-subtle">
         <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-secondary btn-sm">{% icon "shield" size=14 %} MobInspect Scorecard</a>
       </div>
     </div>
   </div>
 
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "package" size=14 %}</span> File information</h2></div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">File name</span><span class="font-mono text-mono text-text-primary truncate" title="{{ file_name }}">{{ file_name }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
@@ -92,8 +176,8 @@
     </div>
   </div>
 
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "info" size=16 %} App information</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "info" size=14 %}</span> App information</h2></div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Package</span><span class="font-mono text-mono text-text-primary truncate">{{ package_name }}</span></div>
@@ -106,8 +190,8 @@
 
 {# ─────────── Play Store ─────────── #}
 {% if not playstore_details.error %}
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "smartphone" size=16 %} Play Store information</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "smartphone" size=14 %}</span> Play Store information</h2></div>
   <div class="card-body text-small">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Title</span><span class="text-text-primary">{{ playstore_details.title }}</span></div>
@@ -131,44 +215,44 @@
 
 {# ─────────── Component stat tiles ─────────── #}
 <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-  <a href="#activities" class="card card-body block hover:bg-surface-2/30 transition-colors duration-fast" data-reveal>
+  <a href="#activities" class="mi-stat card mi-glass card-body block group" x-data="counter({{ exported_count.exported_activities }})" data-reveal>
     <div class="flex items-center justify-between">
       <p class="text-tiny uppercase text-text-secondary">Exported activities</p>
-      <span class="text-text-tertiary">{% icon "layers" size=16 %}</span>
+      <span class="w-9 h-9 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">{% icon "layers" size=16 %}</span>
     </div>
-    <p class="text-display tabular mt-2">{{ exported_count.exported_activities }} <span class="text-h4 text-text-tertiary">/ {{ activities | length }}</span></p>
-    <p class="text-tiny text-text-tertiary mt-2 flex items-center gap-1">View all {% icon "chevron-right" size=12 %}</p>
+    <p class="mi-num text-display font-bold mt-2"><span x-text="shown">0</span> <span class="text-h4 text-text-tertiary font-normal">/ {{ activities | length }}</span></p>
+    <p class="text-tiny text-text-tertiary mt-2 flex items-center gap-1">View all {% icon "chevron-right" size=12 class="transition-transform duration-fast group-hover:translate-x-1" %}</p>
   </a>
-  <a href="#services" class="card card-body block hover:bg-surface-2/30 transition-colors duration-fast" data-reveal>
+  <a href="#services" class="mi-stat card mi-glass card-body block group" x-data="counter({{ exported_count.exported_services }})" data-reveal>
     <div class="flex items-center justify-between">
       <p class="text-tiny uppercase text-text-secondary">Exported services</p>
-      <span class="text-text-tertiary">{% icon "settings" size=16 %}</span>
+      <span class="w-9 h-9 rounded-md bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">{% icon "settings" size=16 %}</span>
     </div>
-    <p class="text-display tabular mt-2">{{ exported_count.exported_services }} <span class="text-h4 text-text-tertiary">/ {{ services | length }}</span></p>
-    <p class="text-tiny text-text-tertiary mt-2 flex items-center gap-1">View all {% icon "chevron-right" size=12 %}</p>
+    <p class="mi-num text-display font-bold mt-2"><span x-text="shown">0</span> <span class="text-h4 text-text-tertiary font-normal">/ {{ services | length }}</span></p>
+    <p class="text-tiny text-text-tertiary mt-2 flex items-center gap-1">View all {% icon "chevron-right" size=12 class="transition-transform duration-fast group-hover:translate-x-1" %}</p>
   </a>
-  <a href="#receivers" class="card card-body block hover:bg-surface-2/30 transition-colors duration-fast" data-reveal>
+  <a href="#receivers" class="mi-stat card mi-glass card-body block group" x-data="counter({{ exported_count.exported_receivers }})" data-reveal>
     <div class="flex items-center justify-between">
       <p class="text-tiny uppercase text-text-secondary">Exported receivers</p>
-      <span class="text-text-tertiary">{% icon "bell" size=16 %}</span>
+      <span class="w-9 h-9 rounded-md bg-severity-medium/15 text-severity-medium inline-flex items-center justify-center flex-shrink-0">{% icon "bell" size=16 %}</span>
     </div>
-    <p class="text-display tabular mt-2">{{ exported_count.exported_receivers }} <span class="text-h4 text-text-tertiary">/ {{ receivers | length }}</span></p>
-    <p class="text-tiny text-text-tertiary mt-2 flex items-center gap-1">View all {% icon "chevron-right" size=12 %}</p>
+    <p class="mi-num text-display font-bold mt-2"><span x-text="shown">0</span> <span class="text-h4 text-text-tertiary font-normal">/ {{ receivers | length }}</span></p>
+    <p class="text-tiny text-text-tertiary mt-2 flex items-center gap-1">View all {% icon "chevron-right" size=12 class="transition-transform duration-fast group-hover:translate-x-1" %}</p>
   </a>
-  <a href="#providers" class="card card-body block hover:bg-surface-2/30 transition-colors duration-fast" data-reveal>
+  <a href="#providers" class="mi-stat card mi-glass card-body block group" x-data="counter({{ exported_count.exported_providers }})" data-reveal>
     <div class="flex items-center justify-between">
       <p class="text-tiny uppercase text-text-secondary">Exported providers</p>
-      <span class="text-text-tertiary">{% icon "database" size=16 %}</span>
+      <span class="w-9 h-9 rounded-md bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">{% icon "database" size=16 %}</span>
     </div>
-    <p class="text-display tabular mt-2">{{exported_count.exported_providers}} <span class="text-h4 text-text-tertiary">/ {{ providers | length }}</span></p>
-    <p class="text-tiny text-text-tertiary mt-2 flex items-center gap-1">View all {% icon "chevron-right" size=12 %}</p>
+    <p class="mi-num text-display font-bold mt-2"><span x-text="shown">0</span> <span class="text-h4 text-text-tertiary font-normal">/ {{ providers | length }}</span></p>
+    <p class="text-tiny text-text-tertiary mt-2 flex items-center gap-1">View all {% icon "chevron-right" size=12 class="transition-transform duration-fast group-hover:translate-x-1" %}</p>
   </a>
 </section>
 
 {# ─────────── Scan options ─────────── #}
 <a id="scan_options" class="anchor"></a>
-<section class="card mb-6 no-print" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "sliders" size=18 %} Scan options</h2></div>
+<section class="card mi-glass card-hover mb-6 no-print" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "sliders" size=16 %}</span> Scan options</h2></div>
   <div class="card-body flex flex-wrap items-center gap-2">
     <a href="{% url 'static_analyzer' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-sm">{% icon "activity" size=14 %} Rescan</a>
     <a id="supbtn" onclick="list_suppressions()" role="button" class="btn btn-secondary btn-sm" data-target="#sup_list" data-toggle="modal" href="#">{% icon "eye-off" size=14 %} Manage Suppressions</a>
@@ -181,8 +265,8 @@
 
 {# ─────────── Application permissions ─────────── #}
 <a id="permissions" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield" size=18 %} Application permissions</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "shield" size=16 %}</span> Application permissions</h2><span class="badge badge-neutral tabular">{{ permissions|length }}</span></div>
   <div class="overflow-x-auto report-table">
     <table id="table_permissions" class="w-full text-small">
       <thead>
@@ -230,6 +314,15 @@
             {% endif %}
           </td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield" size=16 %}</span>
+              <p class="text-small">No permissions declared in the manifest.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -238,8 +331,8 @@
 
 {# ─────────── Android API ─────────── #}
 <a id="android_api" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Android API</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "database" size=16 %}</span> Android API</h2><span class="badge badge-neutral tabular">{{ android_api|length }}</span></div>
   <div class="overflow-x-auto report-table">
     <table id="table_so" class="w-full text-small">
       <thead>
@@ -263,6 +356,15 @@
             </details>
           </td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="2" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "database" size=16 %}</span>
+              <p class="text-small">No sensitive Android API calls detected.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -271,8 +373,8 @@
 
 {# ─────────── Browsable activities ─────────── #}
 <a id="browsable" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "external-link" size=18 %} Browsable activities</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "external-link" size=16 %}</span> Browsable activities</h2><span class="badge badge-neutral tabular">{{ browsable_activities|length }}</span></div>
   <div class="overflow-x-auto report-table">
     <table id="table_browsable" class="w-full text-small">
       <thead>
@@ -310,6 +412,15 @@
             {% endif %}
           </td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="2" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "external-link" size=16 %}</span>
+              <p class="text-small">No browsable activities found.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -318,26 +429,26 @@
 
 {# ─────────── Network security ─────────── #}
 <a id="network_security" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "lock" size=18 %} Network security</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "lock" size=16 %}</span> Network security</h2></div>
   <div class="card-body">
     {% if network_security and 'network_summary' in network_security and network_security.network_summary|length > 0%}
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div class="rounded-lg border border-border-subtle bg-severity-critical/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark">High</p>
-          <p class="text-h2 tabular text-text-primary">{{ network_security.network_summary.high }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-critical/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark flex items-center gap-1.5">{% icon "activity" size=12 %} High</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ network_security.network_summary.high }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-severity-medium/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark">Warning</p>
-          <p class="text-h2 tabular text-text-primary">{{ network_security.network_summary.warning }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-medium/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark flex items-center gap-1.5">{% icon "activity" size=12 %} Warning</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ network_security.network_summary.warning }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-severity-low/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark">Info</p>
-          <p class="text-h2 tabular text-text-primary">{{ network_security.network_summary.info }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-low/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark flex items-center gap-1.5">{% icon "info" size=12 %} Info</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ network_security.network_summary.info }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-severity-passed/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-passed dark:text-severity-passed-dark">Secure</p>
-          <p class="text-h2 tabular text-text-primary">{{ network_security.network_summary.secure }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-passed/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-passed dark:text-severity-passed-dark flex items-center gap-1.5">{% icon "shield-check" size=12 %} Secure</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ network_security.network_summary.secure }}</p>
         </div>
       </div>
     {% endif %}
@@ -373,6 +484,15 @@
           </td>
           <td class="px-5 py-3 text-text-secondary">{{item.description }}</td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield-check" size=16 %}</span>
+              <p class="text-small">No network security findings.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
         {% endif %}
       </tbody>
@@ -382,26 +502,26 @@
 
 {# ─────────── Manifest analysis ─────────── #}
 <a id="manifest" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "search" size=18 %} Manifest analysis</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "search" size=16 %}</span> Manifest analysis</h2></div>
   <div class="card-body">
     {% if manifest_analysis and 'manifest_summary' in manifest_analysis and manifest_analysis.manifest_summary|length > 0%}
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div class="rounded-lg border border-border-subtle bg-severity-critical/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark">High</p>
-          <p class="text-h2 tabular text-text-primary">{{ manifest_analysis.manifest_summary.high }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-critical/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark flex items-center gap-1.5">{% icon "activity" size=12 %} High</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ manifest_analysis.manifest_summary.high }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-severity-medium/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark">Warning</p>
-          <p class="text-h2 tabular text-text-primary">{{ manifest_analysis.manifest_summary.warning }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-medium/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark flex items-center gap-1.5">{% icon "activity" size=12 %} Warning</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ manifest_analysis.manifest_summary.warning }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-severity-low/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark">Info</p>
-          <p class="text-h2 tabular text-text-primary">{{ manifest_analysis.manifest_summary.info }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-low/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark flex items-center gap-1.5">{% icon "info" size=12 %} Info</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ manifest_analysis.manifest_summary.info }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-surface-2 px-4 py-3">
-          <p class="text-tiny uppercase text-text-tertiary">Suppressed</p>
-          <p class="text-h2 tabular text-text-primary">{{ manifest_analysis.manifest_summary.suppressed }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-surface-2 px-4 py-3">
+          <p class="text-tiny uppercase text-text-tertiary flex items-center gap-1.5">{% icon "eye-off" size=12 %} Suppressed</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ manifest_analysis.manifest_summary.suppressed }}</p>
         </div>
       </div>
     {% endif %}
@@ -444,6 +564,15 @@
             </div>
           </td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield-check" size=16 %}</span>
+              <p class="text-small">No manifest findings.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
         {% endif %}
       </tbody>
@@ -453,30 +582,30 @@
 
 {# ─────────── Code analysis ─────────── #}
 <a id="code_analysis" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Code analysis</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "database" size=16 %}</span> Code analysis</h2></div>
   <div class="card-body">
     {% if code_analysis and 'summary' in code_analysis and code_analysis.summary|length > 0 %}
       <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <div class="rounded-lg border border-border-subtle bg-severity-critical/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark">High</p>
-          <p class="text-h2 tabular text-text-primary">{{ code_analysis.summary.high }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-critical/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-critical dark:text-severity-critical-dark flex items-center gap-1.5">{% icon "activity" size=12 %} High</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ code_analysis.summary.high }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-severity-medium/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark">Warning</p>
-          <p class="text-h2 tabular text-text-primary">{{ code_analysis.summary.warning }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-medium/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark flex items-center gap-1.5">{% icon "activity" size=12 %} Warning</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ code_analysis.summary.warning }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-severity-low/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark">Info</p>
-          <p class="text-h2 tabular text-text-primary">{{ code_analysis.summary.info }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-low/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-low dark:text-severity-low-dark flex items-center gap-1.5">{% icon "info" size=12 %} Info</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ code_analysis.summary.info }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-severity-passed/10 px-4 py-3">
-          <p class="text-tiny uppercase text-severity-passed dark:text-severity-passed-dark">Secure</p>
-          <p class="text-h2 tabular text-text-primary">{{ code_analysis.summary.secure }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-severity-passed/10 px-4 py-3">
+          <p class="text-tiny uppercase text-severity-passed dark:text-severity-passed-dark flex items-center gap-1.5">{% icon "shield-check" size=12 %} Secure</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ code_analysis.summary.secure }}</p>
         </div>
-        <div class="rounded-lg border border-border-subtle bg-surface-2 px-4 py-3">
-          <p class="text-tiny uppercase text-text-tertiary">Suppressed</p>
-          <p class="text-h2 tabular text-text-primary">{{ code_analysis.summary.suppressed }}</p>
+        <div class="mi-stat rounded-lg border border-border-subtle bg-surface-2 px-4 py-3">
+          <p class="text-tiny uppercase text-text-tertiary flex items-center gap-1.5">{% icon "eye-off" size=12 %} Suppressed</p>
+          <p class="text-h2 tabular text-text-primary mt-1">{{ code_analysis.summary.suppressed }}</p>
         </div>
       </div>
     {% endif %}
@@ -554,6 +683,15 @@
             </div>
           </td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield-check" size=16 %}</span>
+              <p class="text-small">No code analysis findings.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
         {% endif %}
       </tbody>
@@ -563,8 +701,8 @@
 
 {# ─────────── NIAP analysis ─────────── #}
 <a id="niap_analysis" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield-check" size=18 %} NIAP analysis v1.3</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "shield-check" size=16 %}</span> NIAP analysis v1.3</h2><span class="badge badge-neutral tabular">{{ niap_analysis|length }}</span></div>
   <div class="overflow-x-auto report-table">
     <table id="table_file" class="w-full text-small">
       <thead>
@@ -587,6 +725,15 @@
           <td class="px-5 py-3 text-text-primary">{{ details.description }}</td>
           <td class="px-5 py-3 text-text-secondary">{{ details.choice }}</td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield-check" size=16 %}</span>
+              <p class="text-small">No NIAP requirements evaluated.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -595,8 +742,8 @@
 
 {# ─────────── File analysis ─────────── #}
 <a id="file_analysis" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} File analysis</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "file-text" size=16 %}</span> File analysis</h2><span class="badge badge-neutral tabular">{{ file_analysis|length }}</span></div>
   <div class="overflow-x-auto report-table">
     <table id="table_file" class="w-full text-small">
       <thead>
@@ -615,6 +762,15 @@
             {% for cert_f in item|key:"files" %}{{ cert_f }}<br />{% endfor %}
           </td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "file-text" size=16 %}</span>
+              <p class="text-small">No file-level findings.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -623,8 +779,8 @@
 
 {# ─────────── Firebase DB analysis ─────────── #}
 <a id="firebase" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Firebase database analysis</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "database" size=16 %}</span> Firebase database analysis</h2><span class="badge badge-neutral tabular">{{ firebase_urls|length }}</span></div>
   <div class="overflow-x-auto report-table">
     <table id="table_firebase" class="w-full text-small">
       <thead>
@@ -651,6 +807,15 @@
           </td>
           <td class="px-5 py-3 text-text-secondary">{{ find.description }}</td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "database" size=16 %}</span>
+              <p class="text-small">No Firebase database URLs found.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -659,8 +824,8 @@
 
 {# ─────────── Behaviour analysis ─────────── #}
 <a id="behaviour" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "activity" size=18 %} Behaviour analysis</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "activity" size=16 %}</span> Behaviour analysis</h2><span class="badge badge-neutral tabular">{{ behaviour|length }}</span></div>
   <div class="overflow-x-auto report-table">
     <table id="table_code" class="w-full text-small">
       <thead>
@@ -677,7 +842,7 @@
           <td class="px-5 py-3 font-mono text-mono text-text-tertiary">{{ rule }}</td>
           <td class="px-5 py-3 text-text-primary">{{ details.metadata.description }}</td>
           <td class="px-5 py-3">
-            {% for lbl in details.metadata.label %}<span class="badge badge-medium mr-1 mb-1">{{ lbl }}</span>{% endfor %}
+            {% for lbl in details.metadata.label %}<span class="badge badge-neutral mr-1 mb-1">{{ lbl }}</span>{% endfor %}
           </td>
           <td class="px-5 py-3">
             {% if details.files|length < 4 %}
@@ -696,6 +861,15 @@
             {% endif %}
           </td>
         </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="px-5 py-10 text-center">
+            <div class="flex flex-col items-center gap-2 text-text-tertiary">
+              <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "activity" size=16 %}</span>
+              <p class="text-small">No notable behaviour detected.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -704,8 +878,8 @@
 
 {# ─────────── Abused permissions ─────────── #}
 <a id="malware_permissions" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "alert-triangle" size=18 %} Abused permissions</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "alert-triangle" size=16 %}</span> Abused permissions</h2></div>
   <div class="card-body">
     {% if malware_permissions %}
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -715,7 +889,7 @@
             <span class="text-tiny text-text-secondary tabular"><b class="text-text-primary">{{ malware_permissions.top_malware_permissions | length}}</b>/{{malware_permissions.total_malware_permissions}}</span>
           </div>
           <div class="h-2 w-full rounded-full bg-surface-2 overflow-hidden">
-            <div class="h-full bg-severity-critical" style="width: {% widthratio malware_permissions.top_malware_permissions|length malware_permissions.total_malware_permissions 100 %}%;"></div>
+            <div class="h-full bg-severity-critical transition-[width] duration-700 ease-out" style="width: {% widthratio malware_permissions.top_malware_permissions|length malware_permissions.total_malware_permissions 100 %}%;"></div>
           </div>
           <p class="text-tiny text-text-secondary mt-2 break-words">{{ malware_permissions.top_malware_permissions | join:", "}}</p>
         </div>
@@ -725,7 +899,7 @@
             <span class="text-tiny text-text-secondary tabular"><b class="text-text-primary">{{ malware_permissions.other_abused_permissions | length}}</b>/{{ malware_permissions.total_other_permissions}}</span>
           </div>
           <div class="h-2 w-full rounded-full bg-surface-2 overflow-hidden">
-            <div class="h-full bg-severity-medium" style="width: {% widthratio malware_permissions.other_abused_permissions|length malware_permissions.total_other_permissions 100 %}%;"></div>
+            <div class="h-full bg-severity-medium transition-[width] duration-700 ease-out" style="width: {% widthratio malware_permissions.other_abused_permissions|length malware_permissions.total_other_permissions 100 %}%;"></div>
           </div>
           <p class="text-tiny text-text-secondary mt-2 break-words">{{ malware_permissions.other_abused_permissions | join:", "}}</p>
         </div>
@@ -741,10 +915,10 @@
 
 {# ─────────── Server locations ─────────── #}
 <a id="serverlocations" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "activity" size=18 %} Server locations</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "activity" size=16 %}</span> Server locations</h2></div>
   <div class="card-body">
-    <div id="chartdiv"></div>
+    <div class="overflow-x-auto rounded-lg border border-border-subtle bg-surface-0"><div id="chartdiv"></div></div>
   </div>
   {% if domains %}
   <div class="card-body pt-0">
@@ -775,13 +949,20 @@
       </tbody>
     </table>
   </div>
+  {% else %}
+  <div class="card-body pt-0">
+    <div class="flex flex-col items-center gap-2 text-text-tertiary py-6 text-center">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield-check" size=16 %}</span>
+      <p class="text-small">No outbound connections to OFAC-sanctioned regions detected.</p>
+    </div>
+  </div>
   {% endif %}
 </section>
 
 {# ─────────── Domain malware check ─────────── #}
 <a id="malware_check" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield-alert" size=18 %} Domain malware check</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "shield-alert" size=16 %}</span> Domain malware check</h2></div>
   <div class="overflow-x-auto report-table">
     {% if domains %}
     <table id="table_malware" class="w-full text-small">
@@ -823,14 +1004,19 @@
         {% endfor %}
       </tbody>
     </table>
+    {% else %}
+    <div class="flex flex-col items-center gap-2 text-text-tertiary px-5 py-10 text-center">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield-check" size=16 %}</span>
+      <p class="text-small">No domains extracted for malware / geolocation lookup.</p>
+    </div>
     {% endif %}
   </div>
 </section>
 
 {# ─────────── URLs ─────────── #}
 <a id="urls" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "external-link" size=18 %} URLs</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "external-link" size=16 %}</span> URLs</h2><span class="badge badge-neutral tabular">{{ urls|length }}</span></div>
   <div class="overflow-x-auto report-table">
     {% if urls %}
     <table id="table_urls" class="w-full text-small">
@@ -853,14 +1039,19 @@
         {% endfor %}
       </tbody>
     </table>
+    {% else %}
+    <div class="flex flex-col items-center gap-2 text-text-tertiary px-5 py-10 text-center">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "external-link" size=16 %}</span>
+      <p class="text-small">No URLs found in the decompiled source.</p>
+    </div>
     {% endif %}
   </div>
 </section>
 
 {# ─────────── Emails ─────────── #}
 <a id="emails" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "external-link" size=18 %} Emails</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "external-link" size=16 %}</span> Emails</h2><span class="badge badge-neutral tabular">{{ emails|length }}</span></div>
   <div class="overflow-x-auto report-table">
     {% if emails %}
     <table id="table_emails" class="w-full text-small">
@@ -883,14 +1074,19 @@
         {% endfor %}
       </tbody>
     </table>
+    {% else %}
+    <div class="flex flex-col items-center gap-2 text-text-tertiary px-5 py-10 text-center">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "external-link" size=16 %}</span>
+      <p class="text-small">No email addresses found in the decompiled source.</p>
+    </div>
     {% endif %}
   </div>
 </section>
 
 {# ─────────── Trackers ─────────── #}
 <a id="trackers" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "eye-off" size=18 %} Trackers</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "eye-off" size=16 %}</span> Trackers</h2></div>
   <div class="overflow-x-auto report-table">
     {% if trackers %}
     <table id="table_trackers" class="w-full text-small">
@@ -911,14 +1107,19 @@
         {% endfor %}
       </tbody>
     </table>
+    {% else %}
+    <div class="flex flex-col items-center gap-2 text-text-tertiary px-5 py-10 text-center">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield-check" size=16 %}</span>
+      <p class="text-small">No known trackers detected.</p>
+    </div>
     {% endif %}
   </div>
 </section>
 
 {# ─────────── Possible hardcoded secrets ─────────── #}
 <a id="secrets" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "key" size=18 %} Possible hardcoded secrets</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "key" size=16 %}</span> Possible hardcoded secrets</h2></div>
   <div class="card-body text-small">
     {% include 'base/list.html' with list=secrets type="secrets" limit=100 %}
   </div>
@@ -926,8 +1127,8 @@
 
 {# ─────────── Strings ─────────── #}
 <a id="strings" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Strings</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "file-text" size=16 %}</span> Strings</h2></div>
   <div class="card-body text-small">
     <p class="text-tiny uppercase text-text-tertiary mb-2">From code</p>
     {% include 'base/list.html' with list=strings.strings_code type="strings" limit=100 %}
@@ -936,8 +1137,8 @@
 
 {# ─────────── Activities ─────────── #}
 <a id="activities" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "layers" size=18 %} Activities</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "layers" size=16 %}</span> Activities</h2><span class="badge badge-neutral tabular">{{ activities|length }}</span></div>
   <div class="card-body text-small">
     {% include 'base/list.html' with list=activities type="activities" limit=50 %}
   </div>
@@ -945,8 +1146,8 @@
 
 {# ─────────── Services ─────────── #}
 <a id="services" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "settings" size=18 %} Services</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "settings" size=16 %}</span> Services</h2><span class="badge badge-neutral tabular">{{ services|length }}</span></div>
   <div class="card-body text-small">
     {% include 'base/list.html' with list=services type="services" limit=50 %}
   </div>
@@ -954,8 +1155,8 @@
 
 {# ─────────── Receivers ─────────── #}
 <a id="receivers" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "bell" size=18 %} Receivers</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "bell" size=16 %}</span> Receivers</h2><span class="badge badge-neutral tabular">{{ receivers|length }}</span></div>
   <div class="card-body text-small">
     {% include 'base/list.html' with list=receivers type="receivers" limit=50%}
   </div>
@@ -963,8 +1164,8 @@
 
 {# ─────────── Providers ─────────── #}
 <a id="providers" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Providers</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "database" size=16 %}</span> Providers</h2><span class="badge badge-neutral tabular">{{ providers|length }}</span></div>
   <div class="card-body text-small">
     {% include 'base/list.html' with list=providers type="providers" limit=50 %}
   </div>
@@ -972,8 +1173,8 @@
 
 {# ─────────── Libraries ─────────── #}
 <a id="libraries" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "package" size=18 %} Libraries</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "package" size=16 %}</span> Libraries</h2><span class="badge badge-neutral tabular">{{ libraries|length }}</span></div>
   <div class="card-body text-small">
     {% include 'base/list.html' with list=libraries type="libraries" limit=50 %}
   </div>
@@ -981,8 +1182,8 @@
 
 {# ─────────── SBOM ─────────── #}
 <a id="sbom" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "package" size=18 %} SBOM</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "package" size=16 %}</span> SBOM</h2></div>
   <div class="card-body text-small">
     {% if sbom %}
       {% include 'base/list.html' with list=sbom.sbom_versioned type="Versioned Packages" limit=100 %}
@@ -993,8 +1194,8 @@
 
 {# ─────────── Files ─────────── #}
 <a id="files" class="anchor"></a>
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "copy" size=18 %} Files</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "copy" size=16 %}</span> Files</h2><span class="badge badge-neutral tabular">{{ files|length }}</span></div>
   <div class="card-body text-small">
     {% include 'base/list.html' with list=files type="files" limit=200 %}
   </div>
@@ -1066,6 +1267,66 @@
     </div>
   </div>
 </div>
+
+<script>
+  // Presentational-only additions: animated count-up for the stat tiles above,
+  // and scroll-spy highlighting for the quick-jump nav. Neither touches any
+  // existing report logic, DataTables, suppression, or amCharts code below.
+
+  // Animated count-up (same easing as the dashboard's metric tiles).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+
+  // Highlight the quick-jump nav pill for the section currently in view.
+  (function () {
+    const nav = document.querySelector('[data-quicknav]');
+    if (!nav || !('IntersectionObserver' in window)) return;
+    const links = Array.from(nav.querySelectorAll('a[href^="#"]'));
+    const linkFor = {};
+    links.forEach((a) => { linkFor[a.getAttribute('href').slice(1)] = a; });
+    const targets = Object.keys(linkFor)
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
+    if (!targets.length) return;
+    let current = null;
+    const setActive = (id) => {
+      if (id === current) return;
+      current = id;
+      links.forEach((a) => a.classList.remove('is-active'));
+      const active = linkFor[id];
+      if (active) {
+        active.classList.add('is-active');
+        if (active.scrollIntoView) {
+          active.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+        }
+      }
+    };
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) setActive(entry.target.id);
+      });
+    }, { rootMargin: '-96px 0px -70% 0px', threshold: 0 });
+    targets.forEach((el) => observer.observe(el));
+  })();
+</script>
 
 {% endblock %}
 

@@ -10,51 +10,136 @@
   .enlighter-t-enlighter div.enlighter > div.enlighter-special {
     background-color: rgb(var(--text-brand) / 0.15);
   }
+
+  /* ── Header: soft ambient glow, theme-aware, reduced-motion safe ── */
+  .mi-view-hero { position: relative; overflow: hidden; }
+  .mi-view-hero::before {
+    content: ''; position: absolute; top: -140px; right: -90px;
+    width: 340px; height: 340px; border-radius: 9999px; filter: blur(72px);
+    background: radial-gradient(circle at center, rgba(37,99,235,.30), transparent 70%);
+    pointer-events: none; opacity: .8;
+  }
+  :root[data-theme="dark"] .mi-view-hero::before { opacity: .5; }
+
+  /* ── Code card: brand accent top-bar, matches dashboard stat/action tiles ── */
+  .mi-code-card { position: relative; }
+  .mi-code-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #2563EB, transparent 85%);
+    border-top-left-radius: inherit; border-top-right-radius: inherit;
+    z-index: 1;
+  }
+
+  /* ── Table sections: subtle hover lift, consistent with card-hover pattern ── */
+  .mi-table-section {
+    transition: border-color .18s ease, box-shadow .18s ease;
+  }
+  .mi-table-section:hover {
+    border-color: var(--border-default);
+    box-shadow: 0 10px 28px -18px rgba(0,0,0,.35);
+  }
+
+  /* ── Copy button: quick icon pulse on success ── */
+  .mi-copy-btn .mi-copy-ico { transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
+  .mi-copy-btn.is-copied .mi-copy-ico { transform: scale(1.2); }
+  .mi-copy-btn.is-copied { border-color: rgba(22,163,74,.5); color: #16A34A; }
+  :root[data-theme="dark"] .mi-copy-btn.is-copied { border-color: rgba(74,222,128,.5); color: #4ADE80; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-table-section { transition: none; }
+    .mi-copy-btn .mi-copy-ico { transition: none; }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<header class="mb-6">
-  <a href="javascript:history.back()" class="text-small text-text-secondary hover:text-text-primary inline-flex items-center gap-1">
-    {% icon "chevron-left" size=14 %} Back
-  </a>
-  <h1 class="text-h2 mt-2 font-mono break-all">{{ file }}</h1>
-</header>
+<div class="space-y-6">
 
-<div class="card">
-  <div class="card-body">
-    {% if sqlite %}
-      <div class="space-y-6">
-        {% for table, data in sqlite.items %}
-          <section>
-            <h2 class="text-h3 mb-2 font-mono">{{ table }}</h2>
-            <div class="overflow-x-auto rounded-md border border-border-subtle">
-              <table class="w-full text-small">
-                <thead>
-                  <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-                    {% for head in data|key:"head" %}
-                      <th class="text-left px-4 py-2 font-medium">{{ head }}</th>
+  {# ══════════════════ Header ══════════════════ #}
+  <header class="mi-view-hero card p-0" data-reveal>
+    <div class="relative z-10 px-6 py-6 md:px-8 md:py-7">
+      <a href="javascript:history.back()" class="text-small text-text-secondary hover:text-text-primary inline-flex items-center gap-1 w-fit">
+        {% icon "chevron-left" size=14 %} Back
+      </a>
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mt-3">
+        <div class="flex items-start gap-3 min-w-0">
+          <span class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0 shadow-elevation-1">
+            {% if sqlite %}{% icon "database" size=22 %}{% else %}{% icon "file-text" size=22 %}{% endif %}
+          </span>
+          <div class="min-w-0">
+            <h1 class="text-h2 font-mono break-all leading-snug">{{ file }}</h1>
+            <div class="flex flex-wrap items-center gap-2 mt-2">
+              {% if sqlite %}
+                <span class="badge badge-unknown gap-1.5">{% icon "layers" size=12 %} {{ sqlite|length }} table{{ sqlite|length|pluralize }}</span>
+              {% elif type %}
+                <span class="badge badge-unknown uppercase font-mono">{% icon "file-text" size=12 %} {{ type }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% if not sqlite %}
+        <div class="flex-shrink-0">
+          <button type="button" id="mi_copy_btn" class="mi-copy-btn btn btn-secondary btn-sm">
+            <span id="mi_copy_icon" class="mi-copy-ico inline-flex">{% icon "copy" size=14 %}</span>
+            <span id="mi_copy_label">Copy source</span>
+          </button>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  {% if sqlite %}
+    {# ══════════════════ SQLite tables ══════════════════ #}
+    <div class="space-y-6">
+      {% for table, data in sqlite.items %}
+        <section class="mi-table-section card" data-reveal>
+          <div class="card-header">
+            <h2 class="text-h3 font-mono flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
+                {% icon "database" size=14 %}
+              </span>
+              {{ table }}
+            </h2>
+            <span class="badge badge-neutral tabular">{{ data|key:"data"|length }} row{{ data|key:"data"|length|pluralize }}</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-small">
+              <thead>
+                <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                  {% for head in data|key:"head" %}
+                    <th class="text-left px-4 py-2.5 font-medium whitespace-nowrap">{{ head }}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for dat in data|key:"data" %}
+                  <tr class="border-b border-border-subtle last:border-b-0 hover:bg-surface-2/40 transition-colors duration-fast">
+                    {% for item in dat %}
+                      <td class="px-4 py-2 text-text-secondary break-words align-top" style="min-width:160px;max-width:160px;">{{ item }}</td>
                     {% endfor %}
                   </tr>
-                </thead>
-                <tbody>
-                  {% for dat in data|key:"data" %}
-                    <tr class="border-b border-border-subtle hover:bg-surface-2/40">
-                      {% for item in dat %}
-                        <td class="px-4 py-2 text-text-secondary break-words" style="min-width:160px;max-width:160px;">{{ item }}</td>
-                      {% endfor %}
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        {% endfor %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% else %}
+    {# ══════════════════ Source / text viewer ══════════════════ #}
+    <div class="mi-code-card card overflow-hidden" data-reveal>
+      <div class="card-body p-0">
+        <div class="overflow-x-auto">
+          <pre id="code_block">{{ data }}</pre>
+        </div>
       </div>
-    {% else %}
-      <pre id="code_block">{{ data }}</pre>
-    {% endif %}
-  </div>
+    </div>
+    {# Raw copy of the source, kept off-DOM-visible so EnlighterJS's markup
+       rewrites of #code_block never affect the copy-to-clipboard text. #}
+    <textarea id="code_raw" class="sr-only" tabindex="-1" aria-hidden="true" readonly>{{ data }}</textarea>
+  {% endif %}
+
 </div>
 {% endblock %}
 
@@ -90,5 +175,52 @@
     if (hcls.scrollIntoViewIfNeeded) hcls.scrollIntoViewIfNeeded();
     else hcls.scrollIntoView();
   }
+</script>
+<script>
+  // Copy-to-clipboard for the source viewer (additive, presentational-only;
+  // reads the untouched #code_raw textarea so EnlighterJS's DOM rewrites of
+  // #code_block above can never desync the copied text).
+  (function () {
+    const btn = document.getElementById('mi_copy_btn');
+    const raw = document.getElementById('code_raw');
+    if (!btn || !raw) return;
+    const icon = document.getElementById('mi_copy_icon');
+    const label = document.getElementById('mi_copy_label');
+    const iconCopyHtml = icon ? icon.innerHTML : '';
+    const iconCheckHtml = '{% icon "check" size=14 %}';
+    const labelDefault = label ? label.textContent : 'Copy source';
+
+    const fallbackCopy = function () {
+      raw.classList.remove('sr-only');
+      raw.focus();
+      raw.select();
+      try { document.execCommand('copy'); } catch (e) { /* no-op */ }
+      raw.classList.add('sr-only');
+    };
+
+    const showCopied = function () {
+      btn.classList.add('is-copied');
+      if (icon) icon.innerHTML = iconCheckHtml;
+      if (label) label.textContent = 'Copied';
+      setTimeout(function () {
+        btn.classList.remove('is-copied');
+        if (icon) icon.innerHTML = iconCopyHtml;
+        if (label) label.textContent = labelDefault;
+      }, 1500);
+    };
+
+    btn.addEventListener('click', function () {
+      const text = raw.value;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(showCopied, function () {
+          fallbackCopy();
+          showCopied();
+        });
+      } else {
+        fallbackCopy();
+        showCopied();
+      }
+    });
+  })();
 </script>
 {% endblock %}

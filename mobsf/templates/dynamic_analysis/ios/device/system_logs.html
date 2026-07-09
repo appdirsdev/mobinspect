@@ -1,53 +1,202 @@
 {% extends "base/legacy_app.html" %}
+{% load mi_icons %}
 
 {% block page_title %}iOS device logs{% endblock %}
 
 {% block extra_css %}
 <style>
+  /* ── Ambient header glow (contained, theme-aware, reduced-motion safe) ── */
+  .mi-hero { background: rgb(var(--surface-1)); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(56px); opacity: .5;
+  }
+  .mi-hero-glow::before {
+    width: 220px; height: 220px; top: -90px; right: -30px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.55), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 180px; height: 180px; bottom: -110px; left: 12%;
+    background: radial-gradient(circle at center, rgba(16,185,129,.35), transparent 70%);
+    animation: mi-float 20s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 28px 28px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 70% 100% at 88% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 100% at 88% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .3; }
+
+  /* ── Live pulse indicator ── */
+  .mi-live-dot { width: 7px; height: 7px; border-radius: 9999px; background: currentColor; display: inline-block; position: relative; }
+  .mi-live-dot::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 9999px;
+    background: currentColor; opacity: .55; animation: mi-pulse 1.8s ease-out infinite;
+  }
+  .mi-live-dot.mi-pulse-flash::before {
+    content: ''; position: absolute; inset: -7px; border-radius: 9999px;
+    border: 2px solid currentColor; opacity: .9; animation: mi-flash .6s ease-out;
+  }
+
+  /* ── Terminal-style log window ──
+     Fixed dark palette regardless of app theme: the stream renders raw ANSI
+     colors (incl. literal "white"/"black") inline via ansiToHtml(), which
+     only stays legible against a dark pane in both light and dark themes. */
+  .mi-term { position: relative; }
+  .mi-term-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 14px; background: #050810; border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .mi-term-dot { width: 10px; height: 10px; border-radius: 9999px; opacity: .85; flex-shrink: 0; }
+  .mi-term-path {
+    margin-left: 8px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; color: #64748B; letter-spacing: .01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mi-term-scroll { position: relative; }
   #logs {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     white-space: pre-wrap;
+    word-break: break-word;
     background: #0B0F1A;
     color: #F1F5F9;
     padding: 16px;
-    border-radius: 8px;
-    max-height: 600px;
+    margin: 0;
+    max-height: min(65vh, 640px);
     overflow-y: auto;
+    overflow-x: auto;
+    line-height: 1.6;
+    font-size: 12.5px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  #logs:empty { min-height: 220px; }
+  #logs::-webkit-scrollbar { width: 10px; }
+  #logs::-webkit-scrollbar-track { background: transparent; }
+  #logs::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 8px; }
+  #logs::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.24); }
+
+  .mi-term-empty {
+    display: none; position: absolute; inset: 0;
+    align-items: center; justify-content: center; gap: 8px;
+    padding: 16px; text-align: center; pointer-events: none;
+    color: #64748B; font-size: 13px;
+  }
+  #logs:empty ~ .mi-term-empty { display: flex; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after,
+    .mi-live-dot::after, .mi-live-dot.mi-pulse-flash::before { animation: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-18px,0); }
+  }
+  @keyframes mi-pulse {
+    0%          { transform: scale(.6); opacity: .55; }
+    70%, 100%   { transform: scale(1.9); opacity: 0; }
+  }
+  @keyframes mi-flash {
+    0%   { transform: scale(.4); opacity: 1; }
+    100% { transform: scale(1.6); opacity: 0; }
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<header class="mb-6">
-  <p class="text-tiny uppercase text-text-tertiary">Dynamic · iOS · Device</p>
-  <h1 class="text-h2 mt-1">{% if pid %}Logs for PID {{ pid }}{% else %}System logs{% endif %}</h1>
-</header>
+<div class="space-y-6">
 
-<data id="pid" value="{{ pid }}"></data>
-
-<div class="card mb-4">
-  <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-    <div class="md:col-span-2">
-      <label for="pid_select" class="label">Process</label>
-      <select id="pid_select" class="input">
-        <option value="">All system logs</option>
-      </select>
+  {# ══════════════════ Ambient header ══════════════════ #}
+  <header class="mi-hero card mi-glass relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+    <div class="relative z-10 px-6 py-6 md:px-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div class="flex items-center gap-4 min-w-0">
+        <span class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-chart-amber/15 text-chart-amber shadow-elevation-1 flex-shrink-0">
+          {% icon "activity" size=22 %}
+        </span>
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1 inline-flex items-center gap-1.5">
+            {% icon "smartphone" size=12 %} Dynamic &middot; iOS &middot; Device
+          </p>
+          <h1 class="text-h2 truncate">{% if pid %}Logs for PID {{ pid }}{% else %}System logs{% endif %}</h1>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="badge badge-passed gap-1.5">
+          <span id="liveDot" class="mi-live-dot"></span> Live
+        </span>
+      </div>
     </div>
-    <div class="flex md:justify-end items-end gap-2">
-      <span class="text-tiny text-text-tertiary mr-auto md:hidden">refreshes every 10s</span>
-      <button id="clearLogs" type="button" class="btn btn-secondary btn-sm">Clear</button>
+  </header>
+
+  <data id="pid" value="{{ pid }}" class="hidden"></data>
+
+  {# ══════════════════ Process filter ══════════════════ #}
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+      <div class="md:col-span-2">
+        <label for="pid_select" class="label inline-flex items-center gap-1.5">
+          {% icon "search" size=13 %} Process
+        </label>
+        <select id="pid_select" class="input">
+          <option value="">All system logs</option>
+        </select>
+        <p id="processCount" class="text-tiny text-text-tertiary mt-1.5">Loading process list&hellip;</p>
+      </div>
+      <div class="flex md:justify-end items-end gap-2">
+        <span class="text-tiny text-text-tertiary mr-auto md:hidden">refreshes every 10s</span>
+        <button id="clearLogs" type="button" class="btn btn-secondary btn-sm">
+          {% icon "trash" size=14 %} Clear
+        </button>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="card">
-  <div class="card-header">
-    <span class="text-small text-text-secondary">Log stream</span>
-    <span class="text-tiny text-text-tertiary hidden md:inline">refreshes every 10s</span>
+  {# ══════════════════ Log stream (terminal) ══════════════════ #}
+  <div class="card mi-glass overflow-hidden" data-reveal>
+    <div class="card-header flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="text-small text-text-secondary font-medium">Log stream</span>
+        <span class="text-tiny text-text-tertiary hidden md:inline">&middot; refreshes every 10s</span>
+      </div>
+      <div class="flex items-center gap-3 flex-shrink-0">
+        <span id="logActionStatus" class="text-tiny text-text-brand" aria-live="polite"></span>
+        <span id="lastUpdate" class="text-tiny text-text-tertiary tabular hidden sm:inline">Waiting for first log line&hellip;</span>
+        <div class="flex items-center gap-1">
+          <button type="button" id="copyLogs" class="btn btn-ghost btn-sm" title="Copy visible logs">
+            {% icon "copy" size=14 %}<span class="hidden lg:inline">Copy</span>
+          </button>
+          <button type="button" id="downloadLogs" class="btn btn-ghost btn-sm" title="Download as .log">
+            {% icon "download" size=14 %}<span class="hidden lg:inline">Download</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div id="logStream" class="mi-term" data-device-id="{{ device_id }}" data-pid="{{ pid }}">
+        <div class="mi-term-bar" aria-hidden="true">
+          <span class="mi-term-dot" style="background:#EF4444"></span>
+          <span class="mi-term-dot" style="background:#F59E0B"></span>
+          <span class="mi-term-dot" style="background:#10B981"></span>
+          <span class="mi-term-path">device &middot; {{ device_id }}{% if pid %} &middot; pid {{ pid }}{% endif %}</span>
+        </div>
+        <div class="mi-term-scroll">
+          <pre id="logs"></pre>
+          <div class="mi-term-empty">
+            {% icon "info" size=16 %}
+            <span>Waiting for the first log line &mdash; streaming starts automatically&hellip;</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="card-body p-0">
-    <pre id="logs"></pre>
-  </div>
+
 </div>
 {% endblock %}
 
@@ -145,5 +294,108 @@ $(document).ready(function () {
   get_logs();
   setInterval(get_logs, 10000);
 });
+</script>
+
+<script type="text/javascript">
+  // ── Presentational-only enhancements. Purely additive: observes the DOM
+  // that the script above already produces and never touches its logic,
+  // state, or network calls. Safe to remove without affecting streaming. ──
+  (function () {
+    var select = document.getElementById('pid_select');
+    var countEl = document.getElementById('processCount');
+    function updateProcessCount() {
+      if (!select || !countEl) return;
+      var n = Math.max(select.options.length - 1, 0);
+      countEl.textContent = n > 0
+        ? n + ' process' + (n === 1 ? '' : 'es') + ' available'
+        : 'No processes reported by the device yet';
+    }
+    if (select && countEl) {
+      updateProcessCount();
+      new MutationObserver(updateProcessCount).observe(select, { childList: true });
+    }
+
+    var logsEl = document.getElementById('logs');
+    var liveDot = document.getElementById('liveDot');
+    var lastUpdateEl = document.getElementById('lastUpdate');
+    var lastTime = null;
+
+    function relabelLastUpdate() {
+      if (!lastUpdateEl) return;
+      if (!lastTime) { lastUpdateEl.textContent = 'Waiting for first log line…'; return; }
+      var secs = Math.round((Date.now() - lastTime) / 1000);
+      lastUpdateEl.textContent = secs < 2 ? 'Updated just now' : 'Updated ' + secs + 's ago';
+    }
+
+    if (logsEl) {
+      new MutationObserver(function () {
+        lastTime = Date.now();
+        relabelLastUpdate();
+        if (liveDot) {
+          liveDot.classList.remove('mi-pulse-flash');
+          void liveDot.offsetWidth; // restart the CSS animation
+          liveDot.classList.add('mi-pulse-flash');
+        }
+      }).observe(logsEl, { childList: true, subtree: true, characterData: true });
+    }
+    relabelLastUpdate();
+    setInterval(relabelLastUpdate, 1000);
+
+    var statusEl = document.getElementById('logActionStatus');
+    var statusTimer = null;
+    function flashStatus(msg) {
+      if (!statusEl) return;
+      statusEl.textContent = msg;
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(function () { statusEl.textContent = ''; }, 2500);
+    }
+
+    var copyBtn = document.getElementById('copyLogs');
+    if (copyBtn && logsEl) {
+      copyBtn.addEventListener('click', function () {
+        var text = logsEl.innerText || '';
+        if (!text) { flashStatus('Nothing to copy yet'); return; }
+        var done = function () { flashStatus('Copied to clipboard'); };
+        var fail = function () { flashStatus('Copy failed — select the text manually'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, fail);
+        } else {
+          try {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            done();
+          } catch (e) { fail(); }
+        }
+      });
+    }
+
+    var downloadBtn = document.getElementById('downloadLogs');
+    var streamEl = document.getElementById('logStream');
+    if (downloadBtn && logsEl && streamEl) {
+      downloadBtn.addEventListener('click', function () {
+        var text = logsEl.innerText || '';
+        if (!text) { flashStatus('Nothing to download yet'); return; }
+        var device = (streamEl.dataset.deviceId || 'device').replace(/[^a-z0-9_-]+/gi, '-');
+        var pidPart = streamEl.dataset.pid ? '-pid-' + streamEl.dataset.pid.replace(/[^a-z0-9_-]+/gi, '') : '';
+        var stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        var blob = new Blob([text], { type: 'text/plain' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'system-logs-' + device + pidPart + '-' + stamp + '.log';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        flashStatus('Download started');
+      });
+    }
+  })();
 </script>
 {% endblock %}

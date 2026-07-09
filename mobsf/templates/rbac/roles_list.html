@@ -1,83 +1,225 @@
 {% extends "base/app.html" %}
 {% load mi_icons %}{% load rbac %}
 
+{% block extra_head %}
+<style>
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero { background: var(--surface-1); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .55;
+  }
+  .mi-hero-glow::before {
+    width: 320px; height: 320px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.55), transparent 70%);
+    animation: mi-float 15s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 260px; height: 260px; bottom: -130px; left: -40px;
+    background: radial-gradient(circle at center, rgba(59,130,246,.4), transparent 70%);
+    animation: mi-float 20s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .5;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 80% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 80% 80% at 80% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .42; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .34; }
+
+  /* ── Metric tiles: accent bar + hover lift + count-up ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Role cards: color-accent bar (per-role color) + radial glow on hover ── */
+  .mi-role-card { position: relative; overflow: hidden; }
+  .mi-role-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: linear-gradient(90deg, var(--mi-role-accent, #2563EB), transparent 85%);
+    opacity: .9; }
+  .mi-role-card::after { content: ''; position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(120% 90% at 100% 0%, var(--mi-role-accent, #2563EB), transparent 60%);
+    transition: opacity .22s ease; }
+  .mi-role-card:hover::after { opacity: .09; }
+  .mi-role-ico { transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+  .mi-role-card:hover .mi-role-ico { transform: scale(1.08) rotate(-3deg); }
+
+  /* ── Empty state: soft dashed well ── */
+  .mi-empty { border: 1.5px dashed var(--border-default); background: var(--surface-2); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-stat, .mi-role-ico { transition: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-24px,0); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<header class="flex items-center justify-between gap-4 mb-6">
-  <div>
-    <h1 class="text-h1">Roles</h1>
-    <p class="text-text-secondary mt-1">
-      Bundles of permissions assigned to users. System roles cannot be deleted.
-    </p>
-  </div>
-  {% can 'rbac.role.manage' %}
-    <a href="{% url 'rbac:role_create' %}" class="btn btn-primary btn-md">
-      {% icon "plus" size=14 %} New role
-    </a>
-  {% endcan %}
-</header>
+{% regroup roles by is_system as role_split %}
+<div class="space-y-6">
 
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-  {% for role in roles %}
-    <div class="card card-hover" data-reveal>
-      <div class="card-body">
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <span
-              class="inline-flex items-center justify-center w-8 h-8 rounded-md text-white shadow-elevation-1 flex-shrink-0"
-              style="background-color: {{ role.color }};"
-            >
-              {% icon role.icon size=16 %}
-            </span>
-            <h3 class="text-h3 truncate">{{ role.name }}</h3>
+  {# ══════════════════ Ambient hero ══════════════════ #}
+  <section class="mi-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-8 md:px-10 md:py-9">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "shield-check" size=13 %} Access control
+          </p>
+          <h1 class="text-display font-bold leading-tight">Roles</h1>
+          <p class="text-body text-text-secondary mt-2 max-w-xl">
+            Bundles of permissions assigned to users. System roles cannot be deleted.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          {% can 'rbac.role.manage' %}
+            <a href="{% url 'rbac:role_create' %}" class="btn btn-primary btn-lg">
+              {% icon "plus" size=16 %} New role
+            </a>
+          {% endcan %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ══════════════════ Live stat tiles (animated, real DB counts) ══════════════════ #}
+  <section class="grid grid-cols-2 lg:grid-cols-3 gap-4" data-reveal>
+    <div class="mi-stat card card-body" x-data="counter({{ roles|length }})">
+      <span class="w-10 h-10 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+        {% icon "layers" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Total roles</p>
+    </div>
+    <div class="mi-stat card card-body"
+         x-data="counter({% for grp in role_split %}{% if grp.grouper %}{{ grp.list|length }}{% endif %}{% endfor %})">
+      <span class="w-10 h-10 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+        {% icon "shield-check" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">System roles</p>
+    </div>
+    <div class="mi-stat card card-body col-span-2 lg:col-span-1"
+         x-data="counter({% for grp in role_split %}{% if not grp.grouper %}{{ grp.list|length }}{% endif %}{% endfor %})">
+      <span class="w-10 h-10 rounded-lg bg-severity-medium/15 text-severity-medium inline-flex items-center justify-center flex-shrink-0">
+        {% icon "edit" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Custom roles</p>
+    </div>
+  </section>
+
+  {# ══════════════════ Role cards ══════════════════ #}
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for role in roles %}
+      <div class="mi-role-card card card-hover flex flex-col" style="--mi-role-accent: {{ role.color }};" data-reveal>
+        <div class="card-body flex-1">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span
+                class="mi-role-ico inline-flex items-center justify-center w-9 h-9 rounded-md text-white shadow-elevation-1 flex-shrink-0"
+                style="background-color: {{ role.color }};"
+              >
+                {% icon role.icon size=16 %}
+              </span>
+              <h3 class="text-h3 truncate">{{ role.name }}</h3>
+            </div>
+            {% if role.is_system %}
+              <span class="badge badge-low flex-shrink-0" title="System role">System</span>
+            {% endif %}
           </div>
-          {% if role.is_system %}
-            <span class="badge badge-low" title="System role">SYSTEM</span>
-          {% endif %}
+
+          <p class="text-small text-text-secondary mt-3 line-clamp-2">
+            {{ role.description|default:"—" }}
+          </p>
+
+          <div class="mt-4 flex items-center gap-4 text-tiny text-text-tertiary">
+            <span class="inline-flex items-center gap-1.5">
+              {% icon "key" size=12 %}
+              <span class="tabular text-text-secondary">{{ role.permissions.count }}</span>
+              permission{{ role.permissions.count|pluralize }}
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              {% icon "users" size=12 %}
+              <span class="tabular text-text-secondary">{{ role.assignments.count }}</span>
+              user{{ role.assignments.count|pluralize }}
+            </span>
+          </div>
         </div>
 
-        <p class="text-small text-text-secondary mt-3 line-clamp-2">
-          {{ role.description|default:"—" }}
-        </p>
-
-        <div class="mt-4 flex items-center gap-4 text-tiny text-text-tertiary">
-          <span class="flex items-center gap-1">
-            {% icon "shield" size=12 %}
-            {{ role.permissions.count }} permission{{ role.permissions.count|pluralize }}
+        {% can 'rbac.role.manage' %}
+          <div class="card-footer flex justify-end gap-2 whitespace-nowrap">
+            <a href="{% url 'rbac:role_edit' role.id %}" class="btn btn-ghost btn-sm">
+              {% icon "edit" size=14 %} Edit
+            </a>
+            {% if not role.is_system %}
+              <form method="post" action="{% url 'rbac:role_delete' role.id %}"
+                    onsubmit="return confirm('Delete role &quot;{{ role.name|escapejs }}&quot;? Users assigned to it will lose its permissions.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-sm text-system-error">
+                  {% icon "trash" size=14 %} Delete
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        {% endcan %}
+      </div>
+    {% empty %}
+      <div class="col-span-full">
+        <div class="mi-empty card card-body text-center py-14 rounded-lg" data-reveal>
+          <span class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-mobinspect-500/15 text-mobinspect-500 mx-auto shadow-elevation-1">
+            {% icon "shield" size=26 %}
           </span>
-          <span class="flex items-center gap-1">
-            {% icon "users" size=12 %}
-            {{ role.assignments.count }} user{{ role.assignments.count|pluralize }}
-          </span>
+          <h3 class="text-h3 mt-4">No roles defined</h3>
+          <p class="text-small text-text-secondary mt-1">Seed migrations should have created the default four.</p>
+          {% can 'rbac.role.manage' %}
+            <div class="mt-5">
+              <a href="{% url 'rbac:role_create' %}" class="btn btn-primary btn-md">
+                {% icon "plus" size=14 %} New role
+              </a>
+            </div>
+          {% endcan %}
         </div>
       </div>
+    {% endfor %}
+  </div>
 
-      {% can 'rbac.role.manage' %}
-        <div class="card-footer flex justify-end gap-2">
-          <a href="{% url 'rbac:role_edit' role.id %}" class="btn btn-ghost btn-sm">
-            {% icon "edit" size=14 %} Edit
-          </a>
-          {% if not role.is_system %}
-            <form method="post" action="{% url 'rbac:role_delete' role.id %}"
-                  onsubmit="return confirm('Delete role &quot;{{ role.name|escapejs }}&quot;? Users assigned to it will lose its permissions.');">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-ghost btn-sm text-system-error">
-                {% icon "trash" size=14 %} Delete
-              </button>
-            </form>
-          {% endif %}
-        </div>
-      {% endcan %}
-    </div>
-  {% empty %}
-    <div class="col-span-full">
-      <div class="card card-body text-center py-12">
-        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-2 text-text-tertiary mx-auto">
-          {% icon "shield" size=24 %}
-        </div>
-        <h3 class="text-h3 mt-3">No roles defined</h3>
-        <p class="text-text-secondary mt-1">Seed migrations should have created the default four.</p>
-      </div>
-    </div>
-  {% endfor %}
 </div>
+
+<script>
+  // Animated count-up for the metric tiles (additive; presentation only).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+</script>
 {% endblock %}

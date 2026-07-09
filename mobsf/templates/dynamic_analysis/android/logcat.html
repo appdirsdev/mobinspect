@@ -1,5 +1,103 @@
-<div id="messages"></div>
-<button id="tgl" onclick="toggle()">Stop Streaming</button>
+{% load static %}{% load mi_theme %}{% load mi_icons %}<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  {# Theme bootstrap MUST run before any paint to avoid flash #}
+  {% theme_bootstrap %}
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="MobInspect — Live logcat stream" />
+
+  <title>Logcat — {{package}} · MobInspect</title>
+
+  <link rel="icon" type="image/svg+xml" href="{% static 'mobinspect/img/favicon.svg' %}" />
+  <link rel="alternate icon" href="{% static 'img/favicon.ico' %}" />
+
+  <link rel="stylesheet" href="{% static 'mobinspect/css/dist/app.css' %}" />
+
+  <style>
+    /* Streaming console surface — grows with content so the JS
+       window.scrollTo(0, body.scrollHeight) autoscroll keeps working. */
+    #messages {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: rgb(var(--text-secondary));
+      min-height: 4rem;
+    }
+    #messages:empty::before {
+      content: "Waiting for log output…";
+      color: rgb(var(--text-tertiary));
+      font-style: italic;
+    }
+    /* Soft alternating readability without touching per-line markup */
+    #messages br + * { }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background: rgb(var(--severity-passed, 22 163 74));
+      box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5);
+      animation: live-pulse 1.8s ease-out infinite;
+    }
+    @keyframes live-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45); }
+      70%  { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+    }
+  </style>
+</head>
+
+<body class="h-full antialiased bg-surface-0 text-text-primary">
+
+  {# ─────────── Sticky page header ─────────── #}
+  <header class="sticky top-0 z-20 border-b border-border-subtle bg-surface-1/85 backdrop-blur">
+    <div class="max-w-content mx-auto px-4 lg:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="w-11 h-11 rounded-lg bg-surface-3 text-text-secondary flex items-center justify-center flex-shrink-0">
+          {% icon "terminal" size=20 %}
+        </span>
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-wide text-text-tertiary">Dynamic analysis</p>
+          <h1 class="text-h3 leading-tight">Live Logcat</h1>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="badge inline-flex items-center gap-1.5 font-mono max-w-full truncate" title="{{package}}">
+          {% icon "package" size=12 %}<span class="truncate">{{package}}</span>
+        </span>
+        <span class="inline-flex items-center gap-2 rounded-md border border-border-subtle bg-surface-2 px-2.5 py-1 text-tiny uppercase tracking-wide text-text-secondary">
+          <span class="live-dot"></span> Live
+        </span>
+        <button id="tgl" onclick="toggle()" class="btn btn-secondary btn-md">Stop Streaming</button>
+      </div>
+    </div>
+  </header>
+
+  {# ─────────── Log console ─────────── #}
+  <main class="max-w-content mx-auto px-4 lg:px-6 py-6">
+    <section class="card">
+      <div class="card-header flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2 min-w-0">
+          {% icon "scroll-text" size=16 %}
+          <h2 class="text-small font-medium truncate">Log stream</h2>
+        </div>
+        <p class="text-tiny text-text-tertiary whitespace-nowrap">Filtered to package · last 500 lines</p>
+      </div>
+      <div class="card-body">
+        <div class="rounded-lg border border-border-subtle bg-surface-2 overflow-x-auto">
+          <div class="p-4">
+            <div id="messages"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
 <script type="text/javascript">
 var source = new EventSource('/logcat/?app_package={{package}}');
 var i = 0;
@@ -54,3 +152,5 @@ function html_safe(data){
 }
 
 </script>
+</body>
+</html>

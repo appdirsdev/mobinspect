@@ -9,52 +9,206 @@
     only_second — iterable of entries unique to app 2
     first_label — display label for app 1
     second_label — display label for app 2
+
+  Interactive additions below (search filter, copy-to-clipboard, proportion
+  bar) are presentation-only and operate entirely on the real common /
+  only_first / only_second data already passed in — no new data, no mock
+  content, no change to the variables above.
 {% endcomment %}
-<section class="card" data-reveal>
-  <div class="card-header">
-    <h2 class="text-h3 flex items-center gap-2">{% icon icon size=18 %} {{ title }}</h2>
-    <span class="text-tiny text-text-tertiary">
-      {{ common|length }} common · {{ only_first|length }} only A · {{ only_second|length }} only B
-    </span>
+{% with c=common|length a=only_first|length b=only_second|length %}
+<section
+  class="card card-hover overflow-hidden"
+  data-reveal
+  x-data="{
+    q: '',
+    copied: null,
+    copy(ref, key) {
+      const scope = this.$refs[ref];
+      if (!scope) return;
+      const nodes = scope.querySelectorAll('[data-diff-item]');
+      const text = Array.from(nodes)
+        .filter(n => n.offsetParent !== null)
+        .map(n => n.dataset.value)
+        .join('\n');
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        this.copied = key;
+        setTimeout(() => { if (this.copied === key) this.copied = null }, 1600);
+      });
+    }
+  }"
+>
+  <div class="card-header flex-col sm:flex-row items-start sm:items-center gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-mobinspect-500 to-mobinspect-600 text-white shadow-elevation-1 flex-shrink-0">
+        {% icon icon size=17 %}
+      </span>
+      <div class="min-w-0">
+        <h2 class="text-h3 truncate">{{ title }}</h2>
+        <p class="text-tiny text-text-tertiary mt-0.5 truncate">
+          {{ first_label }} <span class="text-text-tertiary/70">vs</span> {{ second_label }}
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap flex-shrink-0">
+      <span class="badge badge-unknown gap-1.5" title="Present in both apps">{% icon "check" size=11 %} {{ c }} common</span>
+      <span class="badge badge-low gap-1.5" title="Only in {{ first_label }}">A · {{ a }} only</span>
+      <span class="badge badge-medium gap-1.5" title="Only in {{ second_label }}">B · {{ b }} only</span>
+    </div>
   </div>
+
+  {# ── Proportion bar — real counts via flex-grow ratios, no synthetic data ── #}
+  {% if c or a or b %}
+  <div class="px-5 pt-4" aria-hidden="true">
+    <div class="flex h-1.5 w-full rounded-full overflow-hidden bg-surface-2 ring-1 ring-inset ring-border-subtle">
+      {% if c %}<div style="flex-grow:{{ c }}" class="bg-mobinspect-500/70" title="{{ c }} common"></div>{% endif %}
+      {% if a %}<div style="flex-grow:{{ a }}" class="bg-severity-low dark:bg-severity-low-dark" title="{{ a }} only in {{ first_label }}"></div>{% endif %}
+      {% if b %}<div style="flex-grow:{{ b }}" class="bg-severity-medium dark:bg-severity-medium-dark" title="{{ b }} only in {{ second_label }}"></div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Filter — client-side, over the real rendered entries ── #}
+  <div class="px-5 pt-4">
+    <div class="relative max-w-sm">
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+        {% icon "search" size=14 %}
+      </span>
+      <input
+        type="search"
+        x-model="q"
+        placeholder="Filter {{ title|lower }}…"
+        class="input h-8 pl-9 text-small"
+        aria-label="Filter {{ title }} entries"
+      />
+    </div>
+  </div>
+
   <div class="card-body grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-    <div>
-      <h3 class="text-tiny uppercase text-text-secondary mb-2">Common</h3>
-      <div class="space-y-1 max-h-80 overflow-y-auto">
+    {# ═══ Common ═══ #}
+    <div class="min-w-0">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <h3 class="text-tiny uppercase tracking-wide text-text-secondary flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-mobinspect-500 flex-shrink-0"></span> Common
+        </h3>
+        {% if common %}
+        <button type="button" @click="copy('colCommon', 'common')"
+                class="text-text-tertiary hover:text-text-brand transition-colors duration-fast"
+                title="Copy all common entries" aria-label="Copy all common entries">
+          <span x-show="copied !== 'common'">{% icon "copy" size=13 %}</span>
+          <span x-show="copied === 'common'" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=13 %}</span>
+        </button>
+        {% endif %}
+      </div>
+      <div x-ref="colCommon" class="space-y-0.5 max-h-80 overflow-y-auto pr-1">
         {% for item in common %}
-          <code class="block font-mono text-mono text-text-secondary px-2 py-1 rounded bg-surface-2/60 truncate" title="{{ item }}">{{ item }}</code>
+          <div
+            data-diff-item
+            data-value="{{ item }}"
+            x-show="!q || '{{ item|escapejs }}'.toLowerCase().includes(q.toLowerCase())"
+            class="group/row flex items-center gap-1 rounded border-l-2 border-transparent px-2 py-1 hover:bg-surface-2/70 hover:border-mobinspect-500/50 transition-colors duration-fast"
+          >
+            <code class="flex-1 min-w-0 block font-mono text-mono text-text-secondary truncate" title="{{ item }}">{{ item }}</code>
+            <button type="button"
+                    @click="navigator.clipboard.writeText($el.closest('[data-diff-item]').dataset.value)"
+                    class="opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 text-text-tertiary hover:text-text-brand transition-opacity duration-fast flex-shrink-0"
+                    title="Copy" aria-label="Copy entry">
+              {% icon "copy" size=12 %}
+            </button>
+          </div>
         {% empty %}
-          <p class="text-tiny text-text-tertiary italic">none</p>
+          <div class="flex flex-col items-center gap-1.5 py-6 text-center rounded-lg border border-dashed border-border-subtle">
+            <span class="text-text-tertiary">{% icon "info" size=15 %}</span>
+            <p class="text-tiny text-text-tertiary">No common entries</p>
+          </div>
         {% endfor %}
       </div>
     </div>
 
-    <div>
-      <h3 class="text-tiny uppercase text-text-secondary mb-2 truncate" title="Only in {{ first_label }}">
-        Only in {{ first_label }}
-      </h3>
-      <div class="space-y-1 max-h-80 overflow-y-auto">
+    {# ═══ Only in A ═══ #}
+    <div class="min-w-0">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <h3 class="text-tiny uppercase tracking-wide text-text-secondary flex items-center gap-1.5 min-w-0 truncate" title="Only in {{ first_label }}">
+          <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-severity-low/15 text-severity-low dark:bg-severity-low-dark/20 dark:text-severity-low-dark text-[9px] font-bold flex-shrink-0">A</span>
+          <span class="truncate">Only in {{ first_label }}</span>
+        </h3>
+        {% if only_first %}
+        <button type="button" @click="copy('colFirst', 'first')"
+                class="text-text-tertiary hover:text-text-brand transition-colors duration-fast flex-shrink-0"
+                title="Copy all entries only in {{ first_label }}" aria-label="Copy all entries only in {{ first_label }}">
+          <span x-show="copied !== 'first'">{% icon "copy" size=13 %}</span>
+          <span x-show="copied === 'first'" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=13 %}</span>
+        </button>
+        {% endif %}
+      </div>
+      <div x-ref="colFirst" class="space-y-0.5 max-h-80 overflow-y-auto pr-1">
         {% for item in only_first %}
-          <code class="block font-mono text-mono text-severity-low dark:text-severity-low-dark px-2 py-1 rounded bg-severity-low/5 truncate" title="{{ item }}">{{ item }}</code>
+          <div
+            data-diff-item
+            data-value="{{ item }}"
+            x-show="!q || '{{ item|escapejs }}'.toLowerCase().includes(q.toLowerCase())"
+            class="group/row flex items-center gap-1 rounded border-l-2 border-severity-low/40 dark:border-severity-low-dark/40 px-2 py-1 hover:bg-severity-low/5 transition-colors duration-fast"
+          >
+            <code class="flex-1 min-w-0 block font-mono text-mono text-severity-low dark:text-severity-low-dark truncate" title="{{ item }}">{{ item }}</code>
+            <button type="button"
+                    @click="navigator.clipboard.writeText($el.closest('[data-diff-item]').dataset.value)"
+                    class="opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 text-text-tertiary hover:text-text-brand transition-opacity duration-fast flex-shrink-0"
+                    title="Copy" aria-label="Copy entry">
+              {% icon "copy" size=12 %}
+            </button>
+          </div>
         {% empty %}
-          <p class="text-tiny text-text-tertiary italic">none</p>
+          <div class="flex flex-col items-center gap-1.5 py-6 text-center rounded-lg border border-dashed border-border-subtle">
+            <span class="text-text-tertiary">{% icon "info" size=15 %}</span>
+            <p class="text-tiny text-text-tertiary">None unique to {{ first_label }}</p>
+          </div>
         {% endfor %}
       </div>
     </div>
 
-    <div>
-      <h3 class="text-tiny uppercase text-text-secondary mb-2 truncate" title="Only in {{ second_label }}">
-        Only in {{ second_label }}
-      </h3>
-      <div class="space-y-1 max-h-80 overflow-y-auto">
+    {# ═══ Only in B ═══ #}
+    <div class="min-w-0">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <h3 class="text-tiny uppercase tracking-wide text-text-secondary flex items-center gap-1.5 min-w-0 truncate" title="Only in {{ second_label }}">
+          <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-severity-medium/15 text-severity-medium dark:bg-severity-medium-dark/20 dark:text-severity-medium-dark text-[9px] font-bold flex-shrink-0">B</span>
+          <span class="truncate">Only in {{ second_label }}</span>
+        </h3>
+        {% if only_second %}
+        <button type="button" @click="copy('colSecond', 'second')"
+                class="text-text-tertiary hover:text-text-brand transition-colors duration-fast flex-shrink-0"
+                title="Copy all entries only in {{ second_label }}" aria-label="Copy all entries only in {{ second_label }}">
+          <span x-show="copied !== 'second'">{% icon "copy" size=13 %}</span>
+          <span x-show="copied === 'second'" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=13 %}</span>
+        </button>
+        {% endif %}
+      </div>
+      <div x-ref="colSecond" class="space-y-0.5 max-h-80 overflow-y-auto pr-1">
         {% for item in only_second %}
-          <code class="block font-mono text-mono text-severity-medium dark:text-severity-medium-dark px-2 py-1 rounded bg-severity-medium/5 truncate" title="{{ item }}">{{ item }}</code>
+          <div
+            data-diff-item
+            data-value="{{ item }}"
+            x-show="!q || '{{ item|escapejs }}'.toLowerCase().includes(q.toLowerCase())"
+            class="group/row flex items-center gap-1 rounded border-l-2 border-severity-medium/40 dark:border-severity-medium-dark/40 px-2 py-1 hover:bg-severity-medium/5 transition-colors duration-fast"
+          >
+            <code class="flex-1 min-w-0 block font-mono text-mono text-severity-medium dark:text-severity-medium-dark truncate" title="{{ item }}">{{ item }}</code>
+            <button type="button"
+                    @click="navigator.clipboard.writeText($el.closest('[data-diff-item]').dataset.value)"
+                    class="opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 text-text-tertiary hover:text-text-brand transition-opacity duration-fast flex-shrink-0"
+                    title="Copy" aria-label="Copy entry">
+              {% icon "copy" size=12 %}
+            </button>
+          </div>
         {% empty %}
-          <p class="text-tiny text-text-tertiary italic">none</p>
+          <div class="flex flex-col items-center gap-1.5 py-6 text-center rounded-lg border border-dashed border-border-subtle">
+            <span class="text-text-tertiary">{% icon "info" size=15 %}</span>
+            <p class="text-tiny text-text-tertiary">None unique to {{ second_label }}</p>
+          </div>
         {% endfor %}
       </div>
     </div>
 
   </div>
 </section>
+{% endwith %}

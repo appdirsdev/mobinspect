@@ -3,154 +3,327 @@
 
 {% block page_title %}Users{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* ── Users — ambient header + interactive rows, theme-aware, reduced-motion safe ── */
+  .mi-users-hero { background: rgb(var(--surface-1)); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(56px); opacity: .5;
+    width: 260px; height: 260px; top: -100px; right: -50px;
+    background: radial-gradient(circle at center, rgba(254,74,35,.5), transparent 70%);
+    animation: mi-float 17s ease-in-out infinite;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 70% 70% at 85% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 70% at 85% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .3; }
+
+  .mi-icon-chip {
+    background: linear-gradient(135deg, rgba(254,74,35,.18), rgba(254,74,35,.06));
+    box-shadow: inset 0 0 0 1px rgba(254,74,35,.18);
+  }
+
+  /* Stat chips (real counts: page.paginator.count / all_roles length) */
+  .mi-stat-chip {
+    position: relative; overflow: hidden;
+    transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+  }
+  .mi-stat-chip:hover {
+    transform: translateY(-2px);
+    border-color: rgb(var(--border-default));
+    box-shadow: 0 10px 24px -16px rgba(0,0,0,.35);
+  }
+  .mi-stat-num { font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+
+  /* Search: glow ring on focus */
+  .mi-search { transition: box-shadow .18s ease, border-color .18s ease; }
+  .mi-search:focus-within {
+    border-color: #8D5CFC;
+    box-shadow: 0 0 0 4px rgba(141,92,252,.14);
+  }
+  .mi-search-clear { transition: color .15s ease, transform .15s ease; }
+  .mi-search-clear:hover { transform: scale(1.1); }
+
+  /* Table rows */
+  .mi-row { transition: background-color .15s ease; }
+  .mi-avatar { transition: transform .2s cubic-bezier(.34,1.56,.64,1); }
+  .mi-row:hover .mi-avatar { transform: scale(1.08) rotate(-3deg); }
+
+  .mi-role-pill { transition: transform .15s ease, box-shadow .15s ease; }
+  .mi-role-pill:hover { transform: translateY(-1px); box-shadow: 0 4px 10px -6px rgba(0,0,0,.35); }
+
+  .mi-action-btn { transition: transform .15s ease; }
+  .mi-action-btn:hover { transform: translateY(-1px); }
+
+  /* Role-assignment drawer: fade + slide in whenever unhidden */
+  .mi-assign-panel { animation: mi-panel-in .22s ease; }
+  .mi-assign-pill { transition: transform .15s ease, box-shadow .15s ease, filter .15s ease; }
+  .mi-assign-pill:hover { transform: translateY(-1px) scale(1.03); filter: brightness(1.05); }
+
+  /* Status dot pulse for active users */
+  .mi-status-dot { position: relative; }
+  .mi-status-dot.is-active::before {
+    content: ''; position: absolute; inset: 0; border-radius: 9999px;
+    background: currentColor; opacity: .55;
+    animation: mi-pulse 2.2s ease-out infinite;
+  }
+
+  @keyframes mi-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes mi-float { 0%, 100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-18px,0); } }
+  @keyframes mi-pulse { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(2.2); opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before { animation: none; }
+    .mi-stat-chip, .mi-search, .mi-search-clear, .mi-row, .mi-avatar,
+    .mi-role-pill, .mi-action-btn, .mi-assign-panel, .mi-assign-pill { transition: none; animation: none; }
+    .mi-status-dot.is-active::before { animation: none; opacity: 0; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<header class="flex items-center justify-between gap-4 mb-6">
-  <div>
-    <h1 class="text-h1">Users</h1>
-    <p class="text-text-secondary mt-1">Members of this MobInspect instance and their assigned roles.</p>
-  </div>
-  {% can 'admin.user.create' %}
-    <a href="{% url 'create_user' %}" class="btn btn-primary btn-md">
-      {% icon "plus" size=14 %} Add user
-    </a>
-  {% endcan %}
-</header>
+<div class="space-y-6">
 
-<form method="get" action="{% url 'users' %}" class="mb-4">
-  <div class="relative max-w-md">
-    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{% icon "search" size=16 %}</span>
-    <input type="search" name="q" value="{{ query }}" placeholder="Search by username or email…"
-           class="input pl-9 pr-3 h-10 w-full" autocomplete="off" />
-  </div>
-</form>
+  {# ══════════════════ Ambient header ══════════════════ #}
+  <header class="mi-users-hero card mi-glass relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
 
-<div class="card">
-  <div class="overflow-x-auto">
-    <table class="w-full text-small">
-      <thead>
-        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-          <th class="text-left px-5 py-2.5 font-medium">User</th>
-          <th class="text-left px-5 py-2.5 font-medium">Email</th>
-          <th class="text-left px-5 py-2.5 font-medium">Roles</th>
-          <th class="text-left px-5 py-2.5 font-medium">Status</th>
-          <th class="text-right px-5 py-2.5 font-medium">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for u in users %}
-          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
-            <td class="px-5 py-3">
-              <div class="flex items-center gap-3 min-w-0">
-                <span class="w-8 h-8 rounded-full bg-mobinspect-500/15 text-mobinspect-500 flex items-center justify-center font-medium text-small flex-shrink-0">
-                  {{ u.username|slice:":1"|upper }}
-                </span>
-                <div class="min-w-0">
-                  <p class="font-medium text-text-primary truncate">{{ u.username }}</p>
-                </div>
-              </div>
-            </td>
-            <td class="px-5 py-3 text-text-secondary truncate max-w-xs">{{ u.email|default:"—" }}</td>
-            <td class="px-5 py-3">
-              <div class="flex flex-wrap gap-1">
-                {% for ra in u.role_assignments.all %}
-                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-tiny font-medium"
-                        style="background-color: {{ ra.role.color }}1A; color: {{ ra.role.color }};">
-                    {% icon ra.role.icon size=10 %} {{ ra.role.name }}
-                  </span>
-                {% empty %}
-                  {% if u.is_staff %}
-                    <span class="badge badge-critical">Admin (legacy)</span>
-                  {% else %}
-                    <span class="badge badge-unknown">No role</span>
-                  {% endif %}
-                {% endfor %}
-              </div>
-            </td>
-            <td class="px-5 py-3">
-              {% if u.is_active %}
-                <span class="badge badge-passed">Active</span>
-              {% else %}
-                <span class="badge badge-unknown">Disabled</span>
-              {% endif %}
-            </td>
-            <td class="px-5 py-3 text-right">
-              <div class="inline-flex items-center gap-1">
-                {% can 'rbac.role.manage' %}
-                  <button
-                    type="button" class="btn btn-ghost btn-sm"
-                    title="Assign role"
-                    onclick="document.getElementById('assign-row-{{ u.id }}').classList.toggle('hidden')"
-                  >
-                    {% icon "key" size=14 %} Roles
-                  </button>
-                {% endcan %}
-                {% can 'admin.user.delete' %}
-                  {% if not u.is_staff %}
-                    <button
-                      type="button" data-username="{{ u.username }}"
-                      class="btn btn-ghost btn-sm text-system-error mi-delete-user"
-                      title="Delete"
-                    >
-                      {% icon "trash" size=14 %}
-                    </button>
-                  {% endif %}
-                {% endcan %}
-              </div>
-            </td>
+    <div class="relative z-10 px-6 py-6 md:px-8 md:py-7">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="mi-icon-chip w-11 h-11 rounded-xl text-chart-amber inline-flex items-center justify-center flex-shrink-0">
+            {% icon "users" size=20 %}
+          </span>
+          <div class="min-w-0">
+            <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold inline-flex items-center gap-1.5">
+              {% icon "shield-check" size=12 %} Access control
+            </p>
+            <h1 class="text-h1 truncate mt-0.5">Users</h1>
+            <p class="text-small text-text-secondary mt-1">Members of this MobInspect instance and their assigned roles.</p>
+          </div>
+        </div>
+        {% can 'admin.user.create' %}
+          <a href="{% url 'create_user' %}" class="mi-pillbtn btn btn-md flex-shrink-0">
+            {% icon "plus" size=14 %} Add user
+          </a>
+        {% endcan %}
+      </div>
+
+      {# real stat chips — page.paginator.count and all_roles are backend context #}
+      <div class="flex flex-wrap items-center gap-3 mt-6">
+        <div class="mi-stat-chip card mi-glass inline-flex items-center gap-2.5 px-3.5 py-2" x-data="counter({{ page.paginator.count }})">
+          <span class="w-8 h-8 rounded-lg bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">
+            {% icon "users" size=15 %}
+          </span>
+          <span>
+            <span class="mi-stat-num tabular text-h4 font-bold" x-text="shown">0</span>
+            <span class="text-tiny text-text-secondary">
+              user{{ page.paginator.count|pluralize }}{% if query %} matching &ldquo;{{ query }}&rdquo;{% endif %}
+            </span>
+          </span>
+        </div>
+        <div class="mi-stat-chip card mi-glass inline-flex items-center gap-2.5 px-3.5 py-2" x-data="counter({{ all_roles|length }})">
+          <span class="w-8 h-8 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+            {% icon "key" size=15 %}
+          </span>
+          <span>
+            <span class="mi-stat-num tabular text-h4 font-bold" x-text="shown">0</span>
+            <span class="text-tiny text-text-secondary">role{{ all_roles|length|pluralize }} configured</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  {# ══════════════════ Search ══════════════════ #}
+  <form method="get" action="{% url 'users' %}">
+    <div class="mi-search card mi-glass flex items-center gap-2 max-w-md pl-3 pr-2 h-11">
+      <span class="text-text-tertiary pointer-events-none flex-shrink-0">{% icon "search" size=16 %}</span>
+      <input type="search" name="q" value="{{ query }}" placeholder="Search by username or email…"
+             class="input border-0 shadow-none bg-transparent px-1 h-full w-full focus:ring-0" autocomplete="off" />
+      {% if query %}
+        <a href="{% url 'users' %}" class="mi-search-clear text-text-tertiary hover:text-system-error flex-shrink-0" title="Clear search">
+          {% icon "x" size=16 %}
+        </a>
+      {% endif %}
+    </div>
+  </form>
+
+  {# ══════════════════ Users table ══════════════════ #}
+  <section class="card mi-glass" data-reveal>
+    <div class="card-header">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span class="w-8 h-8 rounded-lg bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">
+          {% icon "users" size=16 %}
+        </span>
+        <div class="min-w-0">
+          <h3 class="text-h3">All users</h3>
+        </div>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-3 font-medium">User</th>
+            <th class="text-left px-5 py-3 font-medium">Email</th>
+            <th class="text-left px-5 py-3 font-medium">Roles</th>
+            <th class="text-left px-5 py-3 font-medium">Status</th>
+            <th class="text-right px-5 py-3 font-medium">Actions</th>
           </tr>
-          {% can 'rbac.role.manage' %}
-            <tr id="assign-row-{{ u.id }}" class="hidden bg-surface-2/30">
-              <td colspan="5" class="px-5 py-4">
-                <h4 class="text-tiny uppercase text-text-secondary mb-3">Manage roles for {{ u.username }}</h4>
-                <div class="flex flex-wrap gap-2">
-                  {% for r in all_roles %}
-                    {% with assigned=u.role_assignments.all|stringformat:"s" %}
-                      <form method="post" action="{% if r.id in u.role_ids %}{% url 'rbac:role_unassign' r.id u.id %}{% else %}{% url 'rbac:role_assign' r.id %}{% endif %}" class="inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="user_id" value="{{ u.id }}">
-                        <input type="hidden" name="role_id" value="{{ r.id }}">
-                        <button
-                          type="submit"
-                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-tiny font-medium border transition-colors duration-fast"
-                          style="{% if r.id in u.role_ids %}background-color: {{ r.color }}1A; color: {{ r.color }}; border-color: {{ r.color }}40;{% else %}border-color: rgb(var(--border-subtle)); color: rgb(var(--text-secondary));{% endif %}"
-                        >
-                          {% icon r.icon size=12 %}
-                          {{ r.name }}
-                          {% if r.id in u.role_ids %}
-                            {% icon "x" size=10 %}
-                          {% else %}
-                            {% icon "plus" size=10 %}
-                          {% endif %}
-                        </button>
-                      </form>
-                    {% endwith %}
+        </thead>
+        <tbody>
+          {% for u in users %}
+            {% cycle 'bg-chart-amber/15 text-text-primary' 'bg-chart-violet/15 text-text-primary' 'bg-text-secondary/15 text-text-secondary' as mi_avatar_tone silent %}
+            <tr class="mi-row border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <span class="mi-avatar w-8 h-8 rounded-full {{ mi_avatar_tone }} flex items-center justify-center font-medium text-small flex-shrink-0">
+                    {{ u.username|slice:":1"|upper }}
+                  </span>
+                  <div class="min-w-0">
+                    <p class="font-medium text-text-primary truncate">{{ u.username }}</p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-5 py-3 text-text-secondary truncate max-w-xs">{{ u.email|default:"—" }}</td>
+              <td class="px-5 py-3">
+                <div class="flex flex-wrap gap-1">
+                  {% for ra in u.role_assignments.all %}
+                    <span class="mi-role-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-tiny font-medium"
+                          style="background-color: {{ ra.role.color }}1A; color: {{ ra.role.color }}; box-shadow: inset 0 0 0 1px {{ ra.role.color }}33;">
+                      {% icon ra.role.icon size=10 %} {{ ra.role.name }}
+                    </span>
+                  {% empty %}
+                    {% if u.is_staff %}
+                      <span class="badge badge-critical gap-1">{% icon "lock" size=10 %} Admin (legacy)</span>
+                    {% else %}
+                      <span class="badge badge-unknown gap-1">{% icon "info" size=10 %} No role</span>
+                    {% endif %}
                   {% endfor %}
                 </div>
               </td>
+              <td class="px-5 py-3">
+                {% if u.is_active %}
+                  <span class="badge badge-passed gap-1.5">
+                    <span class="mi-status-dot is-active w-1.5 h-1.5 rounded-full bg-current inline-block"></span>
+                    Active
+                  </span>
+                {% else %}
+                  <span class="badge badge-unknown gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-current inline-block"></span>
+                    Disabled
+                  </span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3 text-right whitespace-nowrap">
+                <div class="inline-flex items-center gap-1">
+                  {% can 'rbac.role.manage' %}
+                    <button
+                      type="button" class="mi-action-btn btn btn-ghost btn-sm"
+                      title="Assign role" aria-controls="assign-row-{{ u.id }}"
+                      onclick="document.getElementById('assign-row-{{ u.id }}').classList.toggle('hidden')"
+                    >
+                      {% icon "key" size=14 %} Roles
+                      {% if u.role_assignments.all %}<span class="text-tiny text-text-tertiary tabular">({{ u.role_assignments.all|length }})</span>{% endif %}
+                    </button>
+                  {% endcan %}
+                  {% can 'admin.user.delete' %}
+                    {% if not u.is_staff %}
+                      <button
+                        type="button" data-username="{{ u.username }}"
+                        class="mi-action-btn btn btn-ghost btn-sm text-system-error mi-delete-user"
+                        title="Delete"
+                      >
+                        {% icon "trash" size=14 %}
+                      </button>
+                    {% endif %}
+                  {% endcan %}
+                </div>
+              </td>
             </tr>
-          {% endcan %}
-        {% empty %}
-          <tr><td colspan="5" class="px-5 py-12 text-center text-text-tertiary">No users.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  {% if page.has_other_pages %}
-    <div class="card-footer flex items-center justify-between">
-      <span class="text-tiny text-text-tertiary">
-        Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} user{{ page.paginator.count|pluralize }}
-      </span>
-      <div class="flex gap-1">
-        {% if page.has_previous %}
-          <a href="?page={{ page.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}" class="btn btn-secondary btn-sm">{% icon "chevron-left" size=14 %} Prev</a>
-        {% endif %}
-        {% if page.has_next %}
-          <a href="?page={{ page.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}" class="btn btn-secondary btn-sm">Next {% icon "chevron-right" size=14 %}</a>
-        {% endif %}
-      </div>
+            {% can 'rbac.role.manage' %}
+              <tr id="assign-row-{{ u.id }}" class="hidden bg-surface-2/30">
+                <td colspan="5" class="px-5 py-4">
+                  <div class="mi-assign-panel">
+                    <h4 class="text-tiny uppercase text-text-secondary mb-3 inline-flex items-center gap-1.5">
+                      {% icon "key" size=12 %} Manage roles for {{ u.username }}
+                    </h4>
+                    <div class="flex flex-wrap gap-2">
+                      {% for r in all_roles %}
+                        {% with assigned=u.role_assignments.all|stringformat:"s" %}
+                          <form method="post" action="{% if r.id in u.role_ids %}{% url 'rbac:role_unassign' r.id u.id %}{% else %}{% url 'rbac:role_assign' r.id %}{% endif %}" class="inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="user_id" value="{{ u.id }}">
+                            <input type="hidden" name="role_id" value="{{ r.id }}">
+                            <button
+                              type="submit"
+                              class="mi-assign-pill inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-tiny font-medium border transition-colors duration-fast"
+                              style="{% if r.id in u.role_ids %}background-color: {{ r.color }}1A; color: {{ r.color }}; border-color: {{ r.color }}40;{% else %}border-color: rgb(var(--border-subtle)); color: rgb(var(--text-secondary));{% endif %}"
+                            >
+                              {% icon r.icon size=12 %}
+                              {{ r.name }}
+                              {% if r.id in u.role_ids %}
+                                {% icon "x" size=10 %}
+                              {% else %}
+                                {% icon "plus" size=10 %}
+                              {% endif %}
+                            </button>
+                          </form>
+                        {% endwith %}
+                      {% endfor %}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {% endcan %}
+          {% empty %}
+            <tr>
+              <td colspan="5" class="px-5 py-16">
+                <div class="flex flex-col items-center text-center">
+                  <span class="w-12 h-12 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center mb-3">
+                    {% icon "users" size=22 %}
+                  </span>
+                  <h3 class="text-h3">No users found</h3>
+                  <p class="text-small text-text-secondary mt-1">{% if query %}No users match your search.{% else %}This instance has no additional users yet.{% endif %}</p>
+                  {% can 'admin.user.create' %}
+                    <a href="{% url 'create_user' %}" class="mi-pillbtn btn btn-md mt-4">
+                      {% icon "plus" size=14 %} Add user
+                    </a>
+                  {% endcan %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-  {% endif %}
+
+    {% if page.has_other_pages %}
+      <div class="card-footer flex items-center justify-between">
+        <span class="text-tiny text-text-tertiary">
+          Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} user{{ page.paginator.count|pluralize }}
+        </span>
+        <div class="flex gap-1">
+          {% if page.has_previous %}
+            <a href="?page={{ page.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}" class="btn btn-secondary btn-sm">{% icon "chevron-left" size=14 %} Prev</a>
+          {% endif %}
+          {% if page.has_next %}
+            <a href="?page={{ page.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}" class="btn btn-secondary btn-sm">Next {% icon "chevron-right" size=14 %}</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </section>
+
 </div>
 
 <script>
@@ -176,5 +349,29 @@
       else alert('Delete failed.');
     }).catch(() => alert('Delete failed.'));
   });
+</script>
+
+<script>
+  // Animated count-up for the header stat chips (additive; presentation only).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 700, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
 </script>
 {% endblock %}

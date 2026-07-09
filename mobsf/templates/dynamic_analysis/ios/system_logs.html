@@ -1,22 +1,222 @@
 {% extends "base/legacy_app.html" %}
+{% load mi_icons %}
 
 {% block page_title %}iOS system logs{% endblock %}
 
-{% block content %}
-<header class="mb-6">
-  <p class="text-tiny uppercase text-text-tertiary">Dynamic · iOS · Corellium</p>
-  <h1 class="text-h2 mt-1">System logs</h1>
-</header>
+{% block extra_css %}
+<style>
+  #logs.il-pre {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    tab-size: 2;
+    background-color: rgb(var(--surface-1)) !important;
+    color: rgb(var(--text-primary)) !important;
+    border: 0 !important;
+  }
+  #logs.il-pre:empty::before {
+    content: "Waiting for system log output…";
+    color: rgb(var(--text-tertiary));
+    font-style: italic;
+  }
+  .console-dots span {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 9999px;
+  }
 
-<div class="card">
-  <div class="card-header">
-    <span class="text-small text-text-secondary">Live tail</span>
-    <span class="text-tiny text-text-tertiary">refreshes every 10s</span>
+  /* ── Ambient header glow: floating brand/graphite blobs + faint grid ── */
+  .il-hero { position: relative; overflow: hidden; }
+  .il-hero-glow, .il-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .il-hero-glow::before, .il-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(60px); opacity: .5;
+  }
+  .il-hero-glow::before {
+    width: 260px; height: 260px; top: -120px; right: 6%;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: il-float 16s ease-in-out infinite;
+  }
+  .il-hero-glow::after {
+    width: 220px; height: 220px; bottom: -130px; left: 4%;
+    background: radial-gradient(circle at center, rgba(100,116,139,.42), transparent 70%);
+    animation: il-float 20s ease-in-out infinite reverse;
+  }
+  .il-hero-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .4;
+    -webkit-mask-image: radial-gradient(ellipse 70% 100% at 50% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 100% at 50% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .il-hero-glow::before { opacity: .36; }
+  :root[data-theme="dark"] .il-hero-glow::after  { opacity: .3; }
+
+  /* ── Stat tiles: accent bar + hover lift ── */
+  .il-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .il-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .il-stat::after { content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: linear-gradient(90deg, var(--il-accent, #2563EB), transparent 85%); }
+  .il-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Console card: soft glow pulse each time new output streams in ── */
+  .il-console { transition: box-shadow .4s ease, border-color .4s ease; }
+  .il-console.il-pulse {
+    box-shadow: 0 0 0 3px rgba(37,99,235,.16), 0 16px 40px -20px rgba(37,99,235,.5);
+    border-color: rgba(37,99,235,.4);
+  }
+
+  /* ── Filtered log lines (search view) ── */
+  .il-log-line {
+    padding: 1px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .il-hero-glow::before, .il-hero-glow::after { animation: none; }
+    .il-stat, .il-console { transition: none; }
+  }
+  @keyframes il-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-18px,0); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="iosLogConsole()" x-init="init()" data-instance="{{ instance_id }}">
+
+  {# ══════════════════ Ambient header ══════════════════ #}
+  <header class="il-hero card relative overflow-hidden p-0 mb-6" data-reveal>
+    <div class="il-hero-grid" aria-hidden="true"></div>
+    <div class="il-hero-glow" aria-hidden="true"></div>
+    <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-6 py-6 md:py-7">
+      <div class="flex items-center gap-4 min-w-0">
+        <span class="w-12 h-12 rounded-xl bg-text-secondary/15 text-text-secondary flex items-center justify-center flex-shrink-0 shadow-elevation-1">
+          {% icon "smartphone" size=22 %}
+        </span>
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold inline-flex items-center gap-1.5">
+            {% icon "shield-check" size=12 %} Dynamic Analysis · iOS · Corellium
+          </p>
+          <h1 class="text-h2 truncate mt-0.5">System logs</h1>
+          <p class="text-small text-text-secondary mt-0.5 inline-flex items-center gap-1.5 font-mono truncate">
+            {% icon "package" size=12 %} instance {{ instance_id }}
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="badge badge-low inline-flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+          Live tail
+        </span>
+      </div>
+    </div>
+  </header>
+
+  {# ══════════════════ Live stat tiles (derived from the actual streamed console output — no mock data) ══════════════════ #}
+  <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6" data-reveal>
+    <div class="il-stat card card-body" style="--il-accent:#2563EB">
+      <span class="w-10 h-10 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+        {% icon "layers" size=18 %}
+      </span>
+      <p class="il-num text-h1 mt-3 tabular" x-text="lineCount">0</p>
+      <p class="text-small text-text-secondary">Log lines captured</p>
+    </div>
+    <div class="il-stat card card-body" style="--il-accent:#16A34A">
+      <span class="w-10 h-10 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+        {% icon "database" size=18 %}
+      </span>
+      <p class="il-num text-h1 mt-3 tabular" x-text="sizeLabel">0 B</p>
+      <p class="text-small text-text-secondary">Output captured</p>
+    </div>
+    <div class="il-stat card card-body" style="--il-accent:#D97706">
+      <span class="w-10 h-10 rounded-lg bg-severity-medium/15 text-severity-medium inline-flex items-center justify-center flex-shrink-0">
+        {% icon "activity" size=18 %}
+      </span>
+      <p class="il-num text-h1 mt-3 tabular" x-text="lastUpdateLabel">Waiting…</p>
+      <p class="text-small text-text-secondary">Last refresh · every 10s</p>
+    </div>
+  </section>
+
+  {# ══════════════════ Console ══════════════════ #}
+  <div class="card il-console overflow-hidden" :class="justUpdated ? 'il-pulse' : ''" data-reveal>
+    <div class="card-header flex flex-col gap-3">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="console-dots inline-flex items-center gap-1.5" aria-hidden="true">
+            <span class="bg-severity-critical/70"></span>
+            <span class="bg-severity-medium/70"></span>
+            <span class="bg-severity-passed/70"></span>
+          </span>
+          <span class="text-small text-text-secondary font-mono truncate">corellium://instance/{{ instance_id }}/console</span>
+        </div>
+        <span class="text-tiny text-text-tertiary inline-flex items-center gap-1.5 flex-shrink-0">
+          {% icon "activity" size=12 %}
+          auto-refresh every 10s
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="relative flex-1 min-w-[200px]">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+            {% icon "search" size=14 %}
+          </span>
+          <input
+            type="text"
+            x-model="query"
+            placeholder="Filter system log lines…"
+            aria-label="Filter iOS system log lines"
+            class="input pl-9 text-small"
+          />
+        </label>
+        <span class="text-tiny text-text-tertiary tabular flex-shrink-0" x-show="query.trim()" x-cloak x-text="filteredLines.length + (filteredLines.length === 1 ? ' match' : ' matches')"></span>
+
+        <label class="inline-flex items-center gap-1.5 text-tiny text-text-secondary cursor-pointer select-none flex-shrink-0">
+          <input type="checkbox" x-model="autoscroll" class="rounded border-border-default">
+          Auto-scroll
+        </label>
+        <button type="button" class="btn btn-ghost btn-sm flex-shrink-0" @click="jumpToLatest()" title="Jump to latest output">
+          {% icon "chevron-right" size=14 class="rotate-90" %} Latest
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm flex-shrink-0" @click="copyLogs()" :disabled="!lineCount" title="Copy full output">
+          <span x-show="!copied">{% icon "copy" size=14 %} Copy</span>
+          <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=14 %} Copied</span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm flex-shrink-0" @click="downloadLogs()" :disabled="!lineCount" title="Export as .log file">
+          {% icon "download" size=14 %} Export
+        </button>
+      </div>
+    </div>
+
+    <div class="card-body p-0 relative">
+      <div id="messages" class="px-5 py-2 text-tiny text-text-tertiary empty:hidden border-b border-border-subtle bg-surface-2/40"></div>
+
+      {# Live raw tail — driven verbatim by the polling script below. Hidden (not removed) while filtering. #}
+      <pre id="logs" class="il-pre px-5 py-4 m-0 max-h-[70vh] overflow-auto" x-show="!query.trim()"></pre>
+
+      {# Filtered view — read-only reflection of the same element's real text, rendered via x-text (auto-escaped). #}
+      <div x-show="query.trim()" x-cloak class="font-mono text-[12.5px] leading-relaxed px-5 py-4 max-h-[70vh] overflow-auto">
+        <template x-if="lineCount && filteredLines.length === 0">
+          <p class="text-text-tertiary italic">No captured lines match "<span x-text="query"></span>".</p>
+        </template>
+        <template x-for="item in filteredLines" :key="item.idx">
+          <div class="il-log-line" :class="lineClass(item.line)" x-text="item.line || ' '"></div>
+        </template>
+      </div>
+    </div>
   </div>
-  <div class="card-body p-0">
-    <div id="messages" class="px-5 py-2 text-tiny text-text-tertiary"></div>
-    <pre id="logs" class="px-5 py-4 m-0 max-h-[70vh] overflow-auto font-mono text-mono bg-surface-2/40 border-t border-border-subtle whitespace-pre-wrap"></pre>
-  </div>
+
+  <p class="text-tiny text-text-tertiary mt-3">
+    Output is streamed directly from the Corellium virtual iOS device console. Keep this tab open while exercising the app to capture live system activity.
+  </p>
 </div>
 {% endblock %}
 
@@ -40,5 +240,122 @@ $(document).ready(function () {
   get_logs();
   setInterval(get_logs, 10000);
 });
+</script>
+
+<script type="text/javascript">
+  // Presentational layer on top of the polling script above — reads the
+  // real #logs text via a MutationObserver, never writes back to it, and
+  // never intercepts the AJAX cycle. Search/export operate on the actual
+  // streamed console output, not sample data.
+  function iosLogConsole() {
+    return {
+      query: '',
+      autoscroll: true,
+      allLines: [],
+      lineCount: 0,
+      charCount: 0,
+      lastUpdate: null,
+      now: Date.now(),
+      copied: false,
+      justUpdated: false,
+
+      init() {
+        const el = document.getElementById('logs');
+        if (!el) return;
+
+        const sync = () => {
+          const text = el.textContent || '';
+          this.allLines = text.length ? text.split(/\r?\n/) : [];
+          this.lineCount = this.allLines.filter((l) => l.trim().length).length;
+          this.charCount = text.length;
+          this.lastUpdate = Date.now();
+          this.justUpdated = true;
+          clearTimeout(this._pulseTimer);
+          this._pulseTimer = setTimeout(() => { this.justUpdated = false; }, 900);
+          if (this.autoscroll && !this.query.trim()) {
+            this.$nextTick(() => { el.scrollTop = el.scrollHeight; });
+          }
+        };
+
+        sync();
+        const observer = new MutationObserver(sync);
+        observer.observe(el, { childList: true, characterData: true, subtree: true });
+        setInterval(() => { this.now = Date.now(); }, 1000);
+
+        this.$watch('query', (val) => {
+          if (!val.trim() && this.autoscroll) {
+            this.$nextTick(() => { el.scrollTop = el.scrollHeight; });
+          }
+        });
+      },
+
+      get sizeLabel() {
+        const b = this.charCount;
+        if (b < 1024) return b + ' B';
+        if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+        return (b / (1024 * 1024)).toFixed(1) + ' MB';
+      },
+
+      get lastUpdateLabel() {
+        if (!this.lastUpdate) return 'Waiting…';
+        const secs = Math.max(0, Math.round((this.now - this.lastUpdate) / 1000));
+        if (secs < 2) return 'just now';
+        if (secs < 60) return secs + 's ago';
+        return Math.round(secs / 60) + 'm ago';
+      },
+
+      get filteredLines() {
+        const q = this.query.trim().toLowerCase();
+        if (!q) return [];
+        return this.allLines
+          .map((line, idx) => ({ line, idx }))
+          .filter((item) => item.line.toLowerCase().includes(q));
+      },
+
+      lineClass(line) {
+        const l = line.toLowerCase();
+        if (/(fault|error|exception|crash|fatal)/.test(l)) {
+          return 'text-severity-critical dark:text-severity-critical-dark';
+        }
+        if (/(warn(ing)?)/.test(l)) {
+          return 'text-severity-medium dark:text-severity-medium-dark';
+        }
+        if (/(notice|default|info)/.test(l)) {
+          return 'text-severity-low dark:text-severity-low-dark';
+        }
+        return 'text-text-primary';
+      },
+
+      jumpToLatest() {
+        const el = document.getElementById('logs');
+        if (el) el.scrollTop = el.scrollHeight;
+      },
+
+      copyLogs() {
+        const el = document.getElementById('logs');
+        if (!el || !this.lineCount) return;
+        const text = el.textContent || '';
+        if (navigator.clipboard) { navigator.clipboard.writeText(text); }
+        this.copied = true;
+        setTimeout(() => { this.copied = false; }, 1400);
+      },
+
+      downloadLogs() {
+        const el = document.getElementById('logs');
+        if (!el || !this.lineCount) return;
+        const text = el.textContent || '';
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const inst = (this.$el.dataset.instance || 'ios-instance').replace(/[^a-zA-Z0-9._-]+/g, '_');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = inst + '-system-logs.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      },
+    };
+  }
 </script>
 {% endblock %}

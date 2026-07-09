@@ -1,170 +1,325 @@
 {% extends "base/app.html" %}
 {% load mi_icons %}
 
+{% block extra_head %}
+<style>
+  /* ── Ambient form hero: faint brand-glow blobs + masked grid ── */
+  .rf-hero { background: rgb(var(--surface-1)); }
+  .rf-hero-glow, .rf-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .rf-hero-glow::before {
+    content: ''; position: absolute; border-radius: 9999px;
+    width: 300px; height: 300px; top: -140px; right: -60px; filter: blur(60px); opacity: .5;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: rf-float 16s ease-in-out infinite;
+  }
+  .rf-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 70% 100% at 100% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 100% at 100% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .rf-hero-glow::before { opacity: .36; }
+  @keyframes rf-float { 0%, 100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-20px,0); } }
+
+  /* ── Color preset swatches ── */
+  .rf-swatch {
+    width: 26px; height: 26px; border-radius: 8px; cursor: pointer; flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
+    transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s ease;
+  }
+  .rf-swatch:hover { transform: translateY(-2px) scale(1.08); }
+  .rf-swatch:focus-visible { outline: 2px solid var(--mi-sw); outline-offset: 2px; }
+  .rf-swatch.is-active {
+    box-shadow: 0 0 0 2px rgb(var(--surface-0)), 0 0 0 4px var(--mi-sw), 0 6px 14px -6px rgba(0,0,0,.5);
+    transform: translateY(-1px) scale(1.05);
+  }
+
+  /* ── Icon option buttons: lift + glow on active ── */
+  .rf-icon-btn { transition: transform .15s ease, box-shadow .15s ease; }
+  .rf-icon-btn:hover { transform: translateY(-1px); }
+  .rf-icon-btn.is-active { box-shadow: 0 0 0 3px rgba(37,99,235,.14); }
+
+  /* ── Permission category card ── */
+  .rf-cat {
+    border: 1px solid rgb(var(--border-subtle)); border-radius: 10px;
+    background: rgb(var(--surface-0)); transition: border-color .15s ease;
+  }
+  .rf-cat:hover { border-color: rgb(var(--border-default)); }
+
+  /* ── Permission row: checked highlight + dangerous accent ── */
+  .rf-perm-row { position: relative; transition: background-color .15s ease, box-shadow .15s ease; }
+  .rf-perm-row.is-checked { box-shadow: inset 2px 0 0 0 #2563EB; }
+  .rf-perm-dangerous::before {
+    content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px;
+    border-radius: 2px; background: #DC2626; opacity: .55;
+  }
+  .rf-danger-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 9999px;
+    background: #DC2626; animation: rf-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes rf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+  /* ── Sticky save bar ── */
+  .rf-actionbar { background: rgb(var(--surface-1) / .92); backdrop-filter: blur(8px); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rf-hero-glow::before { animation: none; }
+    .rf-danger-dot { animation: none; }
+    .rf-swatch, .rf-icon-btn { transition: none; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<header class="mb-6">
-  <a href="{% url 'rbac:roles_list' %}" class="text-small text-text-secondary hover:text-text-primary inline-flex items-center gap-1">
-    {% icon "chevron-left" size=14 %} All roles
-  </a>
-  <h1 class="text-h1 mt-2">{% if is_create %}New role{% else %}Edit role{% endif %}</h1>
-</header>
+<div x-data="roleForm()" class="space-y-6">
 
-{# Pass selected codenames to JS as a parseable JSON script tag #}
-{{ selected_codes|json_script:"initial_selected" }}
+  {# Pass selected codenames to JS as a parseable JSON script tag #}
+  {{ selected_codes|json_script:"initial_selected" }}
 
-<form method="post" x-data="roleForm()">
-  {% csrf_token %}
-  <input type="hidden" name="permission_codenames" :value="selected.join(',')">
-
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-    {# ─── identity ─── #}
-    <section class="lg:col-span-1 space-y-4">
-      <div class="card">
-        <div class="card-header"><h2 class="text-h3">Identity</h2></div>
-        <div class="card-body space-y-4">
-
-          <div>
-            <label class="label" for="id_name">Name</label>
-            <input
-              id="id_name" name="name" maxlength="80" required
-              class="input"
-              value="{{ form.name.value|default:'' }}"
-              {% if role and role.is_system %}readonly title="System role name is locked"{% endif %}
-              x-model="name"
-            />
+  {# ══════════════════ Ambient header + live preview ══════════════════ #}
+  <header class="rf-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="rf-hero-grid" aria-hidden="true"></div>
+    <div class="rf-hero-glow" aria-hidden="true"></div>
+    <div class="relative z-10 px-6 py-6 md:px-8 md:py-7 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+      <div class="flex items-start gap-3 min-w-0">
+        <span class="w-11 h-11 rounded-xl bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0 shadow-elevation-1">
+          {% icon "shield" size=20 %}
+        </span>
+        <div class="min-w-0">
+          <a href="{% url 'rbac:roles_list' %}" class="text-tiny uppercase tracking-wide text-text-tertiary hover:text-text-brand inline-flex items-center gap-1 transition-colors duration-fast">
+            {% icon "chevron-left" size=12 %} All roles
+          </a>
+          <h1 class="text-h1 mt-0.5">{% if is_create %}New role{% else %}Edit role{% endif %}</h1>
+          <p class="text-small text-text-secondary mt-0.5 max-w-md">Define an identity and the permissions this role grants.</p>
+          <div class="flex flex-wrap items-center gap-2 mt-3">
+            <span class="badge badge-neutral gap-1.5">{% icon "layers" size=12 %} {{ grouped_perms|length }} categor{{ grouped_perms|length|pluralize:"y,ies" }}</span>
+            <span class="badge badge-neutral gap-1.5">{% icon "key" size=12 %} <span x-text="selected.length"></span>&nbsp;selected</span>
             {% if role and role.is_system %}
-              <p class="text-tiny text-text-tertiary mt-1">System role name is locked.</p>
+              <span class="badge badge-neutral gap-1.5">{% icon "lock" size=12 %} System role</span>
             {% endif %}
-            {% for e in form.name.errors %}<p class="text-tiny text-system-error mt-1">{{ e }}</p>{% endfor %}
-          </div>
-
-          <div>
-            <label class="label" for="id_description">Description</label>
-            <textarea id="id_description" name="description" rows="3" class="input">{{ form.description.value|default:'' }}</textarea>
-          </div>
-
-          <div>
-            <label class="label" for="id_color">Color</label>
-            <div class="flex items-center gap-2">
-              <input
-                id="id_color" type="color"
-                value="{{ form.color.value|default:'#64748B' }}"
-                class="h-9 w-12 rounded-md border border-border bg-surface-1 cursor-pointer"
-                x-model="color"
-                @input="document.getElementById('id_color_text').value = $event.target.value"
-              />
-              <input
-                id="id_color_text" name="color"
-                value="{{ form.color.value|default:'#64748B' }}"
-                class="input flex-1 font-mono"
-                pattern="^#[0-9A-Fa-f]{6}$"
-                @input="if($event.target.checkValidity()) { color = $event.target.value; document.getElementById('id_color').value = color; }"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label class="label">Icon</label>
-            <div class="grid grid-cols-6 gap-1">
-              {% for ic in icon_options %}
-                <button
-                  type="button"
-                  class="aspect-square flex items-center justify-center rounded-md border transition-all duration-fast"
-                  :class="icon === '{{ ic }}'
-                    ? 'border-mobinspect-500 bg-mobinspect-500/10 text-mobinspect-500'
-                    : 'border-border-subtle text-text-secondary hover:bg-surface-2'"
-                  @click="icon = '{{ ic }}'; document.getElementById('id_icon').value = '{{ ic }}'"
-                  title="{{ ic }}"
-                >
-                  {% icon ic size=16 %}
-                </button>
-              {% endfor %}
-            </div>
-            <input id="id_icon" type="hidden" name="icon" value="{{ form.icon.value|default:'shield' }}">
-          </div>
-
-          <div class="pt-3 border-t border-border-subtle">
-            <p class="text-tiny text-text-tertiary mb-2">Preview</p>
-            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border border-border-subtle bg-surface-2">
-              <span class="inline-flex items-center justify-center w-5 h-5 rounded text-white"
-                    :style="`background-color: ${color}`">
-                {# Simple visual block — full icon swap would need a tag per option. #}
-              </span>
-              <span class="text-small font-medium" x-text="name || 'Unnamed role'"></span>
-            </div>
           </div>
         </div>
       </div>
-    </section>
 
-    {# ─── permissions matrix ─── #}
-    <section class="lg:col-span-2">
-      <div class="card">
-        <div class="card-header">
-          <h2 class="text-h3">Permissions</h2>
-          <span class="text-small text-text-tertiary">
-            <span x-text="selected.length"></span> selected
+      {# live preview — reflects name / color / icon in real time #}
+      <div class="flex-shrink-0">
+        <p class="text-tiny uppercase text-text-tertiary mb-2">Live preview</p>
+        <div class="inline-flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border-subtle bg-surface-0/70 shadow-elevation-1">
+          <span
+            class="relative inline-flex items-center justify-center w-9 h-9 rounded-md text-white shadow-elevation-1 flex-shrink-0 overflow-hidden transition-colors duration-fast"
+            :style="`background-color: ${color}`"
+          >
+            {% for ic in icon_options %}
+              <span class="absolute inset-0 flex items-center justify-center" x-show="icon === '{{ ic }}'" x-cloak>{% icon ic size=16 %}</span>
+            {% endfor %}
           </span>
+          <span class="text-small font-semibold" x-text="name || 'Unnamed role'"></span>
         </div>
+      </div>
+    </div>
+  </header>
 
-        <div class="px-5 pt-4">
-          <input
-            type="search"
-            placeholder="Filter by name or codename…"
-            class="input"
-            x-model="filter"
-          />
-        </div>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="permission_codenames" :value="selected.join(',')">
 
-        <div class="card-body space-y-6">
-          {% for category, perms in grouped_perms.items %}
-            <div data-category="{{ category }}">
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="text-tiny uppercase font-medium text-text-secondary">{{ category }}</h3>
-                <button
-                  type="button"
-                  class="text-tiny text-text-brand hover:underline"
-                  @click="toggleCategory([{% for p in perms %}'{{ p.codename }}'{% if not forloop.last %},{% endif %}{% endfor %}])"
-                >
-                  toggle all
-                </button>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      {# ─── identity ─── #}
+      <section class="lg:col-span-1 space-y-6" data-reveal>
+        <div class="card lg:sticky lg:top-20">
+          <div class="card-header flex items-center gap-2">
+            <span class="w-7 h-7 rounded-md bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+              {% icon "edit" size=14 %}
+            </span>
+            <h3 class="text-h3">Identity</h3>
+          </div>
+          <div class="card-body space-y-5">
+
+            <div>
+              <label class="label" for="id_name">Name</label>
+              <input
+                id="id_name" name="name" maxlength="80" required
+                class="input"
+                value="{{ form.name.value|default:'' }}"
+                {% if role and role.is_system %}readonly title="System role name is locked"{% endif %}
+                x-model="name"
+              />
+              {% if role and role.is_system %}
+                <p class="text-tiny text-text-tertiary mt-1 inline-flex items-center gap-1">{% icon "lock" size=10 %} System role name is locked.</p>
+              {% endif %}
+              {% for e in form.name.errors %}<p class="text-tiny text-system-error mt-1">{{ e }}</p>{% endfor %}
+            </div>
+
+            <div>
+              <label class="label" for="id_description">Description</label>
+              <textarea id="id_description" name="description" rows="3" class="input">{{ form.description.value|default:'' }}</textarea>
+            </div>
+
+            <div>
+              <label class="label" for="id_color">Color</label>
+              <div class="flex items-center gap-2">
+                <input
+                  id="id_color" type="color"
+                  value="{{ form.color.value|default:'#64748B' }}"
+                  class="h-9 w-12 rounded-md border border-border bg-surface-1 cursor-pointer"
+                  x-model="color"
+                  @input="document.getElementById('id_color_text').value = $event.target.value"
+                />
+                <input
+                  id="id_color_text" name="color"
+                  value="{{ form.color.value|default:'#64748B' }}"
+                  class="input flex-1 font-mono"
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                  @input="if($event.target.checkValidity()) { color = $event.target.value; document.getElementById('id_color').value = color; }"
+                />
               </div>
-              <div class="space-y-1">
-                {% for p in perms %}
-                  <label
-                    class="flex items-start gap-3 px-3 py-2 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
-                    x-show="matches('{{ p.codename }}', '{{ p.name|escapejs }}')"
+              {# quick presets — additive convenience; writes both the visible + hidden color fields #}
+              <div class="flex flex-wrap gap-1.5 mt-2.5" role="group" aria-label="Preset colors">
+                <button type="button" class="rf-swatch" style="background:#2563EB;--mi-sw:#2563EB" :class="color === '#2563EB' ? 'is-active' : ''" title="Brand blue" aria-label="Brand blue" @click="color='#2563EB'; document.getElementById('id_color_text').value='#2563EB'; document.getElementById('id_color').value='#2563EB';"></button>
+                <button type="button" class="rf-swatch" style="background:#1D4ED8;--mi-sw:#1D4ED8" :class="color === '#1D4ED8' ? 'is-active' : ''" title="Deep blue" aria-label="Deep blue" @click="color='#1D4ED8'; document.getElementById('id_color_text').value='#1D4ED8'; document.getElementById('id_color').value='#1D4ED8';"></button>
+                <button type="button" class="rf-swatch" style="background:#3B82F6;--mi-sw:#3B82F6" :class="color === '#3B82F6' ? 'is-active' : ''" title="Sky blue" aria-label="Sky blue" @click="color='#3B82F6'; document.getElementById('id_color_text').value='#3B82F6'; document.getElementById('id_color').value='#3B82F6';"></button>
+                <button type="button" class="rf-swatch" style="background:#16A34A;--mi-sw:#16A34A" :class="color === '#16A34A' ? 'is-active' : ''" title="Green" aria-label="Green" @click="color='#16A34A'; document.getElementById('id_color_text').value='#16A34A'; document.getElementById('id_color').value='#16A34A';"></button>
+                <button type="button" class="rf-swatch" style="background:#D97706;--mi-sw:#D97706" :class="color === '#D97706' ? 'is-active' : ''" title="Amber" aria-label="Amber" @click="color='#D97706'; document.getElementById('id_color_text').value='#D97706'; document.getElementById('id_color').value='#D97706';"></button>
+                <button type="button" class="rf-swatch" style="background:#EA580C;--mi-sw:#EA580C" :class="color === '#EA580C' ? 'is-active' : ''" title="Orange" aria-label="Orange" @click="color='#EA580C'; document.getElementById('id_color_text').value='#EA580C'; document.getElementById('id_color').value='#EA580C';"></button>
+                <button type="button" class="rf-swatch" style="background:#DC2626;--mi-sw:#DC2626" :class="color === '#DC2626' ? 'is-active' : ''" title="Red" aria-label="Red" @click="color='#DC2626'; document.getElementById('id_color_text').value='#DC2626'; document.getElementById('id_color').value='#DC2626';"></button>
+                <button type="button" class="rf-swatch" style="background:#64748B;--mi-sw:#64748B" :class="color === '#64748B' ? 'is-active' : ''" title="Slate" aria-label="Slate" @click="color='#64748B'; document.getElementById('id_color_text').value='#64748B'; document.getElementById('id_color').value='#64748B';"></button>
+              </div>
+            </div>
+
+            <div>
+              <label class="label">Icon</label>
+              <div class="grid grid-cols-6 gap-1.5">
+                {% for ic in icon_options %}
+                  <button
+                    type="button"
+                    class="rf-icon-btn aspect-square flex items-center justify-center rounded-md border transition-colors duration-fast"
+                    :class="icon === '{{ ic }}'
+                      ? 'border-mobinspect-500 bg-mobinspect-500/10 text-mobinspect-500 is-active'
+                      : 'border-border-subtle text-text-secondary hover:bg-surface-2'"
+                    @click="icon = '{{ ic }}'; document.getElementById('id_icon').value = '{{ ic }}'"
+                    title="{{ ic }}"
                   >
-                    <input
-                      type="checkbox" class="mt-1"
-                      :checked="selected.includes('{{ p.codename }}')"
-                      @change="toggle('{{ p.codename }}')"
-                    />
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-center gap-2 flex-wrap">
-                        <code class="font-mono text-mono text-mobinspect-500 dark:text-mobinspect-400">{{ p.codename }}</code>
-                        {% if p.is_dangerous %}
-                          <span class="badge badge-critical">{% icon "alert-triangle" size=10 %} Dangerous</span>
-                        {% endif %}
-                      </div>
-                      <p class="text-small text-text-secondary mt-0.5">{{ p.description|default:p.name }}</p>
-                    </div>
-                  </label>
+                    {% icon ic size=16 %}
+                  </button>
                 {% endfor %}
               </div>
+              <input id="id_icon" type="hidden" name="icon" value="{{ form.icon.value|default:'shield' }}">
             </div>
-          {% endfor %}
-        </div>
-      </div>
 
-      <div class="mt-6 flex justify-end gap-2">
-        <a href="{% url 'rbac:roles_list' %}" class="btn btn-ghost btn-md">Cancel</a>
-        <button type="submit" class="btn btn-primary btn-md">{% icon "check" size=14 %} Save role</button>
-      </div>
-    </section>
-  </div>
-</form>
+          </div>
+        </div>
+      </section>
+
+      {# ─── permissions matrix ─── #}
+      <section class="lg:col-span-2" data-reveal>
+        <div class="card">
+          <div class="card-header flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-md bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+                {% icon "key" size=14 %}
+              </span>
+              <h3 class="text-h3">Permissions</h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                @click="toggleCategory([{% for category, perms in grouped_perms.items %}{% for p in perms %}'{{ p.codename }}',{% endfor %}{% endfor %}])"
+              >
+                {% icon "check" size=12 %} Select / clear all
+              </button>
+              <span class="badge badge-neutral">
+                <span x-text="selected.length"></span>&nbsp;selected
+              </span>
+            </div>
+          </div>
+
+          <div class="px-5 pt-4">
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+                {% icon "search" size=14 %}
+              </span>
+              <input
+                type="search"
+                placeholder="Filter by name or codename…"
+                class="input pl-9 pr-9"
+                x-model="filter"
+              />
+              <button
+                type="button"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors duration-fast"
+                x-show="filter" x-cloak
+                @click="filter = ''"
+                aria-label="Clear filter"
+              >
+                {% icon "x" size=14 %}
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body space-y-5">
+            {% for category, perms in grouped_perms.items %}
+              <div class="rf-cat px-4 py-3.5" data-category="{{ category }}">
+                <div class="flex items-center justify-between mb-2.5 pb-2.5 border-b border-border-subtle">
+                  <h4 class="text-tiny uppercase font-medium text-text-secondary inline-flex items-center gap-1.5">
+                    {% icon "layers" size=12 %} {{ category }}
+                    <span class="text-text-tertiary normal-case font-normal">· {{ perms|length }}</span>
+                  </h4>
+                  <button
+                    type="button"
+                    class="btn btn-link btn-sm"
+                    @click="toggleCategory([{% for p in perms %}'{{ p.codename }}'{% if not forloop.last %},{% endif %}{% endfor %}])"
+                  >
+                    Toggle all
+                  </button>
+                </div>
+                <div class="space-y-1">
+                  {% for p in perms %}
+                    <label
+                      class="rf-perm-row {% if p.is_dangerous %}rf-perm-dangerous pl-4{% endif %} flex items-start gap-3 px-3 py-2 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
+                      :class="selected.includes('{{ p.codename }}') ? 'is-checked bg-mobinspect-500/5' : ''"
+                      x-show="matches('{{ p.codename }}', '{{ p.name|escapejs }}')"
+                    >
+                      <input
+                        type="checkbox" class="mt-1"
+                        :checked="selected.includes('{{ p.codename }}')"
+                        @change="toggle('{{ p.codename }}')"
+                      />
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <code class="font-mono text-mono text-mobinspect-500 dark:text-mobinspect-400">{{ p.codename }}</code>
+                          {% if p.is_dangerous %}
+                            <span class="badge badge-critical gap-1"><span class="rf-danger-dot" aria-hidden="true"></span> Dangerous</span>
+                          {% endif %}
+                        </div>
+                        <p class="text-small text-text-secondary mt-0.5">{{ p.description|default:p.name }}</p>
+                      </div>
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        {# ─── sticky save bar ─── #}
+        <div class="rf-actionbar sticky bottom-4 mt-6 z-10 card px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-elevation-3">
+          <p class="text-small text-text-secondary">
+            <span class="font-semibold text-text-primary tabular" x-text="selected.length"></span>
+            permission<span x-show="selected.length !== 1">s</span> selected
+          </p>
+          <div class="flex justify-end gap-2">
+            <a href="{% url 'rbac:roles_list' %}" class="btn btn-ghost btn-md">Cancel</a>
+            <button type="submit" class="btn btn-primary btn-md">{% icon "check" size=14 %} Save role</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </form>
+</div>
 
 <script>
   function roleForm() {

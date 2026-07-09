@@ -15,40 +15,192 @@
     vertical-align: middle;
   }
   @keyframes mi-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+  /* ── Ambient header: floating brand-glow blobs + faint grid, theme-aware ── */
+  .mi-hero { background: var(--surface-1); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .5;
+  }
+  .mi-hero-glow::before {
+    width: 300px; height: 300px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 240px; height: 240px; bottom: -120px; left: -40px;
+    background: radial-gradient(circle at center, rgba(217,119,6,.32), transparent 70%);
+    animation: mi-float 21s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 80% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 80% 80% at 80% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .26; }
+
+  /* ── Metric tiles: accent bar + hover lift (same pattern as the dashboard) ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── "Running" badge: soft pulse ring so live activity reads at a glance ── */
+  #tasks-table .badge-medium { position: relative; }
+  #tasks-table .badge-medium::after {
+    content: ''; position: absolute; inset: -3px; border-radius: 9999px;
+    box-shadow: 0 0 0 0 rgba(217,119,6,.4);
+    animation: mi-badge-pulse 2.2s ease-out infinite;
+    pointer-events: none;
+  }
+
+  /* ── Skeleton rows shown only until the first live fetch resolves ── */
+  .mi-skel {
+    display: inline-block; height: .75rem; border-radius: 4px;
+    background: linear-gradient(90deg, rgb(var(--surface-2)) 25%, rgb(var(--surface-3)) 37%, rgb(var(--surface-2)) 63%);
+    background-size: 400% 100%;
+    animation: mi-shimmer 1.5s ease infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-stat { transition: none; }
+    #tasks-table .badge-medium::after { animation: none; }
+    .mi-skel { animation: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-22px,0); }
+  }
+  @keyframes mi-badge-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(217,119,6,.4); }
+    70%  { box-shadow: 0 0 0 7px rgba(217,119,6,0); }
+    100% { box-shadow: 0 0 0 0 rgba(217,119,6,0); }
+  }
+  @keyframes mi-shimmer {
+    0%   { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<header class="flex items-center justify-between gap-4 mb-6">
-  <div>
-    <h1 class="text-h1">Scan queue</h1>
-    <p class="text-text-secondary mt-1">
-      Live status of asynchronous scans. Completed reports surface in
-      <a href="{% url 'recent' %}" class="text-text-brand hover:underline">Scans</a>.
-    </p>
-  </div>
-  <div class="flex items-center gap-2 text-tiny text-text-tertiary">
-    <span class="inline-block w-2 h-2 rounded-full bg-mobinspect-500 animate-pulse"></span>
-    Auto-refresh · 5s
-  </div>
-</header>
+<div class="space-y-6">
 
-<div class="card">
-  <div class="overflow-x-auto">
-    <table id="tasks-table" class="w-full text-small">
-      <thead>
-        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-          <th class="text-left px-5 py-2.5 font-medium">Scan task</th>
-          <th class="text-left px-5 py-2.5 font-medium">Filename</th>
-          <th class="text-left px-5 py-2.5 font-medium">Timeline</th>
-          <th class="text-left px-5 py-2.5 font-medium">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {# Rows populated dynamically via JS #}
-      </tbody>
-    </table>
-  </div>
+  {# ══════════════════ Ambient header ══════════════════ #}
+  <section class="mi-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+    <div class="relative z-10 px-6 py-7 md:px-9 md:py-8">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "activity" size=13 %} MobInspect · Live queue
+          </p>
+          <h1 class="text-display font-bold leading-tight">Scan queue</h1>
+          <p class="text-body text-text-secondary mt-2 max-w-xl">
+            Live status of asynchronous scans. Completed reports surface in
+            <a href="{% url 'recent' %}" class="text-text-brand hover:underline font-medium">Scans</a>.
+          </p>
+        </div>
+        <div class="flex flex-col items-start lg:items-end gap-2 flex-shrink-0">
+          <span class="badge badge-passed gap-1.5">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-severity-passed animate-pulse"></span>
+            Auto-refresh · 5s
+          </span>
+          <a href="{% url 'recent' %}" class="btn btn-secondary btn-sm">
+            {% icon "layers" size=14 %} View recent scans
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ══════════════════ Live queue counters — derived from the real rows the ══════════════════ #}
+  {# script below renders; no extra network calls, no mock data.            #}
+  <section
+    class="grid grid-cols-2 lg:grid-cols-4 gap-4"
+    data-reveal
+    x-data="taskQueueStats()"
+    @mi-tasks-updated.window="onUpdate($event.detail)"
+  >
+    <div class="mi-stat card card-body">
+      <span class="w-10 h-10 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center">
+        {% icon "layers" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown.total">0</p>
+      <p class="text-small text-text-secondary">In queue</p>
+    </div>
+    <div class="mi-stat card card-body">
+      <span class="w-10 h-10 rounded-lg bg-severity-medium/15 text-severity-medium inline-flex items-center justify-center">
+        {% icon "zap" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown.running">0</p>
+      <p class="text-small text-text-secondary">Running</p>
+    </div>
+    <div class="mi-stat card card-body">
+      <span class="w-10 h-10 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center">
+        {% icon "check" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown.success">0</p>
+      <p class="text-small text-text-secondary">Succeeded</p>
+    </div>
+    <div class="mi-stat card card-body">
+      <span class="w-10 h-10 rounded-lg bg-severity-critical/15 text-severity-critical inline-flex items-center justify-center">
+        {% icon "x" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown.failed">0</p>
+      <p class="text-small text-text-secondary">Failed</p>
+    </div>
+  </section>
+
+  {# ══════════════════ Queue table — rows populated by the unmodified poll script ══════════════════ #}
+  <section class="card overflow-hidden" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2">
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
+          {% icon "layers" size=16 %}
+        </span>
+        Queue
+      </h2>
+      <span class="text-tiny text-text-tertiary hidden sm:inline">Updates automatically — no need to refresh</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="tasks-table" class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium">Scan task</th>
+            <th class="text-left px-5 py-2.5 font-medium">Filename</th>
+            <th class="text-left px-5 py-2.5 font-medium">Timeline</th>
+            <th class="text-left px-5 py-2.5 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {# Rows populated dynamically via JS. The skeleton rows below are #}
+          {# unconditionally cleared by renderTable() on the first fetch.   #}
+          <tr class="mi-skel-row" aria-hidden="true">
+            <td class="px-5 py-4"><span class="mi-skel w-28"></span><span class="mi-skel w-36 mt-2 block"></span></td>
+            <td class="px-5 py-4"><span class="mi-skel w-40"></span></td>
+            <td class="px-5 py-4"><span class="mi-skel w-24"></span></td>
+            <td class="px-5 py-4"><span class="mi-skel w-20"></span></td>
+          </tr>
+          <tr class="mi-skel-row" aria-hidden="true">
+            <td class="px-5 py-4"><span class="mi-skel w-24"></span><span class="mi-skel w-32 mt-2 block"></span></td>
+            <td class="px-5 py-4"><span class="mi-skel w-32"></span></td>
+            <td class="px-5 py-4"><span class="mi-skel w-24"></span></td>
+            <td class="px-5 py-4"><span class="mi-skel w-20"></span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
 </div>
 {% endblock %}
 
@@ -164,5 +316,55 @@ document.addEventListener('DOMContentLoaded', function () {
     alert('This scan task is already in the queue.');
   }
 });
+</script>
+<script>
+// Presentational-only addition: derives live queue counters from the
+// #tasks-table rows that the script above already renders from real API
+// data, and broadcasts them for the animated stat tiles. This does NOT
+// perform any additional network requests and does not touch the
+// fetch/render/poll logic above.
+document.addEventListener('DOMContentLoaded', function () {
+  const tbody = document.querySelector('#tasks-table tbody');
+  if (!tbody) return;
+
+  function computeStats() {
+    const rows = tbody.querySelectorAll('tr[data-task-id]');
+    const stats = { total: rows.length, running: 0, success: 0, failed: 0 };
+    rows.forEach(function (row) {
+      if (row.querySelector('.badge-passed')) stats.success++;
+      else if (row.querySelector('.badge-critical')) stats.failed++;
+      else if (row.querySelector('.badge-medium')) stats.running++;
+    });
+    window.dispatchEvent(new CustomEvent('mi-tasks-updated', { detail: stats }));
+  }
+
+  computeStats();
+  new MutationObserver(computeStats).observe(tbody, { childList: true, subtree: true });
+});
+
+function taskQueueStats() {
+  return {
+    shown: { total: 0, running: 0, success: 0, failed: 0 },
+    animate(key, end) {
+      const reduce = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) { this.shown[key] = end; return; }
+      const from = this.shown[key], dur = 500, t0 = performance.now();
+      const tick = (t) => {
+        const p = Math.min((t - t0) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        this.shown[key] = Math.round(from + (end - from) * eased);
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    },
+    onUpdate(detail) {
+      this.animate('total', detail.total || 0);
+      this.animate('running', detail.running || 0);
+      this.animate('success', detail.success || 0);
+      this.animate('failed', detail.failed || 0);
+    },
+  };
+}
 </script>
 {% endblock %}

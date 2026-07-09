@@ -1,5 +1,6 @@
 {% extends "base/app.html" %}
 {% load mi_icons %}
+{% load mi_score %}
 
 {% block page_title %}Playground{% endblock %}
 
@@ -24,14 +25,28 @@
         <p class="text-tiny text-text-secondary">{{ kpi.label }}</p>
         <div class="flex items-baseline gap-2 mt-1">
           <span class="text-h1 text-text-primary tabular">{{ kpi.value }}</span>
-          <span class="text-small {% if kpi.up %}text-severity-passed dark:text-severity-passed-dark{% else %}text-severity-critical dark:text-severity-critical-dark{% endif %} flex items-center gap-0.5">
-            {% if kpi.up %}{% icon "arrow-up" size=12 %}{% else %}{% icon "arrow-down" size=12 %}{% endif %}
+          <span class="mi-pill-delta {% if kpi.up %}up{% else %}down{% endif %}">
+            {% if kpi.up %}{% icon "arrow-up" size=10 %}{% else %}{% icon "arrow-down" size=10 %}{% endif %}
             {{ kpi.delta }}
           </span>
         </div>
         <p class="text-tiny text-text-tertiary mt-2">{{ kpi.subtitle }}</p>
       </div>
     {% endfor %}
+  </section>
+
+  {# ─────────── Arc gauge (v3) ─────────── #}
+  <section class="card">
+    <div class="card-header">
+      <h2 class="text-h3">Arc gauge</h2>
+      <p class="text-small text-text-tertiary">components/gauge_arc.html — 270° radial score meter, pure CSS/SVG</p>
+    </div>
+    <div class="card-body flex flex-wrap items-center gap-8">
+      {% include "components/gauge_arc.html" with value=21 color=21|score_color sub_label="/ 100" size_class="w-28 h-28" %}
+      {% include "components/gauge_arc.html" with value=45 color=45|score_color sub_label="/ 100" size_class="w-28 h-28" %}
+      {% include "components/gauge_arc.html" with value=58 color=58|score_color sub_label="/ 100" size_class="w-28 h-28" %}
+      {% include "components/gauge_arc.html" with value=83 color=83|score_color sub_label="/ 100" size_class="w-28 h-28" %}
+    </div>
   </section>
 
   {# ─────────── Severity badges ─────────── #}

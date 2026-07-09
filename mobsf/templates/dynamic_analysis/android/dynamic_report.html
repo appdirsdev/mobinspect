@@ -6,62 +6,259 @@
   <style type="text/css" media="print">
     @page { size: landscape; }
     @media print {
-      .btn, #scan_options { display: none; }
+      .btn, #scan_options, .report-nav { display: none; }
     }
   </style>
   <style>
     #chartdiv { width: 100%; height: 500px; overflow: hidden; background: rgb(var(--surface-2) / 0.4); border-radius: 0.5rem; }
+
     /* Data cells that can hold long values */
     .cell-wrap { word-wrap: break-word; min-width: 160px; max-width: 320px; }
+
     /* Give the report tables the design-system look; DataTables still enhances them. */
-    .mi-table { width: 100%; font-size: 0.8125rem; }
+    .mi-table { width: 100%; font-size: 0.8125rem; border-collapse: collapse; }
     .mi-table thead th {
       text-align: left; padding: 0.5rem 0.75rem; font-weight: 500;
       text-transform: uppercase; font-size: 0.6875rem; letter-spacing: 0.03em;
       color: rgb(var(--text-secondary));
-      border-bottom: 1px solid rgb(var(--border-subtle));
+      border-bottom: 1px solid rgb(var(--border-strong));
+      background: rgb(var(--surface-2) / 0.35);
     }
     .mi-table tbody td { padding: 0.625rem 0.75rem; border-bottom: 1px solid rgb(var(--border-subtle)); vertical-align: top; }
-    .mi-badge { display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.375rem; font-size: 0.6875rem; font-weight: 500; }
+    .mi-table tbody tr { transition: background-color 0.12s ease; }
+    .mi-table tbody tr:hover td { background: rgb(var(--surface-2) / 0.45); }
+    .mi-table tbody tr:last-child td { border-bottom: 0; }
+
+    /* Card-header icon chip — tinted by the section's --mi-accent custom property */
+    .mi-chip {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; flex-shrink: 0;
+      background: rgb(var(--surface-2)); color: var(--mi-accent, rgb(var(--text-secondary)));
+      box-shadow: inset 0 0 0 1px rgb(var(--border-subtle));
+      font-size: 0.95rem;
+    }
+
+    /* Section cards: a colored top accent (no overflow:hidden — DataTables'
+       menus/dropdowns must be able to escape the card bounds). */
+    .mi-accent-card { position: relative; }
+    .mi-accent-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      border-top-left-radius: inherit; border-top-right-radius: inherit;
+      background: linear-gradient(90deg, var(--mi-accent, #FE4A23), transparent 85%);
+    }
+
+    /* Sticky in-page section navigation */
+    .report-nav {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; gap: 0.25rem; flex-wrap: nowrap; overflow-x: auto;
+      padding: 0.5rem; margin-bottom: 1.5rem;
+      border: 1px solid rgb(var(--border-subtle)); border-radius: 0.75rem;
+      background: rgb(var(--surface-1) / 0.92);
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+      scrollbar-width: thin;
+    }
+    .report-nav .nav-link {
+      display: inline-flex; align-items: center; gap: 0.375rem;
+      white-space: nowrap; padding: 0.375rem 0.75rem; border-radius: 0.5rem;
+      font-size: 0.8125rem; font-weight: 500; color: rgb(var(--text-secondary));
+      text-decoration: none; transition: background-color 0.12s ease, color 0.12s ease;
+    }
+    .report-nav .nav-link i { font-size: 0.6875rem; opacity: 0.7; }
+    .report-nav .nav-link:hover { background: rgb(var(--surface-2)); color: rgb(var(--text-primary)); }
+    .report-nav .nav-link.active { background: rgb(var(--surface-2)); color: rgb(var(--text-primary)); }
+    .report-nav .nav-link.active i { opacity: 1; color: #2563EB; }
+
+    /* Monospace value lists (urls / emails / clipboard / deps) — copyable rows */
+    .mono-list { display: flex; flex-direction: column; gap: 0.25rem; max-height: 22rem; overflow-y: auto; }
+    .mono-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+      width: 100%; padding: 0.375rem 0.625rem; border-radius: 0.375rem; border: 0;
+      background: rgb(var(--surface-2) / 0.4); color: rgb(var(--text-secondary));
+      font: inherit; text-align: left; cursor: pointer;
+      transition: background-color 0.12s ease;
+    }
+    .mono-row:hover, .mono-row:focus-visible { background: rgb(var(--surface-2)); }
+    .mono-row:focus-visible { outline: 2px solid rgb(var(--text-brand)); outline-offset: 1px; }
+    .mono-row .mono-value { word-break: break-all; }
+    .mono-row .mono-copy-ico {
+      flex-shrink: 0; opacity: 0; font-size: 0.75rem; color: rgb(var(--text-tertiary));
+      transition: opacity 0.12s ease, color 0.12s ease;
+    }
+    .mono-row:hover .mono-copy-ico, .mono-row:focus-visible .mono-copy-ico { opacity: 1; }
+    .mono-row.mi-copied .mono-copy-ico { opacity: 1; color: #16A34A; }
+
+    /* Hash "copy" trigger in the hero */
+    .mi-hash-copy {
+      position: relative; display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.375rem;
+      padding: 0.125rem 0; border: 0; background: transparent; cursor: pointer;
+      color: rgb(var(--text-secondary)); font-size: 0.8125rem;
+      transition: color 0.12s ease;
+    }
+    .mi-hash-copy:hover, .mi-hash-copy:focus-visible { color: rgb(var(--text-brand)); }
+    .mi-hash-copy i { font-size: 0.6875rem; opacity: 0.6; }
+    .mi-hash-copy.mi-copied i { opacity: 1; color: #16A34A; }
+    .mi-hash-copy.mi-copied::after {
+      content: 'Copied'; position: absolute; left: 0; top: 100%; margin-top: 2px;
+      font-size: 0.625rem; color: #16A34A;
+    }
+
+    /* Key/value detail rows — API monitor args, malware, geolocation cells */
+    .mi-kv { display: flex; flex-direction: column; gap: 0.25rem; margin: 0; }
+    .mi-kv > div { display: flex; gap: 0.5rem; font-size: 0.8125rem; line-height: 1.4; }
+    .mi-kv dt { flex: 0 0 auto; min-width: 6.25rem; color: rgb(var(--text-tertiary)); font-weight: 500; }
+    .mi-kv dd { margin: 0; color: rgb(var(--text-secondary)); word-break: break-word; }
+    .mi-kv-title { font-weight: 600; color: rgb(var(--text-primary)); margin-bottom: 0.375rem; }
+
+    /* Empty states */
+    .mi-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.625rem; padding: 2.25rem 1rem; text-align: center; color: rgb(var(--text-tertiary)); }
+    .mi-empty-ico { width: 2.5rem; height: 2.5rem; border-radius: 9999px; background: rgb(var(--surface-2)); display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; }
+
+    /* Screenshot hover zoom */
+    .mi-shot { display: inline-block; overflow: hidden; border-radius: 0.5rem; border: 1px solid rgb(var(--border-subtle)); }
+    .mi-shot img { display: block; transition: transform 0.3s ease; }
+    .mi-shot:hover img { transform: scale(1.035); }
+
+    /* KPI tiles: accent top bar + hover lift + count-up numerals */
+    .mi-stat { position: relative; overflow: hidden; transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+    .mi-stat:hover { transform: translateY(-3px); box-shadow: 0 14px 34px -18px rgb(0 0 0 / 0.4); border-color: rgb(var(--border-default)); }
+    .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+    /* Ambient hero: floating brand-blobs + faint grid, theme-aware */
+    .mi-hero { background: rgb(var(--surface-1)); }
+    .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+    .mi-hero-glow::before, .mi-hero-glow::after { content: ''; position: absolute; border-radius: 9999px; filter: blur(64px); opacity: 0.5; }
+    .mi-hero-glow::before {
+      width: 300px; height: 300px; top: -120px; right: -60px;
+      background: radial-gradient(circle at center, rgba(254,74,35,.5), transparent 70%);
+      animation: mi-float 16s ease-in-out infinite;
+    }
+    .mi-hero-glow::after {
+      width: 260px; height: 260px; bottom: -130px; left: -40px;
+      background: radial-gradient(circle at center, rgba(22,163,74,.35), transparent 70%);
+      animation: mi-float 21s ease-in-out infinite reverse;
+    }
+    .mi-hero-grid {
+      background-image: linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+      background-size: 34px 34px; opacity: 0.5;
+      -webkit-mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+      mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+    }
+    :root[data-theme="dark"] .mi-hero-glow::before { opacity: 0.38; }
+    :root[data-theme="dark"] .mi-hero-glow::after { opacity: 0.3; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+      .mi-stat, .mi-shot img, .mono-row, .mi-hash-copy { transition: none; }
+    }
+    @keyframes mi-float {
+      0%, 100% { transform: translate3d(0,0,0); }
+      50%      { transform: translate3d(0,-22px,0); }
+    }
   </style>
 {% endblock %}
 
 {% block content %}
 
-{# ─────────────────── Page header ─────────────────── #}
-<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-  <div class="flex items-center gap-4 min-w-0">
-    <span class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
-      <i class="fas fa-file-alt text-xl"></i>
-    </span>
-    <div class="min-w-0">
-      <p class="text-tiny uppercase text-text-tertiary">Dynamic · Android · Report</p>
-      <h1 class="text-h2 truncate" title="{{ package }}">{{ package|default:"Dynamic Analysis Report" }}</h1>
+{# ─────────────────── Ambient hero header ─────────────────── #}
+<section class="mi-hero card mi-glass relative overflow-hidden p-0 mb-6" data-reveal>
+  <div class="mi-hero-grid" aria-hidden="true"></div>
+  <div class="mi-hero-glow" aria-hidden="true"></div>
+  <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-6 py-6 md:px-8 md:py-7">
+    <div class="flex items-center gap-4 min-w-0">
+      <span class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0 shadow-elevation-1">
+        <i class="fas fa-file-alt text-xl"></i>
+      </span>
+      <div class="min-w-0">
+        <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-1">Dynamic · Android · Report</p>
+        <h1 class="text-h2 font-bold truncate" title="{{ package }}">{{ package|default:"Dynamic Analysis Report" }}</h1>
+        {% if hash %}
+        <button type="button" class="mi-hash-copy font-mono" onclick="miCopyRow(this)" title="Copy hash">
+          <span class="mono-value">{{ hash }}</span>
+          <i class="fas fa-copy"></i>
+        </button>
+        {% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <a href="{% url 'dynamic' %}" class="btn btn-ghost btn-md"><i class="fas fa-chevron-left"></i> All platforms</a>
     </div>
   </div>
-  <div class="flex items-center gap-2">
-    <a href="{% url 'dynamic' %}" class="btn btn-ghost btn-md"><i class="fas fa-chevron-left"></i> All platforms</a>
+</section>
+
+{# ─────────────────── Overview KPIs ─────────────────── #}
+<section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
+  <div class="mi-stat card mi-glass card-body" data-reveal x-data="counter({{ domains|length }})">
+    <span class="mi-chip"><i class="fas fa-globe"></i></span>
+    <p class="mi-num text-h3 font-bold tabular mt-3" x-text="shown">0</p>
+    <p class="text-tiny uppercase text-text-tertiary">Domains</p>
   </div>
-</header>
+  <div class="mi-stat card mi-glass card-body" data-reveal x-data='counter({{ trackers|key:"trackers"|length }})'>
+    <span class="mi-chip"><i class="fas fa-user-secret"></i></span>
+    <p class="mi-num text-h3 font-bold tabular mt-3" x-text="shown">0</p>
+    <p class="text-tiny uppercase text-text-tertiary">Trackers</p>
+  </div>
+  <div class="mi-stat card mi-glass card-body" data-reveal x-data="counter({{ screenshots|length }})">
+    <span class="mi-chip"><i class="fas fa-images"></i></span>
+    <p class="mi-num text-h3 font-bold tabular mt-3" x-text="shown">0</p>
+    <p class="text-tiny uppercase text-text-tertiary">Screenshots</p>
+  </div>
+  <div class="mi-stat card mi-glass card-body" data-reveal x-data="counter({{ urls|length }})">
+    <span class="mi-chip"><i class="fas fa-link"></i></span>
+    <p class="mi-num text-h3 font-bold tabular mt-3" x-text="shown">0</p>
+    <p class="text-tiny uppercase text-text-tertiary">URLs</p>
+  </div>
+  <div class="mi-stat card mi-glass card-body" data-reveal x-data="counter({{ emails|length }})">
+    <span class="mi-chip"><i class="fas fa-envelope"></i></span>
+    <p class="mi-num text-h3 font-bold tabular mt-3" x-text="shown">0</p>
+    <p class="text-tiny uppercase text-text-tertiary">Emails</p>
+  </div>
+</section>
+
+{# ─────────────────── Section navigation ─────────────────── #}
+<nav class="report-nav" aria-label="Report sections">
+  <a class="nav-link active" href="#information"><i class="fas fa-info-circle"></i> Information</a>
+  <a class="nav-link" href="#tls_tests"><i class="fas fa-lock"></i> TLS/SSL</a>
+  <a class="nav-link" href="#exportedactivitytester"><i class="fas fa-shapes"></i> Exported Activities</a>
+  <a class="nav-link" href="#activitytester"><i class="fa fa-language"></i> Activities</a>
+  <a class="nav-link" href="#screenshots"><i class="fas fa-images"></i> Screenshots</a>
+  <a class="nav-link" href="#deps"><i class="fas fa-running"></i> Runtime Deps</a>
+  <a class="nav-link" href="#serverlocations"><i class="fas fa-globe-asia"></i> Server Locations</a>
+  <a class="nav-link" href="#malware_check"><i class="fab fa-searchengin"></i> Malware</a>
+  <a class="nav-link" href="#trackers"><i class="fas fa-user-secret"></i> Trackers</a>
+  <a class="nav-link" href="#urls"><i class="fas fa-globe"></i> URLs</a>
+  <a class="nav-link" href="#emails"><i class="fas fa-envelope"></i> Emails</a>
+  <a class="nav-link" href="#clipboard"><i class="fas fa-paste"></i> Clipboard</a>
+  <a class="nav-link" href="#b64"><i class="fas fa-puzzle-piece"></i> Base64</a>
+  <a class="nav-link" href="#sqlitedb"><i class="fas fa-database"></i> SQLite</a>
+  <a class="nav-link" href="#xmlfiles"><i class="fas fa-file-code"></i> XML</a>
+  <a class="nav-link" href="#other_files"><i class="fas fa-file-contract"></i> Other Files</a>
+</nav>
 
 {# ─────────────────── Information / actions ─────────────────── #}
 <section class="mb-6" id="information">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-info-circle"></i> Information</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#FE4A23">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-info-circle"></i></span>
+      <div>
+        <h2 class="text-h3">Information</h2>
+        <p class="text-tiny text-text-tertiary">Live views and raw instrumentation logs</p>
+      </div>
     </div>
-    <div class="card-body space-y-4">
-      <div class="flex flex-wrap gap-2">
-        {% if apimon %}
-        <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'live_api' %}?hash={{ hash }}&amp;package={{ package }}"><i class="fa fa-mobile"></i> API Monitor View</a>
-        {% endif %}
-        {% if frida_logs %}
-        <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'frida_logs' %}?hash={{ hash }}&amp;package={{ package }}"><i class="fas fa-spider"></i> Frida Logs View</a>
-        {% endif %}
-        <a class="btn btn-secondary btn-sm" target="_blank" role="button" href="{% url 'httptools' %}?project={{ package }}"><i class="fab fa-hire-a-helper"></i> Start HTTPTools</a>
+    <div class="card-body space-y-5">
+      <div>
+        <h6 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Live Views</h6>
+        <div class="flex flex-wrap gap-2">
+          {% if apimon %}
+          <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'live_api' %}?hash={{ hash }}&amp;package={{ package }}"><i class="fa fa-mobile"></i> API Monitor View</a>
+          {% endif %}
+          {% if frida_logs %}
+          <a target="_blank" class="btn btn-primary btn-sm" role="button" href="{% url 'frida_logs' %}?hash={{ hash }}&amp;package={{ package }}"><i class="fas fa-spider"></i> Frida Logs View</a>
+          {% endif %}
+          <a class="btn btn-secondary btn-sm" target="_blank" role="button" href="{% url 'httptools' %}?project={{ package }}"><i class="fab fa-hire-a-helper"></i> Start HTTPTools</a>
+        </div>
       </div>
 
-      <div>
+      <div class="border-t border-border-subtle pt-4">
         <h6 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Raw Logs</h6>
         <div class="flex flex-wrap gap-2">
           {% if droidmon %}
@@ -86,9 +283,13 @@
 {# ─────────────────── API Monitor (apimon) ─────────────────── #}
 {% for api, details in apimon.items %}
 <section class="mb-6" id="{{ api|slugify }}">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="{{ details.0|key:"icon" }}"></i> {{ api|upper }}</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:{% cycle '#FE4A23' '#16A34A' '#D97706' '#64748B' '#8D5CFC' %}">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="{{ details.0|key:"icon" }}"></i></span>
+      <div>
+        <h2 class="text-h3">{{ api|upper }}</h2>
+        <p class="text-tiny text-text-tertiary">{{ details|length }} call{{ details|length|pluralize }} captured</p>
+      </div>
     </div>
     <div class="card-body overflow-x-auto">
       <table class="mi-table">
@@ -98,12 +299,14 @@
           <tr>
             <td class="font-mono text-mono text-text-secondary">{{ call|key:"class" }}</td>
             <td class="cell-wrap">
-              <b>{{ call|key:"method" }}</b>
-              <p class="mt-1"><b><i>Arguments:</i></b> {{ call|key:"arguments" }}</p>
-              {% if call|key:"result" %}<p><b><i>Result: </i></b>{{ call|key:"result" }}</p>{% endif %}
-              {% if call|key:"returnValue" %}<p><b><i>Return Value: </i></b>{{ call|key:"returnValue" }}</p>{% endif %}
-              {% if call|key:"decoded" %}<p><b><i>Decoded String: </i></b>{{ call|key:"decoded" }}</p>{% endif %}
-              <p><b><i>Called From: </i></b>{{ call|key:"calledFrom" }}</p>
+              <p class="mi-kv-title">{{ call|key:"method" }}</p>
+              <dl class="mi-kv">
+                <div><dt>Arguments</dt><dd>{{ call|key:"arguments" }}</dd></div>
+                {% if call|key:"result" %}<div><dt>Result</dt><dd>{{ call|key:"result" }}</dd></div>{% endif %}
+                {% if call|key:"returnValue" %}<div><dt>Return Value</dt><dd>{{ call|key:"returnValue" }}</dd></div>{% endif %}
+                {% if call|key:"decoded" %}<div><dt>Decoded String</dt><dd>{{ call|key:"decoded" }}</dd></div>{% endif %}
+                <div><dt>Called From</dt><dd>{{ call|key:"calledFrom" }}</dd></div>
+              </dl>
             </td>
           </tr>
           {% endfor %}
@@ -117,9 +320,10 @@
 {# ─────────────────── Droidmon ─────────────────── #}
 {% for api, details in droidmon.items %}
 <section class="mb-6" id="{{ api }}">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="{{ details|key:"icon" }}"></i> {{ details|key:"name" }}</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:{% cycle '#16A34A' '#FE4A23' '#64748B' '#D97706' '#8D5CFC' %}">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="{{ details|key:"icon" }}"></i></span>
+      <h2 class="text-h3">{{ details|key:"name" }}</h2>
     </div>
     <div class="card-body overflow-x-auto">
       <table class="mi-table">
@@ -129,10 +333,12 @@
           <tr>
             <td class="font-mono text-mono text-text-secondary">{{ call|key:"class" }}</td>
             <td class="cell-wrap">
-              <b>{{ call|key:"method" }}</b>
-              {% if call|key:"args" %}<p class="mt-1"><b><i>Arguments:</i></b> {{ call|key:"args" }}</p>{% endif %}
-              {% if call|key:"decoded" %}<p><b><i>Decoded String: </i></b>{{ call|key:"decoded" }}</p>{% endif %}
-              {% if call|key:"return" %}<p><b><i>Return: </i></b>{{ call|key:"return" }}</p>{% endif %}
+              <p class="mi-kv-title">{{ call|key:"method" }}</p>
+              <dl class="mi-kv">
+                {% if call|key:"args" %}<div><dt>Arguments</dt><dd>{{ call|key:"args" }}</dd></div>{% endif %}
+                {% if call|key:"decoded" %}<div><dt>Decoded String</dt><dd>{{ call|key:"decoded" }}</dd></div>{% endif %}
+                {% if call|key:"return" %}<div><dt>Return</dt><dd>{{ call|key:"return" }}</dd></div>{% endif %}
+              </dl>
             </td>
           </tr>
           {% endfor %}
@@ -145,18 +351,34 @@
 
 {# ─────────────────── TLS/SSL tester ─────────────────── #}
 <section class="mb-6" id="tls_tests">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-lock"></i> TLS/SSL Security Tester</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#D97706">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-lock"></i></span>
+      <div>
+        <h2 class="text-h3">TLS/SSL Security Tester</h2>
+        <p class="text-tiny text-text-tertiary">Transport-layer configuration checks</p>
+      </div>
     </div>
     <div class="card-body overflow-x-auto">
       <table class="mi-table">
-        <thead><tr><th>Tests</th><th>Result</th></tr></thead>
+        <thead><tr><th>Test</th><th>Result</th></tr></thead>
         <tbody>
-          <tr><td>TLS Misconfiguration Test</td><td>{% if tls_tests %}{% if tls_tests.tls_misconfigured == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td></tr>
-          <tr><td>TLS Pinning/Certificate Transparency Test</td><td>{% if tls_tests %}{% if tls_tests.no_tls_pin_or_transparency == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td></tr>
-          <tr><td>TLS Pinning/Certificate Transparency Bypass Test</td><td>{% if tls_tests %}{% if tls_tests.pin_or_transparency_bypassed == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td></tr>
-          <tr><td>Cleartext Traffic Test</td><td>{% if tls_tests %}{% if tls_tests.has_cleartext == True %}❌{% else %}✅{% endif %}{% else %}Not Tested{% endif %}</td></tr>
+          <tr>
+            <td>TLS Misconfiguration Test</td>
+            <td>{% if tls_tests %}{% if tls_tests.tls_misconfigured == True %}<span class="badge badge-critical"><i class="fas fa-times"></i> Fail</span>{% else %}<span class="badge badge-passed"><i class="fas fa-check"></i> Pass</span>{% endif %}{% else %}<span class="badge badge-unknown">Not Tested</span>{% endif %}</td>
+          </tr>
+          <tr>
+            <td>TLS Pinning/Certificate Transparency Test</td>
+            <td>{% if tls_tests %}{% if tls_tests.no_tls_pin_or_transparency == True %}<span class="badge badge-critical"><i class="fas fa-times"></i> Fail</span>{% else %}<span class="badge badge-passed"><i class="fas fa-check"></i> Pass</span>{% endif %}{% else %}<span class="badge badge-unknown">Not Tested</span>{% endif %}</td>
+          </tr>
+          <tr>
+            <td>TLS Pinning/Certificate Transparency Bypass Test</td>
+            <td>{% if tls_tests %}{% if tls_tests.pin_or_transparency_bypassed == True %}<span class="badge badge-critical"><i class="fas fa-times"></i> Fail</span>{% else %}<span class="badge badge-passed"><i class="fas fa-check"></i> Pass</span>{% endif %}{% else %}<span class="badge badge-unknown">Not Tested</span>{% endif %}</td>
+          </tr>
+          <tr>
+            <td>Cleartext Traffic Test</td>
+            <td>{% if tls_tests %}{% if tls_tests.has_cleartext == True %}<span class="badge badge-critical"><i class="fas fa-times"></i> Fail</span>{% else %}<span class="badge badge-passed"><i class="fas fa-check"></i> Pass</span>{% endif %}{% else %}<span class="badge badge-unknown">Not Tested</span>{% endif %}</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -165,85 +387,113 @@
 
 {# ─────────────────── Exported activity tester ─────────────────── #}
 <section class="mb-6" id="exportedactivitytester">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-shapes"></i> Exported Activity Tester</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#8D5CFC">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-shapes"></i></span>
+      <h2 class="text-h3">Exported Activity Tester</h2>
     </div>
     <div class="card-body overflow-x-auto">
+      {% if exported_activity_tester %}
       <table class="mi-table">
         <thead><tr><th>Screenshot</th><th>Activity</th></tr></thead>
         <tbody>
           {% for img, desc in exported_activity_tester.items %}
           <tr>
-            <td><img alt="{{ desc }}" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" class="rounded-md border border-border-subtle" height="300" width="175"></td>
+            <td><a class="mi-shot" href="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" target="_blank" rel="noopener noreferrer"><img alt="{{ desc }}" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" height="300" width="175"></a></td>
             <td>{{ desc }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+      {% else %}
+      <div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-shapes"></i></span><p>No exported activities tested.</p></div>
+      {% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── Activity tester ─────────────────── #}
 <section class="mb-6" id="activitytester">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fa fa-language"></i> Activity Tester</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#FE4A23">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fa fa-language"></i></span>
+      <h2 class="text-h3">Activity Tester</h2>
     </div>
     <div class="card-body overflow-x-auto">
+      {% if activity_tester %}
       <table class="mi-table">
         <thead><tr><th>Screenshot</th><th>Activity</th></tr></thead>
         <tbody>
           {% for img, desc in activity_tester.items %}
           <tr>
-            <td><img alt="{{ desc }}" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" class="rounded-md border border-border-subtle" height="300" width="175"></td>
+            <td><a class="mi-shot" href="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" target="_blank" rel="noopener noreferrer"><img alt="{{ desc }}" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ img }}" height="300" width="175"></a></td>
             <td>{{ desc }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+      {% else %}
+      <div class="mi-empty"><span class="mi-empty-ico"><i class="fa fa-language"></i></span><p>No activities tested.</p></div>
+      {% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── Screenshots ─────────────────── #}
 <section class="mb-6" id="screenshots">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-images"></i> Screenshots</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#8D5CFC">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-images"></i></span>
+      <div>
+        <h2 class="text-h3">Screenshots</h2>
+        <p class="text-tiny text-text-tertiary">{{ screenshots|length }} capture{{ screenshots|length|pluralize }} during dynamic run</p>
+      </div>
     </div>
     <div class="card-body">
+      {% if screenshots %}
       <div class="flex flex-wrap gap-3">
         {% for i in screenshots %}
-        <img alt="Screenshot" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ i }}" class="rounded-md border border-border-subtle" height="600" width="350">
+        <a class="mi-shot" href="{% url 'download' %}{{ hash }}-screenshots-apk/{{ i }}" target="_blank" rel="noopener noreferrer">
+          <img alt="Screenshot" src="{% url 'download' %}{{ hash }}-screenshots-apk/{{ i }}" height="600" width="350">
+        </a>
         {% endfor %}
       </div>
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-images"></i></span><p>No screenshots captured.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── Runtime dependencies ─────────────────── #}
 <section class="mb-6" id="deps">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-running"></i> Runtime Dependencies</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#64748B">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-running"></i></span>
+      <h2 class="text-h3">Runtime Dependencies</h2>
     </div>
     <div class="card-body">
       {% if runtime_dependencies %}
-      <div class="font-mono text-mono text-text-secondary space-y-1">
-        {% for f in runtime_dependencies %}<div>{{ f }}</div>{% endfor %}
+      <div class="mono-list font-mono text-mono">
+        {% for f in runtime_dependencies %}
+        <button type="button" class="mono-row" onclick="miCopyRow(this)">
+          <span class="mono-value">{{ f }}</span>
+          <i class="fas fa-copy mono-copy-ico"></i>
+        </button>
+        {% endfor %}
       </div>
-      {% else %}<p class="text-text-tertiary text-small">No runtime dependencies captured.</p>{% endif %}
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-running"></i></span><p>No runtime dependencies captured.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── Server locations ─────────────────── #}
 <section class="mb-6" id="serverlocations">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-globe-asia"></i> Server Locations</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#FE4A23">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-globe-asia"></i></span>
+      <div>
+        <h2 class="text-h3">Server Locations</h2>
+        <p class="text-tiny text-text-tertiary">Geolocation of contacted endpoints</p>
+      </div>
     </div>
     <div class="card-body space-y-4">
       <div id="chartdiv"></div>
@@ -258,10 +508,12 @@
             <tr>
               <td class="font-mono text-mono text-text-secondary">{{ domain }}</td>
               <td>
-                <strong>IP: </strong>{{ details|key:"geolocation"|key:"ip" }}<br/>
-                <strong>Country: </strong>{{ details|key:"geolocation"|key:"country_long" }}<br/>
-                <strong>Region: </strong>{{ details|key:"geolocation"|key:"region" }}<br/>
-                <strong>City: </strong>{{ details|key:"geolocation"|key:"city" }}<br/>
+                <dl class="mi-kv">
+                  <div><dt>IP</dt><dd class="font-mono text-mono">{{ details|key:"geolocation"|key:"ip" }}</dd></div>
+                  <div><dt>Country</dt><dd>{{ details|key:"geolocation"|key:"country_long" }}</dd></div>
+                  <div><dt>Region</dt><dd>{{ details|key:"geolocation"|key:"region" }}</dd></div>
+                  <div><dt>City</dt><dd>{{ details|key:"geolocation"|key:"city" }}</dd></div>
+                </dl>
               </td>
             </tr>
             {% endif %}
@@ -276,9 +528,10 @@
 
 {# ─────────────────── Domain malware check ─────────────────── #}
 <section class="mb-6" id="malware_check">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fab fa-searchengin"></i> Domain Malware Check</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#DC2626">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fab fa-searchengin"></i></span>
+      <h2 class="text-h3">Domain Malware Check</h2>
     </div>
     <div class="card-body overflow-x-auto">
       {% if domains %}
@@ -290,87 +543,115 @@
             <td class="font-mono text-mono text-text-secondary">{{ domain }}</td>
             <td>
               {% if details|key:"bad" == "yes" %}
-              <span class="mi-badge bg-severity-critical/10 text-severity-critical dark:bg-severity-critical-dark/15 dark:text-severity-critical-dark">malware</span><br/>
-              <pre class="font-mono text-mono mt-1"><strong>URL: </strong>{{ details|key:"domain_or_url" }}
-<strong>IP: </strong>{{ details|key:"ip" }}
-<strong>Description: </strong>{{ details|key:"desc" }}</pre>
+              <span class="badge badge-critical"><i class="fas fa-exclamation-triangle"></i> Malware</span>
+              <dl class="mi-kv mt-2">
+                <div><dt>URL</dt><dd class="font-mono text-mono">{{ details|key:"domain_or_url" }}</dd></div>
+                <div><dt>IP</dt><dd class="font-mono text-mono">{{ details|key:"ip" }}</dd></div>
+                <div><dt>Description</dt><dd>{{ details|key:"desc" }}</dd></div>
+              </dl>
               {% else %}
-              <span class="mi-badge bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark">good</span><br/>
+              <span class="badge badge-passed"><i class="fas fa-check-circle"></i> Good</span>
               {% endif %}
             </td>
             <td>
               {% if details|key:"geolocation" %}
-              <strong>IP: </strong>{{ details|key:"geolocation"|key:"ip" }}<br/>
-              <strong>Country: </strong>{{ details|key:"geolocation"|key:"country_long" }}<br/>
-              <strong>Region: </strong>{{ details|key:"geolocation"|key:"region" }}<br/>
-              <strong>City: </strong>{{ details|key:"geolocation"|key:"city" }}<br/>
-              <strong>Latitude: </strong>{{ details|key:"geolocation"|key:"latitude" }}<br/>
-              <strong>Longitude: </strong>{{ details|key:"geolocation"|key:"longitude" }}<br/>
-              <strong>View: </strong><a class="text-text-brand hover:underline" target="_blank" href="http://maps.google.com/maps?q={{ details|key:"geolocation"|key:"latitude" }},{{ details|key:"geolocation"|key:"longitude" }}">Google Map</a>
+              <dl class="mi-kv">
+                <div><dt>IP</dt><dd class="font-mono text-mono">{{ details|key:"geolocation"|key:"ip" }}</dd></div>
+                <div><dt>Country</dt><dd>{{ details|key:"geolocation"|key:"country_long" }}</dd></div>
+                <div><dt>Region</dt><dd>{{ details|key:"geolocation"|key:"region" }}</dd></div>
+                <div><dt>City</dt><dd>{{ details|key:"geolocation"|key:"city" }}</dd></div>
+                <div><dt>Latitude</dt><dd>{{ details|key:"geolocation"|key:"latitude" }}</dd></div>
+                <div><dt>Longitude</dt><dd>{{ details|key:"geolocation"|key:"longitude" }}</dd></div>
+                <div><dt>Map</dt><dd><a class="text-text-brand hover:underline" target="_blank" href="http://maps.google.com/maps?q={{ details|key:"geolocation"|key:"latitude" }},{{ details|key:"geolocation"|key:"longitude" }}">Google Map</a></dd></div>
+              </dl>
               {% else %}
-              No Geolocation information available.
+              <span class="text-text-tertiary text-small">No Geolocation information available.</span>
               {% endif %}
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      {% endif %}
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fab fa-searchengin"></i></span><p>No domains captured.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── Clipboard dump ─────────────────── #}
 <section class="mb-6" id="clipboard">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-paste"></i> Clipboard Dump</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#64748B">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-paste"></i></span>
+      <h2 class="text-h3">Clipboard Dump</h2>
     </div>
     <div class="card-body">
-      <div class="font-mono text-mono text-text-secondary space-y-1">
-        {% for f in clipboard %}<div>{{ f }}</div>{% endfor %}
+      {% if clipboard %}
+      <div class="mono-list font-mono text-mono">
+        {% for f in clipboard %}
+        <button type="button" class="mono-row" onclick="miCopyRow(this)">
+          <span class="mono-value">{{ f }}</span>
+          <i class="fas fa-copy mono-copy-ico"></i>
+        </button>
+        {% endfor %}
       </div>
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-paste"></i></span><p>No clipboard data captured.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── URLs ─────────────────── #}
 <section class="mb-6" id="urls">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-globe"></i> URLs</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#8D5CFC">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-globe"></i></span>
+      <h2 class="text-h3">URLs</h2>
     </div>
     <div class="card-body">
       {% if urls %}
-      <div class="font-mono text-mono text-text-secondary space-y-1">
-        {% for f in urls %}<div>{{ f }}</div>{% endfor %}
+      <div class="mono-list font-mono text-mono">
+        {% for f in urls %}
+        <button type="button" class="mono-row" onclick="miCopyRow(this)">
+          <span class="mono-value">{{ f }}</span>
+          <i class="fas fa-copy mono-copy-ico"></i>
+        </button>
+        {% endfor %}
       </div>
-      {% else %}<p class="text-text-tertiary text-small">No URLs captured.</p>{% endif %}
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-globe"></i></span><p>No URLs captured.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── Emails ─────────────────── #}
 <section class="mb-6" id="emails">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-envelope"></i> Emails</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#FE4A23">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-envelope"></i></span>
+      <h2 class="text-h3">Emails</h2>
     </div>
     <div class="card-body">
       {% if emails %}
-      <div class="font-mono text-mono text-text-secondary space-y-1">
-        {% for f in emails %}<div>{{ f }}</div>{% endfor %}
+      <div class="mono-list font-mono text-mono">
+        {% for f in emails %}
+        <button type="button" class="mono-row" onclick="miCopyRow(this)">
+          <span class="mono-value">{{ f }}</span>
+          <i class="fas fa-copy mono-copy-ico"></i>
+        </button>
+        {% endfor %}
       </div>
-      {% else %}<p class="text-text-tertiary text-small">No emails captured.</p>{% endif %}
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-envelope"></i></span><p>No emails captured.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── Trackers ─────────────────── #}
 <section class="mb-6" id="trackers">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-user-secret"></i> Trackers</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#EA580C">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-user-secret"></i></span>
+      <div>
+        <h2 class="text-h3">Trackers</h2>
+        <p class="text-tiny text-text-tertiary">Third-party analytics and advertising signatures</p>
+      </div>
     </div>
     <div class="card-body overflow-x-auto">
       {% if trackers %}
@@ -386,18 +667,20 @@
           {% endfor %}
         </tbody>
       </table>
-      {% endif %}
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-user-secret"></i></span><p>No trackers detected.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── Base64 decoded ─────────────────── #}
 <section class="mb-6" id="b64">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-puzzle-piece"></i> Base64 Strings Decoded</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#64748B">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-puzzle-piece"></i></span>
+      <h2 class="text-h3">Base64 Strings Decoded</h2>
     </div>
     <div class="card-body overflow-x-auto">
+      {% if base64_strings %}
       <table class="mi-table">
         <thead><tr><th>Called</th><th>Decoded String</th></tr></thead>
         <tbody>
@@ -409,63 +692,73 @@
           {% endfor %}
         </tbody>
       </table>
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-puzzle-piece"></i></span><p>No base64 strings decoded.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── SQLite databases ─────────────────── #}
 <section class="mb-6" id="sqlitedb">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-database"></i> SQLite Database</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#64748B">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-database"></i></span>
+      <h2 class="text-h3">SQLite Database</h2>
     </div>
     <div class="card-body overflow-x-auto">
+      {% if sqlite %}
       <table class="mi-table">
         <thead><tr><th>Files</th></tr></thead>
         <tbody>
           {% for file in sqlite %}
-          <tr><td><a class="text-text-brand hover:underline" href="{% url 'dynamic_view_file' %}?file={{ file|key:"file" }}&amp;hash={{ hash }}&amp;type={{ file|key:"type" }}">{{ file|key:"file" }}</a></td></tr>
+          <tr><td><a class="text-text-brand hover:underline inline-flex items-center gap-2" href="{% url 'dynamic_view_file' %}?file={{ file|key:"file" }}&amp;hash={{ hash }}&amp;type={{ file|key:"type" }}"><i class="fas fa-database text-text-tertiary"></i> {{ file|key:"file" }}</a></td></tr>
           {% endfor %}
         </tbody>
       </table>
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-database"></i></span><p>No SQLite databases captured.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── XML files ─────────────────── #}
 <section class="mb-6" id="xmlfiles">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-file-code"></i> XML Files</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#64748B">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-file-code"></i></span>
+      <h2 class="text-h3">XML Files</h2>
     </div>
     <div class="card-body overflow-x-auto">
+      {% if xml %}
       <table class="mi-table">
         <thead><tr><th>Files</th></tr></thead>
         <tbody>
           {% for file in xml %}
-          <tr><td><a class="text-text-brand hover:underline" href="{% url 'dynamic_view_file' %}?file={{ file|key:"file" }}&amp;hash={{ hash }}&amp;type={{ file|key:"type" }}">{{ file|key:"file" }}</a></td></tr>
+          <tr><td><a class="text-text-brand hover:underline inline-flex items-center gap-2" href="{% url 'dynamic_view_file' %}?file={{ file|key:"file" }}&amp;hash={{ hash }}&amp;type={{ file|key:"type" }}"><i class="fas fa-file-code text-text-tertiary"></i> {{ file|key:"file" }}</a></td></tr>
           {% endfor %}
         </tbody>
       </table>
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-file-code"></i></span><p>No XML files captured.</p></div>{% endif %}
     </div>
   </div>
 </section>
 
 {# ─────────────────── Other files ─────────────────── #}
 <section class="mb-6" id="other_files">
-  <div class="card" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2"><i class="fas fa-file-contract"></i> Other Files</h2>
+  <div class="card mi-glass mi-accent-card card-hover" data-reveal style="--mi-accent:#64748B">
+    <div class="card-header flex items-center gap-3">
+      <span class="mi-chip"><i class="fas fa-file-contract"></i></span>
+      <h2 class="text-h3">Other Files</h2>
     </div>
     <div class="card-body overflow-x-auto">
+      {% if others %}
       <table class="mi-table">
         <thead><tr><th>Files</th></tr></thead>
         <tbody>
           {% for file in others %}
-          <tr><td><a class="text-text-brand hover:underline" href="{% url 'dynamic_view_file' %}?file={{ file|key:"file" }}&amp;hash={{ hash }}&amp;type={{ file|key:"type" }}">{{ file|key:"file" }}</a></td></tr>
+          <tr><td><a class="text-text-brand hover:underline inline-flex items-center gap-2" href="{% url 'dynamic_view_file' %}?file={{ file|key:"file" }}&amp;hash={{ hash }}&amp;type={{ file|key:"type" }}"><i class="fas fa-file-contract text-text-tertiary"></i> {{ file|key:"file" }}</a></td></tr>
           {% endfor %}
         </tbody>
       </table>
+      {% else %}<div class="mi-empty"><span class="mi-empty-ico"><i class="fas fa-file-contract"></i></span><p>No other files captured.</p></div>{% endif %}
     </div>
   </div>
 </section>
@@ -563,5 +856,84 @@
     {% endfor %}
   {% endif %}
   ];
+</script>
+<script>
+  // Presentational-only additions (do not touch the map/report logic above):
+  // animated count-up for the KPI tiles, and one-click copy for the hash
+  // pill + mono-list rows (dependencies, clipboard, URLs, emails).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+
+  function miCopyRow(trigger) {
+    try {
+      if (!navigator.clipboard) return;
+      var valueEl = trigger.querySelector('.mono-value');
+      var text = valueEl ? valueEl.textContent.trim() : '';
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function () {
+        trigger.classList.add('mi-copied');
+        setTimeout(function () { trigger.classList.remove('mi-copied'); }, 1200);
+      });
+    } catch (e) { /* clipboard copy is a non-critical enhancement */ }
+  }
+</script>
+<script>
+  // Presentational-only: theme the amCharts world map with design tokens.
+  // Reads CSS custom properties so light/dark automatically match the rest
+  // of the app. Never touches the map's data, series, or config above —
+  // only cosmetic fill/stroke/tooltip colors on the objects already created.
+  (function () {
+    if (typeof am4core === 'undefined' || typeof chart === 'undefined') return;
+
+    function cssColor(name, fallback) {
+      try {
+        var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return v ? am4core.color('rgb(' + v.replace(/\s+/g, ',') + ')') : am4core.color(fallback);
+      } catch (e) { return am4core.color(fallback); }
+    }
+
+    function themeMap() {
+      try {
+        if (typeof polygonTemplate !== 'undefined') {
+          polygonTemplate.fill = cssColor('--surface-3', '#E2E8F0');
+          polygonTemplate.stroke = cssColor('--border-default', '#CBD5E1');
+          polygonTemplate.strokeWidth = 0.5;
+        }
+        if (typeof hs !== 'undefined') {
+          hs.properties.fill = cssColor('--text-brand', '#2563EB');
+        }
+        if (chart.tooltip) {
+          chart.tooltip.getFillFromObject = false;
+          chart.tooltip.background.fill = cssColor('--surface-4', '#1F2937');
+          chart.tooltip.background.cornerRadius = 6;
+          chart.tooltip.background.stroke = cssColor('--border-default', '#CBD5E1');
+          chart.tooltip.background.strokeWidth = 1;
+          chart.tooltip.label.fill = cssColor('--text-primary', '#0F172A');
+          chart.tooltip.label.fontSize = 12;
+        }
+      } catch (e) { /* styling only — never block map rendering */ }
+    }
+
+    themeMap();
+    window.addEventListener('mi:theme-change', themeMap);
+  })();
 </script>
 {% endblock %}

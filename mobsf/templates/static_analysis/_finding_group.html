@@ -1,40 +1,163 @@
 {% load mi_icons %}
 {% comment %}
-  Reusable finding group for the AppSec dashboard.
-  Vars: items (list with .title, .section, .description), level (severity token), label
+  Reusable finding group for the AppSec dashboard — one severity "bucket".
+  Vars: items (list of {title, description, section}), level (severity token:
+  critical|medium|low|passed|unknown), label (display text, e.g. "HIGH").
+
+  Included 5x from appsec_dashboard.html inside a single shared Alpine scope
+  `x-data="{ open: '' }"` — `open` is ONE string for the whole page, so only
+  one finding (across every bucket) is expanded at a time. The @click / x-show
+  key `{{ level }}-{{ forloop.counter }}` is that shared contract — keep it
+  byte-identical if this file is touched again.
+
+  SECURITY: item.title / item.section / item.description are scan-derived
+  (can contain attacker-influenced strings — domains, package strings, app
+  metadata). They are only ever rendered as autoescaped text nodes or into
+  a data-* attribute (also autoescaped) that JS reads back as inert string
+  data via `.dataset` — never interpolated into an Alpine/JS expression
+  string. Do not change that pattern; do not add |safe.
 {% endcomment %}
-{% if items %}
+<div class="mi-fgroup" data-reveal x-data="{ q: '' }">
+
+  {# ── Bucket header: icon chip · label · live animated count · optional filter ── #}
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <span
+        class="inline-flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0
+          {% if level == 'critical' %}bg-severity-critical/10 text-severity-critical dark:bg-severity-critical-dark/15 dark:text-severity-critical-dark
+          {% elif level == 'medium' %}bg-severity-medium/10 text-severity-medium dark:bg-severity-medium-dark/15 dark:text-severity-medium-dark
+          {% elif level == 'low' %}bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark
+          {% elif level == 'passed' %}bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark
+          {% else %}bg-severity-unknown/15 text-severity-unknown dark:bg-severity-unknown-dark/15 dark:text-severity-unknown-dark{% endif %}"
+      >
+        {% if level == 'critical' or level == 'medium' %}{% icon "alert-triangle" size=17 %}
+        {% elif level == 'low' %}{% icon "info" size=17 %}
+        {% elif level == 'passed' %}{% icon "check" size=17 %}
+        {% else %}{% icon "search" size=17 %}{% endif %}
+      </span>
+      <h3 class="text-h4 flex items-center gap-2 min-w-0">
+        <span class="truncate">{{ label }}</span>
+        <span class="badge badge-{{ level }} tabular" x-data="counter({{ items|length }})" x-text="shown">{{ items|length }}</span>
+      </h3>
+    </div>
+
+    {% if items|length > 8 %}
+    <div class="relative w-full sm:w-56 flex-shrink-0">
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+        {% icon "search" size=14 %}
+      </span>
+      <input
+        type="search"
+        x-model.debounce.150ms="q"
+        placeholder="Filter {{ label|lower }}…"
+        aria-label="Filter {{ label|lower }} findings"
+        class="input pl-9 text-small"
+      />
+    </div>
+    {% endif %}
+  </div>
+
+  {% if items %}
   <div class="space-y-2">
     {% for item in items %}
-      <div class="card" data-reveal>
+      <div
+        class="card relative overflow-hidden"
+        data-search="{{ item.title|lower }} {{ item.section|lower }}"
+        x-show="q === '' || $el.dataset.search.includes(q.toLowerCase())"
+        :class="open === '{{ level }}-{{ forloop.counter }}' ? 'ring-1 ring-mobinspect-500/40 border-mobinspect-500/40' : ''"
+      >
+        <span
+          aria-hidden="true"
+          class="absolute inset-y-0 left-0 w-[3px]
+            {% if level == 'critical' %}bg-severity-critical dark:bg-severity-critical-dark
+            {% elif level == 'medium' %}bg-severity-medium dark:bg-severity-medium-dark
+            {% elif level == 'low' %}bg-severity-low dark:bg-severity-low-dark
+            {% elif level == 'passed' %}bg-severity-passed dark:bg-severity-passed-dark
+            {% else %}bg-severity-unknown dark:bg-severity-unknown-dark{% endif %}"
+        ></span>
         <button
           type="button"
-          class="w-full flex items-center justify-between gap-3 px-5 py-3 text-left hover:bg-surface-2/40 transition-colors duration-fast"
+          id="finding-toggle-{{ level }}-{{ forloop.counter }}"
+          class="w-full flex items-center justify-between gap-3 pl-5 pr-5 py-3 text-left hover:bg-surface-2/40 transition-colors duration-fast rounded-lg"
           @click="open = (open === '{{ level }}-{{ forloop.counter }}' ? '' : '{{ level }}-{{ forloop.counter }}')"
+          :aria-expanded="(open === '{{ level }}-{{ forloop.counter }}').toString()"
+          aria-controls="finding-panel-{{ level }}-{{ forloop.counter }}"
         >
           <div class="flex items-center gap-3 min-w-0">
-            <span class="badge badge-{{ level }}">{{ label }}</span>
+            <span class="badge badge-{{ level }} flex-shrink-0">{{ label }}</span>
             <span class="text-text-primary font-medium truncate">{{ item.title }}</span>
           </div>
           <div class="flex items-center gap-3 flex-shrink-0">
             <span class="text-tiny uppercase text-text-tertiary hidden sm:inline">{{ item.section }}</span>
-            <span class="text-text-tertiary transition-transform duration-fast"
-                  :class="open === '{{ level }}-{{ forloop.counter }}' ? 'rotate-180' : ''">
+            <span
+              class="text-text-tertiary transition-transform duration-base flex-shrink-0"
+              :class="open === '{{ level }}-{{ forloop.counter }}' ? 'rotate-180' : ''"
+            >
               {% icon "chevron-down" size=16 %}
             </span>
           </div>
         </button>
         <div
+          id="finding-panel-{{ level }}-{{ forloop.counter }}"
           x-show="open === '{{ level }}-{{ forloop.counter }}'"
           x-cloak
           x-transition:enter="transition ease-out duration-base"
-          x-transition:enter-start="opacity-0 max-h-0"
-          x-transition:enter-end="opacity-100 max-h-[1000px]"
-          class="px-5 pb-4 border-t border-border-subtle"
+          x-transition:enter-start="opacity-0 -translate-y-1"
+          x-transition:enter-end="opacity-100 translate-y-0"
+          x-transition:leave="transition ease-in duration-fast"
+          x-transition:leave-start="opacity-100 translate-y-0"
+          x-transition:leave-end="opacity-0 -translate-y-1"
+          x-data="{ copied: false }"
+          class="pl-5 pr-5 pb-4 border-t border-border-subtle"
         >
-          <pre class="pre-finding text-text-secondary mt-3">{{ item.description }}</pre>
+          <div class="flex items-center justify-between mt-3 mb-1.5">
+            <span class="text-tiny uppercase text-text-tertiary">Details</span>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm !h-7 !px-2 text-tiny"
+              @click="navigator.clipboard.writeText($refs.desc.innerText); copied = true; setTimeout(() => copied = false, 1500)"
+            >
+              <span x-show="!copied" class="inline-flex items-center gap-1">{% icon "copy" size=13 %} Copy</span>
+              <span x-show="copied" x-cloak class="inline-flex items-center gap-1 text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=13 %} Copied</span>
+            </button>
+          </div>
+          <pre x-ref="desc" class="pre-finding text-text-secondary bg-surface-2/50 border border-border-subtle rounded-lg p-3">{{ item.description }}</pre>
         </div>
       </div>
     {% endfor %}
   </div>
-{% endif %}
+  {% else %}
+  <div class="card card-body flex items-center gap-3">
+    <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
+      {% icon "check" size=15 %}
+    </span>
+    <p class="text-small text-text-secondary">No {{ label|lower }} findings detected in this scan.</p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  // Animated count-up for the bucket's finding count (additive; presentation
+  // only). Guarded so the identical definition can safely load once per
+  // included bucket without redeclaration side effects.
+  window.counter = window.counter || function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 700, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  };
+</script>

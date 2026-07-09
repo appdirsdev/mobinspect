@@ -1,6 +1,6 @@
 
 {% extends "base/legacy_app.html" %}
-{% load static %}
+{% load static %}{% load mi_icons %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static "others/css/terminal.css" %}" type="text/css">
 <link rel="stylesheet" href="{% static "codemirror/codemirror.css" %}" type="text/css">
@@ -9,78 +9,138 @@
 <link rel="stylesheet" href="{% static "others/css/spinner.css" %}">
 <link href="{% static "adminlte/plugins/sweetalert2/sweetalert2.min.css" %}" rel="stylesheet">
 <style>
-     #stat {
+    [x-cloak] { display: none !important; }
+
+    /* Status console */
+    #stat {
         width: 100%;
         height: 170px;
-        -moz-border-bottom-colors: none;
-        -moz-border-left-colors: none;
-        -moz-border-right-colors: none;
-        -moz-border-top-colors: none;
+        border-radius: 0.5rem;
         background: rgb(var(--surface-2));
-        border-color: rgb(var(--border-default));
-        border-image: none;
-        border-radius: 6px 6px 6px 6px;
-        border-style: none solid solid none;
-        border-width: medium 1px 1px medium;
+        border: 1px solid rgb(var(--border-subtle));
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12) inset;
-        color: rgb(var(--text-primary));
-        font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
-        font-size: 1em;
+        color: rgb(var(--text-secondary));
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.8rem;
         line-height: 1.4em;
-        padding: 5px 8px;
-        transition: background-color 0.2s ease 0s;
+        padding: 8px 10px;
+        resize: vertical;
+        transition: border-color 0.15s ease;
     }
     #stat:focus {
-        background: rgb(var(--surface-1));
-        outline-width: 0;
+        outline: 2px solid rgb(var(--text-brand) / 0.4);
+        outline-offset: -1px;
+        border-color: rgb(var(--text-brand));
     }
-    .highlight { border: solid 2px #1e6dff;}
+    .highlight { outline: 2px solid rgb(var(--text-brand)); border-radius: 0.375rem; }
 
-
+    /* Frida code editor — clean modern chrome (no coordinate-shifting CSS
+       transforms, which previously misaligned CodeMirror's mouse hit-testing). */
     #code-editor{
-      transform: scale(1.25) !important;
-      transform-origin: top left;
-      width: 80%;
+      width: 100%;
       height: auto;
       overflow: auto;
       max-height: 600px;
       border: 1px solid rgb(var(--border-subtle));
-      border-radius: 4px;
-      padding: 10px;
+      border-radius: 0.5rem;
       background: rgb(var(--surface-2));
-      margin-bottom: 150px;
-      position: relative;
-      z-index: 1;
       scrollbar-width: none; /* Firefox */
       -ms-overflow-style: none; /* Internet Explorer 10+ */
     }
-    
     #code-editor::-webkit-scrollbar {
       display: none; /* Chrome, Safari, Opera */
     }
-    
     .CodeMirror {
-        height: 610px;
-        font-size: 11px;
-        border: 1px solid rgb(var(--border-subtle));
+        height: 560px;
+        font-size: 12px;
+        border-radius: 0.5rem;
       }
-      
-    .form-group {
-        position: relative;
-        z-index: 2;
-        margin-top: 20px;
-    }
+
+    .form-group { position: relative; }
     .frida-pre {
-      font-family: "courier new", courier, monospace;
-      font-size: 11px;
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
-    #start_activity{
-        margin-top: 5px;
+    #start_activity{ margin-top: 5px; }
+    #start_activity_form{ margin-top: 10px; }
+
+    /* ── Section header icon chip (amber/violet duotone — non-semantic UI accent) ── */
+    .hdr-chip {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 2rem; height: 2rem; border-radius: 0.5rem;
+      background: rgba(254, 74, 35, 0.15); color: #FE4A23;
+      flex-shrink: 0;
     }
-    #start_activity_form{
-        margin-top: 10px;
+    .hdr-chip.hdr-chip-violet { background: rgba(141, 92, 252, 0.15); color: #8D5CFC; }
+
+    /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+    .mi-hero { position: relative; background: rgb(var(--surface-1)); }
+    .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+    .mi-hero-glow::before, .mi-hero-glow::after {
+      content: ''; position: absolute; border-radius: 9999px;
+      filter: blur(64px); opacity: .5;
+    }
+    .mi-hero-glow::before {
+      width: 320px; height: 320px; top: -120px; right: -60px;
+      background: radial-gradient(circle at center, rgb(var(--text-brand) / .5), transparent 70%);
+      animation: mi-float 16s ease-in-out infinite;
+    }
+    .mi-hero-glow::after {
+      width: 260px; height: 260px; bottom: -130px; left: -40px;
+      background: radial-gradient(circle at center, rgb(100 116 139 / .35), transparent 70%);
+      animation: mi-float 20s ease-in-out infinite reverse;
+    }
+    .mi-hero-grid {
+      background-image:
+        linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+      background-size: 32px 32px; opacity: .45;
+      -webkit-mask-image: radial-gradient(ellipse 75% 75% at 85% 0%, #000 10%, transparent 72%);
+              mask-image: radial-gradient(ellipse 75% 75% at 85% 0%, #000 10%, transparent 72%);
+    }
+    :root[data-theme="dark"] .mi-hero-glow::before { opacity: .38; }
+    :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .3; }
+
+    /* ── Copy-chip micro-interaction ── */
+    .mi-copy-chip { cursor: pointer; user-select: none; transition: border-color .15s ease, background-color .15s ease; }
+    .mi-copy-chip:hover { border-color: rgb(var(--text-brand) / .4); background: rgb(var(--text-brand) / .06); }
+
+    /* ── Live pulse dot (real-time indicators) ── */
+    .mi-pulse-dot { position: relative; width: 7px; height: 7px; border-radius: 9999px; background: currentColor; display: inline-block; flex-shrink: 0; }
+    .mi-pulse-dot::after {
+      content: ''; position: absolute; inset: -5px; border-radius: 9999px;
+      background: currentColor; opacity: .5; animation: mi-pulse 1.8s ease-out infinite;
     }
 
+    /* ── Checkbox chip rows ── */
+    .mi-chk { transition: background-color .15s ease; }
+    .mi-chk:hover { background: rgb(var(--surface-2)); }
+    .mi-chk input[type="checkbox"] { accent-color: rgb(var(--text-brand)); width: 15px; height: 15px; }
+
+    /* ── Toolbar buttons: tinted lift on hover ── */
+    .mi-tool-btn { position: relative; transition: transform .15s ease, box-shadow .15s ease; }
+    .mi-tool-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgb(var(--text-brand) / .45); }
+
+    /* ── Terminal chrome dots ── */
+    .mi-term-dot { width: 0.65rem; height: 0.65rem; border-radius: 9999px; flex-shrink: 0; }
+
+    /* ── Loader: visual polish only — structure/toggle classes unchanged ── */
+    .loading { backdrop-filter: blur(2px); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mi-hero-glow::before, .mi-hero-glow::after, .mi-pulse-dot::after { animation: none; }
+      .mi-tool-btn, .mi-chk, .mi-copy-chip, #stat { transition: none; }
+    }
+    @keyframes mi-float {
+      0%, 100% { transform: translate3d(0,0,0); }
+      50%      { transform: translate3d(0,-22px,0); }
+    }
+    @keyframes mi-pulse {
+      0%   { transform: scale(.6); opacity: .55; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
 </style>
 
 {% endblock %}
@@ -88,285 +148,280 @@
 
 <script src="{% static "adminlte/plugins/jquery.min.js" %}"></script>
 
-<div class="content-wrapper">
-  <div class="content-header">
-    <div class="container-fluid">
-      <div class="row mb-2">
-        <div id="mobsf_header" align="center" style="padding-left: 20px;">
-            <h2><strong>Dynamic Analyzer </strong>- {{ bundle_id }}</h2>
+<div class="space-y-6">
+
+  {# ─────────────────── Ambient hero header ─────────────────── #}
+  <section class="mi-hero card mi-glass relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-7 md:px-8 md:py-8">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+        <div class="flex items-start gap-4 min-w-0">
+          <span class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-text-secondary/10 text-text-secondary flex-shrink-0 shadow-elevation-1">
+            {% icon "smartphone" size=26 %}
+          </span>
+          <div class="min-w-0" id="mobsf_header">
+            <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1.5 inline-flex items-center gap-1.5">
+              {% icon "shield-check" size=13 %} Dynamic &middot; iOS &middot; Jailbroken device
+            </p>
+            <h2 class="text-h1 md:text-display truncate" title="{{ bundle_id }}"><strong>{{ bundle_id }}</strong></h2>
+            <div class="flex flex-wrap items-center gap-2 mt-3">
+              <span class="badge badge-passed gap-1.5">
+                <span class="mi-pulse-dot"></span> Frida environment ready
+              </span>
+              <span
+                class="badge badge-unknown gap-1.5 font-mono mi-copy-chip"
+                x-data="{ copied: false }"
+                @click="navigator.clipboard && navigator.clipboard.writeText('{{ device_id }}'); copied = true; setTimeout(() => copied = false, 1400)"
+                title="Click to copy device ID"
+              >
+                <span x-show="!copied">{% icon "copy" size=12 %} {{ device_id }}</span>
+                <span x-show="copied" x-cloak>{% icon "check" size=12 %} Copied</span>
+              </span>
+              <span
+                class="badge badge-unknown gap-1.5 font-mono mi-copy-chip"
+                x-data="{ copied: false }"
+                @click="navigator.clipboard && navigator.clipboard.writeText('{{ checksum }}'); copied = true; setTimeout(() => copied = false, 1400)"
+                title="Click to copy scan checksum"
+              >
+                <span x-show="!copied">{% icon "copy" size=12 %} {{ checksum|slice:":12" }}&hellip;</span>
+                <span x-show="copied" x-cloak>{% icon "check" size=12 %} Copied</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div id="but" class="flex items-center gap-2 flex-wrap flex-shrink-0">
+          <a href="#" id="ss" class="btn btn-secondary btn-md mi-tool-btn" role="button"><i class="fa fa-camera"></i> Take a Screenshot</a>
+          <a href="{% url 'system_logs_device' %}?device_id={{device_id}}" target="_blank" id="system_logs" class="btn btn-secondary btn-md mi-tool-btn"><i class="fa fa-water"></i> System Logs</a>
+          <a href="{% url 'ios_api_monitor' %}?checksum={{ checksum }}&bundle_id={{ bundle_id }}" id="apimon" target="_blank" class="btn btn-secondary btn-md mi-tool-btn" style='display: none'><i class="fa fa-search"></i> Live API Monitor</a>
+          <a href="#" id="report" class="mi-pillbtn btn btn-md disabled" role="button"><i class="fa fa-file-alt"></i> Generate Report</a>
         </div>
       </div>
     </div>
-  </div>
-   <div class="container-fluid">
+  </section>
 
-   
-   <div class="row">
-          <div class="col-md-12">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                 <div id="but" align="center">
-                  <a href="#" id="ss" class="btn btn-primary" role="button"><i class="fa fa-camera"></i> Take a Screenshot</a>
-                  <a href="{% url 'system_logs_device' %}?device_id={{device_id}}" target="_blank" id="system_logs" class="btn btn-primary"><i class="fa fa-water"></i> System Logs</a>
-                  <a href="{% url 'ios_api_monitor' %}?checksum={{ checksum }}&bundle_id={{ bundle_id }}" id="apimon" target="_blank" class="btn btn-primary" style='display: none'><i class="fa fa-search"></i> Live API Monitor</a>
-                  <a href="#" id="report" class="btn btn-info disabled" role="button"><i class="fa fa-file-alt"></i> Generate Report</a>
-                </div>
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
+  {# ─────────────────── Analyzer + Code editor ─────────────────── #}
+  <section class="grid grid-cols-1 xl:grid-cols-12 gap-4">
 
-           <div class="col-md-4">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
+    {# ── Instrumentation controls ── #}
+    <div class="card mi-glass xl:col-span-5" data-reveal>
+      <div class="card-header p-0">
+        <ul class="nav nav-tabs flex w-full !mb-0" id="tabnav" role="tablist">
+          <li class="nav-item">
+            <a class="nav-link active px-4 py-3 text-small font-medium inline-flex items-center gap-1.5" id="dm-tab" data-toggle="pill" href="#dm" role="tab" aria-controls="dm" aria-selected="true">{% icon "zap" size=14 %} Dynamic Analyzer</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link px-4 py-3 text-small font-medium inline-flex items-center gap-1.5" id="errors-tab" data-toggle="pill" href="#errors" role="tab" aria-controls="errors" aria-selected="false">{% icon "info" size=14 %} Errors</a>
+          </li>
+        </ul>
+      </div>
+      <div class="card-body">
+        <div class="tab-content" id="tabs">
+          <div class="tab-pane fade active show" id="dm" role="tabpanel" aria-labelledby="dm-tab">
+            <textarea id="stat"></textarea>
 
-            <div class="card card-primary card-outline card-outline-tabs">
-              <div class="card-header p-0 border-bottom-0">
-                <ul class="nav nav-tabs" id="tabnav" role="tablist">
-                  <li class="nav-item">
-                    <a class="nav-link active" id="dm-tab" data-toggle="pill" href="#dm" role="tab" aria-controls="dm" aria-selected="true">Dynamic Analyzer</a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" id="errors-tab" data-toggle="pill" href="#errors" role="tab" aria-controls="errors" aria-selected="false">Errors</a>
-                  </li>
-                </ul>
-              </div>
-              <div class="card-body">
-                <div class="tab-content" id="tabs">
-                  <div class="tab-pane fade active show" id="dm" role="tabpanel" aria-labelledby="dm-tab">
-                  <textarea id="stat"></textarea>
-                <!--box-->
-                <div id="frida_options" class="box box-primary">
-                    <!-- /.box-header -->
-                    <!-- form start -->
-                    <form role="form">
-                      <div class="box-body">
-                        <div class="form-group">
-                            <hr/>
-                        <h4> Default Frida Scripts</h4>
-                             <label>
-                             <input name="default_hooks" type="checkbox" value="jailbreak_bypass" checked>
-                              Jailbreak Detection Bypass 
-                            </label>
-                            <label>
-                              <input name="default_hooks" type="checkbox" value="ssl_pinning" checked>
-                              SSL Pinning Bypass
-                            </label>
-                        </div>
-                        <hr/>
-                          <div class="form-group">
-                      <h4> Trace Frida Scripts</h4>
-                        <label>
-                          <input name="dump_hooks" type="checkbox" value="network" checked>
-                            Network
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="crypto" checked>
-                            Crypto
-                          </label>
-                          <label>
-                            <input name="dump_hooks" type="checkbox" value="cookies" checked>
-                            Cookies 
-                          </label>
-                            <label>
-                            <input name="dump_hooks" type="checkbox" value="file-access" checked>
-                            File Access 
-                          </label>
-                          <label>
-                            <input name="dump_hooks" type="checkbox" value="json" checked>
-                            Json Data
-                          </label>
-                          <label>
-                            <input name="dump_hooks" type="checkbox" value="sqlite" checked>
-                            Sqlite Query
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="data-dir" checked>
-                            Data Directory
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="keychain" checked>
-                            Keychain
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="nslog" checked>
-                            NSLog
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="text-inputs" checked>
-                            Text Inputs
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="nsurlcredentialstorage" checked>
-                            URL Credential Storage
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="nsuserdefaults" checked>
-                            User Defaults
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="pasteboard" checked>
-                            Pasteboard
-                          </label>
-                      </div>
-                     <hr/>
-                        <div class="form-group">
-                        <h4> Auxiliary Frida Scripts</h4>
-                            <label>
-                            <input name="auxiliary" type="checkbox" value="enum_class" id="enum_class">
-                              Enumerate Classes
-                            </label> 
-                            <label>
-                              <input name="auxiliary" type="checkbox" value="enum_class_methods" id="enum_class_methods">
-                                Enumerate Classes &amp; Methods
-                              </label> 
-                             <label>
-                            <input name="auxiliary" type="checkbox" value="string_capture" id="string_capture">
-                               Capture Strings
-                            </label>
-                             <label>
-                            <input name="auxiliary" type="checkbox" value="string_compare" id="string_compare">
-                                Capture String Comparisons
-                            </label>
-                            <br />
-                             <label>
-                              <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="enum_methods" id="enum_methods">
-                              Enumerate Class Methods
-                            </label>
-                             <input type="text" class="form-control" id="class_name" placeholder="NSData">
-                             <label>
-                              <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_class" id="search_class">
-                              Search Class Pattern
-                            </label>
-                             <input type="text" class="form-control" id="class_search" placeholder="Jailbreak*">
-                             <label>
-                              <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_method" id="search_method">
-                              Find all classes with Specific Method
-                            </label>
-                             <input type="text" class="form-control" id="method_search" placeholder="MethodName">
-                             <label>
-                             <input onclick="aux_click(this)" name="auxiliary" type="checkbox"  value="trace_class" id="trace_class">
-                              Trace Class Methods
-                            </label>
-                             <input type="text" class="form-control" id="class_trace" placeholder="NSURLConnection">
-                        </div>
-
-                      </div>
-                      <!-- /.box-body -->
-                      <hr/>
-                      <div class="form-group">
-                        <h4> Instrumentation </h4>
-                      </div>
-                      <div class="box-footer">
-                      <button id="frida_run" type="submit" class="btn btn-success btn-sm"><i class="fas fa-play"></i> Run</button>
-                      <button id="frida_spawn" type="submit" class="btn btn-success btn-sm"><i class="far fa-play-circle"></i> Spawn & Inject</button>
-                      <button id="frida_session" type="submit" class="btn btn-success btn-sm" disabled><i class="fas fa-redo"></i> Inject </button>
-                      <button id="frida_attach" type="submit" class="btn btn-success btn-sm"><i class="fas fa-bug"></i> Attach </button>
-                      <button id="frida_get" class="btn btn-primary btn-sm" hidden><i class="fas fa-code"></i> Injected Code</button>
+            <div id="frida_options" class="mt-4">
+              <form role="form">
+                <div class="form-group space-y-5">
+                  <div>
+                    <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "shield-check" size=12 %} Default Frida Scripts</h4>
+                    <div class="space-y-1 text-small text-text-secondary">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="default_hooks" type="checkbox" value="jailbreak_bypass" checked>
+                        Jailbreak Detection Bypass
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="default_hooks" type="checkbox" value="ssl_pinning" checked>
+                        SSL Pinning Bypass
+                      </label>
                     </div>
-                    </form>
                   </div>
 
-              <!--tab end-->
-
+                  <div class="pt-4 border-t border-border-subtle">
+                    <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "activity" size=12 %} Trace Frida Scripts</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-2 text-small text-text-secondary">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="network" checked>
+                        Network
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="crypto" checked>
+                        Crypto
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="cookies" checked>
+                        Cookies
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="file-access" checked>
+                        File Access
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="json" checked>
+                        Json Data
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="sqlite" checked>
+                        Sqlite Query
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="data-dir" checked>
+                        Data Directory
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="keychain" checked>
+                        Keychain
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="nslog" checked>
+                        NSLog
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="text-inputs" checked>
+                        Text Inputs
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="nsurlcredentialstorage" checked>
+                        URL Credential Storage
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="nsuserdefaults" checked>
+                        User Defaults
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="pasteboard" checked>
+                        Pasteboard
+                      </label>
+                    </div>
                   </div>
-                  <div class="tab-pane fade" id="errors" role="tabpanel" aria-labelledby="errors-tab">
-                    <iframe sandbox frameborder="0" width="100%" height="650px" id="er"></iframe>
+
+                  <div class="pt-4 border-t border-border-subtle">
+                    <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "search" size=12 %} Auxiliary Frida Scripts</h4>
+                    <div class="space-y-1.5 text-small text-text-secondary">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="auxiliary" type="checkbox" value="enum_class" id="enum_class">
+                        Enumerate Classes
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="auxiliary" type="checkbox" value="enum_class_methods" id="enum_class_methods">
+                        Enumerate Classes &amp; Methods
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="auxiliary" type="checkbox" value="string_capture" id="string_capture">
+                        Capture Strings
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="auxiliary" type="checkbox" value="string_compare" id="string_compare">
+                        Capture String Comparisons
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="enum_methods" id="enum_methods">
+                        Enumerate Class Methods
+                      </label>
+                      <input type="text" class="input" id="class_name" placeholder="NSData">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_class" id="search_class">
+                        Search Class Pattern
+                      </label>
+                      <input type="text" class="input" id="class_search" placeholder="Jailbreak*">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_method" id="search_method">
+                        Find all classes with Specific Method
+                      </label>
+                      <input type="text" class="input" id="method_search" placeholder="MethodName">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input onclick="aux_click(this)" name="auxiliary" type="checkbox"  value="trace_class" id="trace_class">
+                        Trace Class Methods
+                      </label>
+                      <input type="text" class="input" id="class_trace" placeholder="NSURLConnection">
+                    </div>
                   </div>
                 </div>
-              </div>
-              <!-- /.card -->
-            </div>
 
-
-              </div>
-              <!-- /.card-body -->
+                <div class="pt-4 mt-5 border-t border-border-subtle">
+                  <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "zap" size=12 %} Instrumentation</h4>
+                  <div class="flex flex-wrap gap-2">
+                    <button id="frida_run" type="submit" class="btn btn-secondary btn-sm"><i class="fas fa-play"></i> Run</button>
+                    <button id="frida_spawn" type="submit" class="btn btn-primary btn-sm"><i class="far fa-play-circle"></i> Spawn &amp; Inject</button>
+                    <button id="frida_session" type="submit" class="btn btn-secondary btn-sm" disabled><i class="fas fa-redo"></i> Inject </button>
+                    <button id="frida_attach" type="submit" class="btn btn-secondary btn-sm"><i class="fas fa-bug"></i> Attach </button>
+                    <button id="frida_get" class="btn btn-ghost btn-sm" hidden><i class="fas fa-code"></i> Injected Code</button>
+                  </div>
+                </div>
+              </form>
             </div>
-            <!-- /.card -->
           </div>
-          <!-- /.col -->
 
-           <div class="col-md-8" id="codeedit">
-            <div class="card card-default">
-              <div class="card-header">
-                <h3 class="card-title"><i class="fa fa-code"></i> Frida Code Editor </h3>
-                <!-- /.card-tools -->
-              </div>
-              <!-- /.card-header -->
-              <div class="card-body">
-                <div id="code-editor">
+          <div class="tab-pane fade" id="errors" role="tabpanel" aria-labelledby="errors-tab">
+            <iframe sandbox frameborder="0" width="100%" height="650px" id="er" class="rounded-md border border-border-subtle bg-surface-0"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ── Frida code editor ── #}
+    <div class="card xl:col-span-7" id="codeedit" data-reveal>
+      <div class="card-header flex items-center justify-between gap-2">
+        <h3 class="card-title text-h3 flex items-center gap-2.5"><span class="hdr-chip"><i class="fa fa-code"></i></span> Frida Code Editor</h3>
+        <span class="text-tiny text-text-tertiary font-mono hidden sm:inline">JavaScript</span>
+      </div>
+      <div class="card-body">
+        <div id="code-editor">
 <textarea id="code-js" rows="100">
   // Use send() for logging
 </textarea>
-                </div>
-                <br/>
-                <div class="form-group">
-                  <span class="box-title">Available Scripts (Use CTRL to choose multiple)  </span>
-                  <button id="loadscript" type="submit" class="btn btn-primary btn-sm">Load</button>
-                </div>
-                <div class="form-group">
-                  <select id="fd_scs" size="10" multiple="" class="form-control">
-                  </select>
-                </div>
-              
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-            <div class="col-md-12">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                <form style="display: flex; justify-content: flex-end">
-                  <label for="id_file" class="btn btn-primary btn-sm"><i class="fas fa-file-upload"></i> Upload to Device</label>
-                  <input type="file" style="visibility:hidden; width: 0%;" name="file" required="" id="id_file" onchange="uploadFile()">
-                </form>
-                   <div id="shell">
-                    <output></output>
-                    <div id="input-line" class="input-line">
-                      <div class="prompt"></div><div><input id="cmdinp" class="cmdline" autofocus /></div>
-                    </div>
-                  </div>
-              
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-        
-
-
-          <div class="col-md-12">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                   <div>
-                    <h4 class="page-header"><strong>Frida Logs </strong></h4>
-                    <div id="messages"></br>Data refreshed in every 3 seconds.</div>
-                    <pre class="frida-pre" id="frida-logs" style="font-size:15pt"></pre>
-                  </div>
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-
         </div>
-
+        <div class="flex items-center justify-between gap-2 mt-3">
+          <span class="text-tiny text-text-tertiary">Available Scripts (Use CTRL to choose multiple)</span>
+          <button id="loadscript" type="submit" class="btn btn-secondary btn-sm">Load</button>
         </div>
-       </div>
-     </div>
+        <select id="fd_scs" size="10" multiple="" class="input mt-2 w-full"></select>
+      </div>
     </div>
+  </section>
+
+  {# ─────────────────── Shell access ─────────────────── #}
+  <section class="card" data-reveal>
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap">
+      <h3 class="card-title text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "upload" size=16 %}</span> Device Shell</h3>
+      <form style="display: flex; justify-content: flex-end">
+        <label for="id_file" class="btn btn-secondary btn-sm mi-tool-btn"><i class="fas fa-file-upload"></i> Upload to Device</label>
+        <input type="file" style="visibility:hidden; width: 0%;" name="file" required="" id="id_file" onchange="uploadFile()">
+      </form>
+    </div>
+    <div class="card-body p-0">
+      <div class="flex items-center gap-1.5 px-4 py-2.5 border-b border-border-subtle bg-surface-2/60">
+        <span class="mi-term-dot bg-text-tertiary/50"></span>
+        <span class="mi-term-dot bg-text-tertiary/35"></span>
+        <span class="mi-term-dot bg-text-tertiary/20"></span>
+        <span class="text-tiny text-text-tertiary ml-2 font-mono truncate">root@iPhone &mdash; ssh</span>
+      </div>
+      <div class="p-4">
+        <div id="shell">
+          <output></output>
+          <div id="input-line" class="input-line">
+            <div class="prompt"></div><div><input id="cmdinp" class="cmdline" autofocus /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ─────────────────── Frida logs ─────────────────── #}
+  <section class="card" data-reveal>
+    <div class="card-header flex items-center justify-between gap-2">
+      <h3 class="card-title text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "file-text" size=16 %}</span> Frida Logs</h3>
+      <span class="inline-flex items-center gap-2 rounded-md border border-border-subtle bg-surface-2 px-2.5 py-1 text-tiny uppercase tracking-wide text-text-secondary">
+        <span class="mi-pulse-dot text-severity-passed dark:text-severity-passed-dark"></span>
+        <span id="messages">Data refreshed in every 3 seconds.</span>
+      </span>
+    </div>
+    <div class="card-body">
+      <pre class="frida-pre" id="frida-logs"></pre>
+    </div>
+  </section>
+
 </div>
 
 <!--Loader-->
@@ -382,7 +437,7 @@
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
-        <h4 class="modal-title">Injected Frida Script</h4>
+        <h4 class="modal-title flex items-center gap-2.5"><span class="hdr-chip"><i class="fas fa-code"></i></span> Injected Frida Script</h4>
         <button type="button" class="close" data-dismiss="modal">&times;</button>
       </div>
       <div class="modal-body" id="injected_content">
@@ -398,7 +453,7 @@
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Attach to a Running Process</h5>
+        <h5 class="modal-title flex items-center gap-2.5" id="exampleModalLabel"><span class="hdr-chip"><i class="fas fa-bug"></i></span> Attach to a Running Process</h5>
         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
@@ -406,7 +461,7 @@
       <div class="modal-body">
         <form role="form">
           <div class="form-group">
-            <select id="process_select" class="form-select" aria-label="Select a process">
+            <select id="process_select" class="input w-full" aria-label="Select a process">
             </select>
           </div>
         </form>
@@ -418,14 +473,6 @@
     </div>
   </div>
 </div>
-
-
-
-    <!-- /.modal-content -->
-  </div>
-  <!-- /.modal-dialog -->
-</div>
-<!-- End Modal -->
 
 {% endblock %}
 {% block extra_scripts %}

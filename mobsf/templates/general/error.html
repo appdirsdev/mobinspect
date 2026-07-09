@@ -1,20 +1,150 @@
 {% extends "base/legacy_app.html" %}
+{% load static %}{% load mi_icons %}
+
+{% block page_title %}Error{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Ambient hero, error-toned: floating red/orange blobs + faint grid ──
+     Same technique as the dashboard hero (general/home.html), re-tinted
+     to signal "something went wrong" while staying on-brand. Theme-aware,
+     reduced-motion safe. */
+  .mi-err-hero { background: var(--surface-1); }
+  .mi-err-glow, .mi-err-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-err-glow::before, .mi-err-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .5;
+  }
+  .mi-err-glow::before {
+    width: 340px; height: 340px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgba(220,38,38,.5), transparent 70%);
+    animation: mi-err-float 16s ease-in-out infinite;
+  }
+  .mi-err-glow::after {
+    width: 280px; height: 280px; bottom: -140px; left: -50px;
+    background: radial-gradient(circle at center, rgba(234,88,12,.35), transparent 70%);
+    animation: mi-err-float 21s ease-in-out infinite reverse;
+  }
+  .mi-err-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .5;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 20% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 80% 80% at 20% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-err-glow::before { opacity: .36; }
+  :root[data-theme="dark"] .mi-err-glow::after  { opacity: .26; }
+
+  /* Pulsing ring on the error badge — draws the eye without being noisy */
+  .mi-err-badge { animation: mi-err-pulse 2.6s ease-in-out infinite; }
+
+  /* Quick-action tiles — same recipe as the dashboard's gradient tiles */
+  .mi-action { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease; }
+  .mi-action:hover { transform: translateY(-3px);
+    box-shadow: 0 16px 36px -18px rgba(0,0,0,.45); }
+  .mi-action::before { content: ''; position: absolute; inset: 0; opacity: 0;
+    background: radial-gradient(120% 120% at 100% 0%, var(--mi-accent, #2563EB), transparent 55%);
+    transition: opacity .22s ease; }
+  .mi-action:hover::before { opacity: .10; }
+  .mi-action:focus-visible { outline: 2px solid rgb(var(--text-brand)); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-err-glow::before, .mi-err-glow::after, .mi-err-badge { animation: none; }
+    .mi-action { transition: none; }
+  }
+  @keyframes mi-err-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-22px,0); }
+  }
+  @keyframes mi-err-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.32); }
+    50%      { box-shadow: 0 0 0 8px rgba(220,38,38,0); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="content-wrapper">
-  <div class="content-header">
-  </div>
-   <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-12">
-            <div class="card">
-              <div class="card-body">
-                <h2>Error</h2>
-                  <p class="lead">{{ exp }}</p>
-                  <p>{{ doc }}</p>
-          </div>
+<div class="space-y-6">
+
+  {# ══════════════════ Ambient error hero ══════════════════ #}
+  <section class="mi-err-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-err-grid" aria-hidden="true"></div>
+    <div class="mi-err-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-10 md:px-10 md:py-12">
+      <div class="max-w-2xl">
+        <span class="mi-err-badge inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-severity-critical/15 dark:bg-severity-critical-dark/15 text-severity-critical dark:text-severity-critical-dark mb-5 shadow-elevation-1">
+          {% icon "x" size=30 %}
+        </span>
+
+        <p class="text-tiny uppercase tracking-[0.18em] text-severity-critical dark:text-severity-critical-dark font-semibold mb-2 inline-flex items-center gap-1.5">
+          {% icon "info" size=13 %} MobInspect · Error
+        </p>
+        <h1 class="text-display font-bold leading-tight">Something went wrong</h1>
+
+        {% if exp %}
+          <p class="text-h4 text-text-primary mt-3 break-words">{{ exp }}</p>
+        {% endif %}
+        {% if doc %}
+          <p class="text-body text-text-secondary mt-2 leading-relaxed break-words">{{ doc }}</p>
+        {% endif %}
+
+        {% if not exp and not doc %}
+          <p class="text-body text-text-secondary mt-2 leading-relaxed">
+            The request could not be completed. Try again, or head back to the dashboard.
+          </p>
+        {% endif %}
+
+        <div class="flex flex-wrap items-center gap-2 mt-6">
+          <button type="button" onclick="window.history.back()" class="btn btn-primary btn-md">
+            {% icon "zap" size=14 %} Go back &amp; retry
+          </button>
+          <a href="{% url 'home' %}" class="btn btn-secondary btn-md">
+            {% icon "gauge" size=14 %} Dashboard
+          </a>
         </div>
-       </div>
-     </div>
+      </div>
     </div>
+  </section>
+
+  {# ══════════════════ Where to next ══════════════════ #}
+  <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" data-reveal>
+    <a href="{% url 'home' %}" class="mi-action card card-body group" style="--mi-accent:#2563EB">
+      <div class="relative z-10 flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
+          {% icon "gauge" size=20 %}
+        </span>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-h4 flex items-center gap-1">Dashboard {% icon "chevron-right" size=14 class="text-text-tertiary transition-transform duration-fast group-hover:translate-x-1" %}</h3>
+          <p class="text-small text-text-secondary mt-1">Start a fresh scan or check system status.</p>
+        </div>
+      </div>
+    </a>
+    <a href="{% url 'recent' %}" class="mi-action card card-body group" style="--mi-accent:#16A34A">
+      <div class="relative z-10 flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-severity-passed/15 text-severity-passed flex-shrink-0">
+          {% icon "layers" size=20 %}
+        </span>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-h4 flex items-center gap-1">Recent scans {% icon "chevron-right" size=14 class="text-text-tertiary transition-transform duration-fast group-hover:translate-x-1" %}</h3>
+          <p class="text-small text-text-secondary mt-1">Your previous results were not affected.</p>
+        </div>
+      </div>
+    </a>
+    <a href="{% url 'api_docs' %}" class="mi-action card card-body group" style="--mi-accent:#3B82F6">
+      <div class="relative z-10 flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-mobinspect-400/15 text-mobinspect-400 flex-shrink-0">
+          {% icon "file-text" size=20 %}
+        </span>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-h4 flex items-center gap-1">REST API docs {% icon "chevron-right" size=14 class="text-text-tertiary transition-transform duration-fast group-hover:translate-x-1" %}</h3>
+          <p class="text-small text-text-secondary mt-1">Check request format if this came from CI/CD.</p>
+        </div>
+      </div>
+    </a>
+  </section>
+
 </div>
 {% endblock %}

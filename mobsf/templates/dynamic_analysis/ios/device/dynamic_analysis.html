@@ -1,130 +1,329 @@
 {% extends "base/legacy_app.html" %}
-{% load static %}
+{% load static %}{% load mi_icons %}
 {% block extra_css %}
  <!-- DataTables -->
 <link rel="stylesheet" href="{% static "adminlte/plugins/datatables-bs4/dataTables.bootstrap4.min.css" %}">
-<link rel="stylesheet" href="{% static "others/css/spinner.css" %}">
 <link href="{% static "adminlte/plugins/sweetalert2/sweetalert2.min.css" %}" rel="stylesheet">
 <style>
-#app_icon{
-  width: 64px;
-  height: 64px;
-}
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero { background: rgb(var(--surface-1)); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .5;
+  }
+  .mi-hero-glow::before {
+    width: 300px; height: 300px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 260px; height: 260px; bottom: -130px; left: -40px;
+    background: radial-gradient(circle at center, rgba(100,116,139,.38), transparent 70%);
+    animation: mi-float 21s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 75% 85% at 80% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 75% 85% at 80% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .28; }
+
+  /* ── Metric tiles: accent bar + hover lift ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: rgb(var(--border-default)); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Shared table skin for both the JS-populated "Apps in device" table
+       and the server-rendered "Apps available" DataTable — keeps the two
+       visually consistent without touching either's JS/markup logic. ── */
+  .mi-legacy-table { width: 100%; border-collapse: collapse; }
+  .mi-legacy-table thead th {
+    text-transform: uppercase; font-size: 11px; letter-spacing: .04em;
+    font-weight: 600; text-align: left; padding: 10px 20px;
+    color: rgb(var(--text-secondary)); background: rgb(var(--surface-2) / .5);
+    border-bottom: 1px solid rgb(var(--border-subtle));
+  }
+  .mi-legacy-table tbody td {
+    padding: 12px 20px; vertical-align: middle;
+    color: rgb(var(--text-primary));
+    border-bottom: 1px solid rgb(var(--border-subtle));
+  }
+  .mi-legacy-table tbody tr { transition: background-color .15s ease; }
+  .mi-legacy-table tbody tr:hover { background: rgb(var(--surface-2)); }
+
+  /* ── Re-skin legacy Bootstrap buttons/badges used on this page — including
+       markup injected at runtime by the untouched jQuery script — to match
+       the MobInspect brand. Scoped + !important: AdminLTE's Bootstrap CSS
+       loads after app.css and shares the bare `.btn` class name, so it would
+       otherwise win the cascade. ── */
+  #mi-ios-dyn .btn {
+    display: inline-flex !important; align-items: center !important; gap: 6px !important;
+    border-radius: 8px !important; font-weight: 600 !important; font-size: 12px !important;
+    line-height: 1 !important; padding: 8px 12px !important; border: none !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .08) !important;
+    transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease !important;
+  }
+  #mi-ios-dyn .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -8px rgb(0 0 0 / .4) !important; }
+  #mi-ios-dyn .btn-success { background: linear-gradient(135deg, #16A34A, #15803D) !important; color: #fff !important; }
+  #mi-ios-dyn .btn-info    { background: linear-gradient(135deg, #2563EB, #1D4ED8) !important; color: #fff !important; }
+  #mi-ios-dyn .btn.disabled, #mi-ios-dyn .btn:disabled {
+    opacity: .4 !important; pointer-events: none !important; box-shadow: none !important; transform: none !important;
+  }
+  #mi-ios-dyn #app_icon {
+    width: 40px; height: 40px; border-radius: 8px; object-fit: contain; flex-shrink: 0;
+    background: rgb(var(--surface-2)); box-shadow: 0 0 0 1px rgb(var(--border-subtle));
+  }
+
+  /* ── Loading overlay ── */
+  .loading {
+    position: fixed; inset: 0; z-index: 60;
+    display: flex; align-items: center; justify-content: center;
+    background: rgb(var(--surface-0) / 0.6); backdrop-filter: blur(4px);
+  }
+  .loading.hidden { display: none; }
+  .loading .ring {
+    width: 56px; height: 56px;
+    border: 4px solid rgb(var(--border-default));
+    border-top-color: rgb(var(--text-brand));
+    border-radius: 9999px;
+    animation: mi-spin 0.9s linear infinite;
+  }
+  @keyframes mi-spin { to { transform: rotate(360deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-stat, .mi-legacy-table tbody tr, #mi-ios-dyn .btn { transition: none; }
+    .loading .ring { animation: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-22px,0); }
+  }
 </style>
 {% endblock %}
 {% block content %}
-<div class="content-wrapper">
-  <div class="content-header">
-  </div>
-   <div class="container-fluid">
+<div id="mi-ios-dyn" class="space-y-6">
 
+  {# ══════════════════ Ambient hero + device picker ══════════════════ #}
+  <section class="mi-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
 
-   <div class="row">
-          <div class="col-md-12">
-            <div class="card bg-gradient-primary">
-              <!-- /.card-header -->
-              <div class="card-body">
-                  <div class="row">
-                     <div class="col-md-12">
-                        <h4>MobInspect iOS Dynamic Analyzer</h4>
-                        <data id="choosen_device" value="{{ selected_device }}"></data>
-                        <div class="card-body">
-                          <div class="table-responsive">
-                         <p>
-                         <h6><strong> Choose a device for Dynamic Analysis: </strong></h6>
-                         <select class="form-control" id="ios_dynamic"></select>
-                        </p>
-                        </div>
-                        </div>
-                      
-                      </div>   
-                     </div>
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
+    <div class="relative z-10 px-6 py-6 md:px-8 md:py-7">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div class="flex items-center gap-4 min-w-0">
+          <span class="w-12 h-12 rounded-2xl bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0 shadow-elevation-1">
+            {% icon "smartphone" size=22 %}
+          </span>
+          <div class="min-w-0">
+            <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-1 inline-flex items-center gap-1.5">
+              {% icon "activity" size=12 %} Dynamic · iOS Device
+            </p>
+            <h1 class="text-h1 font-bold leading-tight">iOS Dynamic Analyzer</h1>
+            <p class="text-small text-text-secondary mt-1 max-w-xl">
+              Connect a jailbroken iOS device over USB or WiFi, install an IPA and instrument it at runtime.
+            </p>
           </div>
-          <!-- /.col -->
-        
-          <div class="col-md-12">
-            <div class="card card-default">
-              <div class="card-header">
-                <h3 class="card-title"><i class="fa fa-rocket"></i> MobInspect Dynamic Analysis</h3>
-              </div>
-              <div class="card-body">
-                 <div class="table-responsive">
-                <h4> Apps in Device</h4>
-                <table id="in_device" class="table table-bordered table-hover table-striped">
-                  <tbody>
-                  </tbody>
-              </table>
-            </br>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap flex-shrink-0 justify-end">
+          <span class="badge {% if selected_device %}badge-passed{% else %}badge-unknown{% endif %} gap-1.5">
+            <span class="inline-block w-1.5 h-1.5 rounded-full {% if selected_device %}bg-severity-passed dark:bg-severity-passed-dark animate-pulse{% else %}bg-severity-unknown{% endif %}"></span>
+            {% if selected_device %}Device selected{% else %}No device selected{% endif %}
+          </span>
+          <a href="{% url 'dynamic' %}" class="btn btn-ghost btn-md">
+            {% icon "chevron-left" size=14 %} All platforms
+          </a>
+        </div>
+      </div>
 
-            <h4> Apps Available</h4>
-            <table class="dattbl table table-bordered table-hover table-striped">
-                <thead>
-                <tr>
-                    <th>APP</th>
-                    <th>FILE NAME</th>
-                    <th>BUNDLE ID</th>
-                    <th>ACTION</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% if apps %}
-                {% for e in apps %}
-                    <tr>
-                        <td align="center">
-                          <img id="app_icon" src="/download/{{ e.MD5 }}-icon.png"/>
-                          <br/><strong>{{ e.APP_NAME }} - {{ e.APP_VERSION }}</strong>
-                        </td>
-                        <td>
-                            {{ e.FILE_NAME }}
-                        </td>
-                        <td>
-                            {{ e.BUNDLE_ID }}
-                       </td>
-                        <td align="center"> 
-                          {% if e.ENCRYPTED %}
-                            <span class="badge badge-danger">ENCRYPTED IPA</span></br>
-                            <small>You need decrypted IPA for dynamic analysis.</small>
-                          {% else %}
-                          <p>
-                              <a class="btn btn-success upload-install-btn disabled" onclick="upload_and_install('{{ e.MD5 }}')" data-checksum="{{ e.MD5 }}"><i class="fab fa-apple"></i> Upload &amp; Install</a>
-                          </p>
-                          <p>
-                            <a class="btn btn-info {% if not e.DYNAMIC_REPORT_EXISTS %}disabled{% endif %}" href="{% url 'view_report_device' bundle_id=e.BUNDLE_ID %}" onclick="dynamic_loader()"><i class="fa fa-mobile"></i> View Report </a>
-                         </p>
-                         {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-                {% endif %}
-                </tbody>
-            </table>
+      <data id="choosen_device" value="{{ selected_device }}" class="hidden"></data>
 
-            </div>
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
+      <div class="bg-surface-0/70 border border-border-subtle rounded-lg p-4 md:p-5">
+        <label class="label" for="ios_dynamic">Choose a device for Dynamic Analysis</label>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+          <select class="input sm:max-w-md" id="ios_dynamic"></select>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="badge badge-neutral gap-1.5">{% icon "layers" size=12 %} {{ wifi_devices|length }} WiFi</span>
+            <span class="badge badge-neutral gap-1.5">{% icon "layers" size=12 %} {{ usb_devices|length }} USB</span>
           </div>
-          <!-- /.col -->
         </div>
-
-        </div>
-       </div>
-     </div>
+        <p class="text-tiny text-text-tertiary mt-2">Selecting a device reloads this page and lists the apps installed on it.</p>
+      </div>
     </div>
-</div>
+  </section>
 
+  {# ══════════════════ Live stat tiles (real data) ══════════════════ #}
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-4" data-reveal>
+
+    {# Device status #}
+    <div class="mi-stat card mi-glass card-body">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg {% if selected_device %}bg-severity-passed/15 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark{% else %}bg-surface-2 text-text-tertiary{% endif %} inline-flex items-center justify-center flex-shrink-0">
+          {% icon "smartphone" size=18 %}
+        </span>
+      </div>
+      <p class="text-tiny uppercase text-text-secondary mt-3">Device</p>
+      <div class="mt-1 flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full {% if selected_device %}bg-severity-passed dark:bg-severity-passed-dark animate-pulse{% else %}bg-severity-unknown{% endif %}"></span>
+        <span class="text-h3 {% if selected_device %}text-severity-passed dark:text-severity-passed-dark{% else %}text-text-tertiary{% endif %}">{% if selected_device %}Connected{% else %}None{% endif %}</span>
+      </div>
+      <p class="text-tiny text-text-tertiary font-mono truncate mt-2" title="{{ selected_device }}">{{ selected_device|default:"No device chosen" }}</p>
+    </div>
+
+    {# WiFi devices #}
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ wifi_devices|length }})">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">
+          {% icon "activity" size=18 %}
+        </span>
+      </div>
+      <p class="text-tiny uppercase text-text-secondary mt-3">WiFi devices</p>
+      <p class="mi-num text-h2 tabular mt-1" x-text="shown">0</p>
+      <p class="text-tiny text-text-tertiary mt-2">Discovered over the local network</p>
+    </div>
+
+    {# USB devices #}
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ usb_devices|length }})">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">
+          {% icon "zap" size=18 %}
+        </span>
+      </div>
+      <p class="text-tiny uppercase text-text-secondary mt-3">USB devices</p>
+      <p class="mi-num text-h2 tabular mt-1" x-text="shown">0</p>
+      <p class="text-tiny text-text-tertiary mt-2">Connected via usbmuxd</p>
+    </div>
+
+    {# Apps available #}
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ apps|length }})">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-severity-passed/15 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark inline-flex items-center justify-center flex-shrink-0">
+          {% icon "package" size=18 %}
+        </span>
+      </div>
+      <p class="text-tiny uppercase text-text-secondary mt-3">Apps available</p>
+      <p class="mi-num text-h2 tabular mt-1" x-text="shown">0</p>
+      <p class="text-tiny text-text-tertiary mt-2">Uploaded IPAs ready to install</p>
+    </div>
+  </section>
+
+  {# ══════════════════ Apps in device (JS-populated; logic untouched) ══════════════════ #}
+  <section class="card mi-glass card-hover" data-reveal>
+    <div class="card-header flex-wrap gap-3">
+      <h2 class="text-h3 flex items-center gap-2">
+        <span class="w-7 h-7 rounded-md bg-severity-passed/15 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark inline-flex items-center justify-center">{% icon "smartphone" size=14 %}</span>
+        Apps in device
+      </h2>
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{% icon "search" size=13 %}</span>
+          <input type="text" id="mi-search-device" class="input pl-8 h-8 text-small w-40 sm:w-56" placeholder="Filter apps…" autocomplete="off" />
+        </div>
+        <span id="mi-device-count" class="text-tiny text-text-tertiary whitespace-nowrap">—</span>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="in_device" class="mi-legacy-table">
+        <tbody>
+        </tbody>
+      </table>
+    </div>
+    <div id="mi-device-empty-state" class="px-5 py-12 text-center">
+      <span class="w-12 h-12 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center mb-3 mx-auto">
+        {% icon "smartphone" size=22 %}
+      </span>
+      <p class="text-h4">No apps listed</p>
+      <p id="mi-device-empty-desc" class="text-small text-text-secondary mt-1">Choose a connected device above to list its installed apps.</p>
+    </div>
+  </section>
+
+  {# ══════════════════ Apps available (uploaded IPAs; DataTable-managed) ══════════════════ #}
+  <section class="card mi-glass card-hover" data-reveal>
+    <div class="card-header flex-wrap gap-3">
+      <h2 class="text-h3 flex items-center gap-2">
+        <span class="w-7 h-7 rounded-md bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center">{% icon "package" size=14 %}</span>
+        Apps available
+      </h2>
+      <span class="text-tiny text-text-tertiary whitespace-nowrap">
+        {% if apps %}{{ apps|length }} uploaded{% else %}none uploaded{% endif %}
+      </span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="dattbl mi-legacy-table">
+        <thead>
+        <tr>
+            <th>APP</th>
+            <th>FILE NAME</th>
+            <th>BUNDLE ID</th>
+            <th>ACTION</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% if apps %}
+        {% for e in apps %}
+            <tr>
+                <td>
+                  <div class="flex items-center gap-3 min-w-0">
+                    <img id="app_icon" src="/download/{{ e.MD5 }}-icon.png" alt=""
+                         onerror="this.onerror=null;this.src='{% static 'img/no_icon.png' %}'" />
+                    <div class="min-w-0">
+                      <p class="font-medium text-text-primary truncate">{{ e.APP_NAME }} <span class="text-text-tertiary font-normal">v{{ e.APP_VERSION }}</span></p>
+                      <p class="text-tiny text-text-tertiary font-mono truncate">{{ e.MD5|slice:":12" }}…</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="text-text-secondary truncate max-w-xs" title="{{ e.FILE_NAME }}">{{ e.FILE_NAME }}</td>
+                <td class="font-mono text-mono text-text-secondary truncate max-w-xs">{{ e.BUNDLE_ID }}</td>
+                <td class="text-right whitespace-nowrap">
+                  {% if e.ENCRYPTED %}
+                    <span class="badge badge-critical">Encrypted IPA</span>
+                    <p class="text-tiny text-text-tertiary mt-1 max-w-xs ml-auto">You need decrypted IPA for dynamic analysis.</p>
+                  {% else %}
+                  <div class="inline-flex flex-col gap-1.5 items-end">
+                      <a class="btn btn-success upload-install-btn disabled" onclick="upload_and_install('{{ e.MD5 }}')" data-checksum="{{ e.MD5 }}"><i class="fab fa-apple"></i> Upload &amp; Install</a>
+                      <a class="btn btn-info {% if not e.DYNAMIC_REPORT_EXISTS %}disabled{% endif %}" href="{% url 'view_report_device' bundle_id=e.BUNDLE_ID %}" onclick="dynamic_loader()"><i class="fa fa-mobile"></i> View Report </a>
+                  </div>
+                  {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        {% else %}
+            <tr>
+              <td colspan="4" class="px-5 py-12 text-center">
+                <div class="flex flex-col items-center">
+                  <span class="w-12 h-12 rounded-full bg-chart-amber/10 text-chart-amber inline-flex items-center justify-center mb-3">
+                    {% icon "package" size=22 %}
+                  </span>
+                  <p class="text-h3">No apps uploaded yet</p>
+                  <p class="text-small text-text-secondary mt-1">Upload an IPA to make it available for dynamic analysis.</p>
+                  <a href="{% url 'home' %}" class="mi-pillbtn btn btn-md mt-4">
+                    {% icon "upload" size=14 %} Upload an IPA
+                  </a>
+                </div>
+              </td>
+            </tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
 
 
 <!--Loader-->
-<div class="hidden loading">
-<div class='uil-ring-css' style='transform:scale(0.79);'>
-  <div></div>
-</div>
+<div class="loading hidden" aria-live="polite" aria-label="Loading">
+  <div class="flex flex-col items-center gap-3">
+    <div class="ring"></div>
+    <p class="text-small text-text-secondary font-medium">Working…</p>
+  </div>
 </div>
 {% endblock %}
 {% block extra_scripts %}
@@ -328,5 +527,73 @@ function upload_and_install(checksum){
                   }
       });
 }
+</script>
+<script>
+  // Presentational-only additions: animated count-up for the stat tiles and
+  // a live filter / empty-state / count for the "Apps in device" table.
+  // These only read the DOM produced by the script above — they never
+  // modify its logic, endpoints, ids or markup.
+
+  // Animated count-up (same pattern used across the redesigned MobInspect pages).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+
+  (function () {
+    var table = document.getElementById('in_device');
+    var emptyState = document.getElementById('mi-device-empty-state');
+    var emptyDesc = document.getElementById('mi-device-empty-desc');
+    var countEl = document.getElementById('mi-device-count');
+    var searchInput = document.getElementById('mi-search-device');
+    if (!table || !emptyState) return;
+
+    function refresh() {
+      var q = (searchInput && searchInput.value || '').trim().toLowerCase();
+      // Query every <tr> under any <tbody> in the table (list_apps() above
+      // may (re)append its own <thead>/<tbody> pair at runtime).
+      var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+      var visible = 0;
+      rows.forEach(function (row) {
+        var match = !q || row.textContent.toLowerCase().indexOf(q) !== -1;
+        row.classList.toggle('hidden', !match);
+        if (match) visible++;
+      });
+      var total = rows.length;
+      emptyState.classList.toggle('hidden', total > 0);
+      if (emptyDesc) {
+        var deviceSelect = document.getElementById('ios_dynamic');
+        var deviceChosen = deviceSelect && deviceSelect.value;
+        emptyDesc.textContent = deviceChosen
+          ? 'No apps detected on this device.'
+          : 'Choose a connected device above to list its installed apps.';
+      }
+      if (countEl) {
+        if (!total) countEl.textContent = '—';
+        else if (q) countEl.textContent = visible + ' / ' + total + ' apps';
+        else countEl.textContent = total + (total === 1 ? ' app' : ' apps');
+      }
+    }
+
+    new MutationObserver(refresh).observe(table, { childList: true, subtree: true });
+    if (searchInput) searchInput.addEventListener('input', refresh);
+    refresh();
+  })();
 </script>
 {% endblock %}

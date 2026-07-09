@@ -3,103 +3,305 @@
 
 {% block page_title %}Compare Versions — {{ app_name|default:package }}{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* ── Icon-chip glow (header) — small nod to the dashboard's ambient style ── */
+  .mi-icon-chip { position: relative; z-index: 0; }
+  .mi-icon-chip::before {
+    content: ''; position: absolute; inset: -8px; z-index: -1;
+    border-radius: 9999px; filter: blur(12px); opacity: .5;
+    background: radial-gradient(circle at center, rgba(22,163,74,.5), transparent 70%);
+  }
+  :root[data-theme="dark"] .mi-icon-chip::before { opacity: .32; }
+
+  /* ── Base-version card: accent rail + soft ambient corner glow ── */
+  .mi-cv-base { position: relative; overflow: hidden; }
+  .mi-cv-base::before {
+    content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 3px;
+    background: linear-gradient(180deg, #FE4A23, #16A34A);
+  }
+  .mi-cv-base::after {
+    content: ''; position: absolute; top: -70px; right: -70px; width: 220px; height: 220px;
+    border-radius: 9999px; filter: blur(56px); opacity: .30; pointer-events: none;
+    background: radial-gradient(circle at center, rgba(254,74,35,.65), transparent 70%);
+  }
+  :root[data-theme="dark"] .mi-cv-base::after { opacity: .20; }
+
+  /* ── "Compare against" connector ── */
+  .mi-cv-vs-dot { animation: mi-cv-pulse 2.4s ease-in-out infinite; }
+  @keyframes mi-cv-pulse {
+    0%, 100% { opacity: .5; transform: scale(1); }
+    50%      { opacity: 1;  transform: scale(1.25); }
+  }
+
+  /* ── Tabular animated counts ── */
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Table row micro-interaction ── */
+  .mi-row-ico { transition: transform .2s cubic-bezier(.34,1.56,.64,1); }
+  tr.mi-row:hover .mi-row-ico { transform: scale(1.08) rotate(-3deg); }
+
+  /* ── Copy-hash feedback ── */
+  .mi-copy-hash { transition: color .15s ease, background-color .15s ease, transform .1s ease; }
+  .mi-copy-hash:active { transform: scale(.9); }
+  .mi-copy-hash.is-copied { color: #16A34A; }
+
+  /* ── Compare button lift ── */
+  .mi-cv-compare-btn { transition: transform .15s ease, box-shadow .15s ease; }
+  .mi-cv-compare-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -10px rgba(254,74,35,.55); }
+
+  /* ── Empty-state icon float ── */
+  .mi-cv-empty-ico { animation: mi-cv-float 4.5s ease-in-out infinite; }
+  @keyframes mi-cv-float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-cv-vs-dot, .mi-cv-empty-ico, .mi-row-ico, .mi-copy-hash, .mi-cv-compare-btn,
+    .mi-cv-base { animation: none; transition: none; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
+<div class="space-y-6">
 
-{# ─────────────────── Header ─────────────────── #}
-<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-  <div class="flex items-center gap-4 min-w-0">
-    <span class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
-      {% icon "git-compare" size=24 %}
+  {# ─────────────────── Header ─────────────────── #}
+  <header class="flex flex-col md:flex-row md:items-start md:justify-between gap-4" data-reveal>
+    <div class="flex items-center gap-4 min-w-0">
+      <span class="mi-icon-chip inline-flex items-center justify-center w-12 h-12 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
+        {% icon "git-compare" size=24 %}
+      </span>
+      <div class="min-w-0">
+        <p class="text-tiny uppercase text-text-tertiary">Static · Android · Compare versions</p>
+        <h1 class="text-h2 truncate" title="{{ app_name }}">
+          {{ app_name|default:file_name }}
+          {% if version_name %}<span class="text-text-tertiary">v{{ version_name }}</span>{% endif %}
+        </h1>
+        {% if package %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ package }}</p>{% endif %}
+        <div class="flex flex-wrap items-center gap-1.5 mt-2">
+          <span class="badge badge-unknown gap-1.5">
+            {% icon "layers" size=11 %} {{ others|length }} version{{ others|length|pluralize }} found
+          </span>
+          <span class="badge badge-unknown gap-1.5" title="{% if package %}{{ package }}{% else %}{{ file_name }}{% endif %}">
+            {% if package %}{% icon "package" size=11 %} Matched by package{% else %}{% icon "file-text" size=11 %} Matched by file name{% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <a href="{% url 'home' %}" class="btn btn-secondary btn-md">
+        {% icon "upload" size=14 %} New scan
+      </a>
+      <a href="{% url 'static_analyzer' checksum=checksum %}" class="btn btn-ghost btn-md">
+        {% icon "chevron-left" size=14 %} Back to report
+      </a>
+    </div>
+  </header>
+
+  {# ─────────────────── Current (base) version ─────────────────── #}
+  <section class="mi-cv-base card mi-glass hover:shadow-elevation-2 transition-shadow duration-fast" data-reveal>
+    <div class="card-body relative z-10 flex flex-col sm:flex-row sm:items-center gap-4 py-6">
+      <span class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-chart-amber/15 text-chart-amber flex-shrink-0 shadow-elevation-1">
+        {% icon "smartphone" size=26 %}
+      </span>
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-2 mb-1.5">
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-tiny font-semibold bg-chart-amber/10 text-text-primary">
+            <span class="text-chart-amber">{% icon "check" size=11 %}</span> Base version
+          </span>
+          {% if package %}<span class="badge badge-unknown font-mono truncate max-w-[220px]">{{ package }}</span>{% endif %}
+        </div>
+        <p class="text-h3 truncate" title="{{ app_name|default:file_name }}">
+          {{ app_name|default:file_name }}{% if version_name %} <span class="text-text-tertiary font-normal">v{{ version_name }}</span>{% endif %}
+        </p>
+        <div class="flex items-center gap-1.5 mt-1.5">
+          <p class="text-tiny text-text-tertiary font-mono truncate">{{ checksum }}</p>
+          <button type="button" class="mi-copy-hash inline-flex items-center justify-center w-6 h-6 rounded-md text-text-tertiary hover:text-text-primary hover:bg-surface-2 flex-shrink-0" data-hash="{{ checksum }}" title="Copy full hash">
+            {% icon "copy" size=12 %}
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ─────────────────── Connector ─────────────────── #}
+  <div class="flex items-center gap-3 px-1" aria-hidden="true">
+    <span class="flex-1 h-px bg-gradient-to-r from-transparent via-border-default to-transparent"></span>
+    <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-border-default bg-surface-1 text-tiny font-medium text-text-secondary shadow-elevation-1">
+      <span class="mi-cv-vs-dot inline-block w-1.5 h-1.5 rounded-full bg-text-brand"></span>
+      {% icon "git-compare" size=13 class="text-text-brand" %} Compare against
     </span>
-    <div class="min-w-0">
-      <p class="text-tiny uppercase text-text-tertiary">Static · Android · Compare versions</p>
-      <h1 class="text-h2 truncate" title="{{ app_name }}">
-        {{ app_name|default:file_name }}
-        {% if version_name %}<span class="text-text-tertiary">v{{ version_name }}</span>{% endif %}
-      </h1>
-      {% if package %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ package }}</p>{% endif %}
+    <span class="flex-1 h-px bg-gradient-to-r from-transparent via-border-default to-transparent"></span>
+  </div>
+
+  {# ─────────────────── Other versions to compare ─────────────────── #}
+  <section class="card mi-glass overflow-hidden" data-reveal>
+    <div class="card-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <h2 class="text-h3 flex items-center gap-2">
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-violet/10 text-chart-violet flex-shrink-0">
+          {% icon "layers" size=14 %}
+        </span>
+        Other scanned versions
+      </h2>
+      {% if others %}
+        <span class="badge badge-unknown gap-1 tabular">
+          <span class="mi-num" data-count-up="{{ others|length }}">0</span> version{{ others|length|pluralize }}
+        </span>
+      {% else %}
+        <span class="text-tiny text-text-tertiary">none</span>
+      {% endif %}
     </div>
-  </div>
-  <div class="flex items-center gap-2">
-    <a href="{% url 'static_analyzer' checksum=checksum %}" class="btn btn-ghost btn-md">
-      {% icon "chevron-left" size=14 %} Back to report
-    </a>
-  </div>
-</header>
 
-{# ─────────────────── Current (base) version ─────────────────── #}
-<section class="card mb-6" data-reveal>
-  <div class="card-body flex items-center gap-3">
-    <span class="mi-badge inline-flex items-center px-2 py-0.5 rounded text-tiny font-medium bg-text-brand/10 text-text-brand">Base</span>
-    <div class="min-w-0">
-      <p class="font-medium text-text-primary truncate">
-        {{ app_name|default:file_name }}{% if version_name %} <span class="text-text-tertiary">v{{ version_name }}</span>{% endif %}
-      </p>
-      <p class="text-tiny text-text-tertiary font-mono truncate">{{ checksum }}</p>
+    {% if others %}
+      {% if others|length > 4 %}
+      <div class="px-5 pt-4">
+        <div class="relative max-w-sm">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{% icon "search" size=14 %}</span>
+          <input type="search" id="miCompareSearch" placeholder="Filter by version, file or hash…"
+                 class="input pl-9 h-9 w-full" autocomplete="off" aria-label="Filter comparison table" />
+        </div>
+      </div>
+      {% endif %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-small" id="miCompareTable">
+          <thead>
+            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+              <th class="text-left px-5 py-2.5 font-medium">Version</th>
+              <th class="text-left px-5 py-2.5 font-medium">File</th>
+              <th class="text-left px-5 py-2.5 font-medium">Scanned</th>
+              <th class="text-left px-5 py-2.5 font-medium">Hash</th>
+              <th class="text-right px-5 py-2.5 font-medium">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for o in others %}
+            <tr class="mi-row border-b border-border-subtle hover:bg-surface-2/60 transition-colors duration-fast">
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-3">
+                  <span class="mi-row-ico w-8 h-8 rounded-md bg-severity-passed/10 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+                    {% icon "smartphone" size=14 %}
+                  </span>
+                  <span class="font-medium text-text-primary">{% if o.version_name %}v{{ o.version_name }}{% else %}—{% endif %}</span>
+                </div>
+              </td>
+              <td class="px-5 py-3 text-text-secondary truncate max-w-xs" title="{{ o.file_name }}">{{ o.file_name|default:o.app_name }}</td>
+              <td class="px-5 py-3 text-text-secondary whitespace-nowrap">
+                {% if o.timestamp %}
+                  <span>{{ o.timestamp|date:"Y-m-d H:i" }}</span>
+                  <span class="block text-tiny text-text-tertiary">{{ o.timestamp|timesince }} ago</span>
+                {% else %}<span class="text-text-tertiary">—</span>{% endif %}
+              </td>
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-mono text-mono text-text-tertiary">{{ o.md5|slice:":12" }}…</span>
+                  <button type="button" class="mi-copy-hash inline-flex items-center justify-center w-6 h-6 rounded-md text-text-tertiary hover:text-text-primary hover:bg-surface-2 flex-shrink-0" data-hash="{{ o.md5 }}" title="Copy full hash">
+                    {% icon "copy" size=11 %}
+                  </button>
+                </div>
+              </td>
+              <td class="px-5 py-3 text-right">
+                <a class="mi-cv-compare-btn btn btn-primary btn-sm group inline-flex items-center gap-1.5" href="{% url 'compare_apps' hash1=checksum hash2=o.md5 %}">
+                  {% icon "git-compare" size=12 %} Compare
+                  {% icon "chevron-right" size=12 class="transition-transform duration-fast group-hover:translate-x-0.5" %}
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+            <tr id="miCompareNoMatch" class="hidden">
+              <td colspan="5" class="px-5 py-10 text-center text-text-tertiary">No versions match your search.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+    <div class="card-body">
+      <div class="py-10 text-center">
+        <div class="mi-cv-empty-ico inline-flex items-center justify-center w-14 h-14 rounded-full bg-surface-2 text-text-tertiary mb-4">
+          {% icon "layers" size=26 %}
+        </div>
+        <p class="text-text-secondary">No other versions of this app have been scanned yet.</p>
+        <p class="text-tiny mt-1 max-w-md mx-auto">
+          {% if package %}
+          Scan another build with the same package name
+          (<span class="font-mono">{{ package }}</span>)
+          {% else %}
+          No package name could be parsed for this scan; scan another build
+          with the same file name (<span class="font-mono">{{ file_name }}</span>)
+          {% endif %}
+          to compare it here.
+        </p>
+        <a href="{% url 'home' %}" class="mi-pillbtn btn btn-md mt-4">{% icon "upload" size=14 %} Upload a version</a>
+      </div>
     </div>
-  </div>
-</section>
+    {% endif %}
+  </section>
 
-{# ─────────────────── Other versions to compare ─────────────────── #}
-<section class="card" data-reveal>
-  <div class="card-header">
-    <h2 class="text-h3 flex items-center gap-2">{% icon "layers" size=18 %} Other scanned versions</h2>
-    <span class="text-tiny text-text-tertiary">
-      {% if others %}{{ others|length }} version{{ others|length|pluralize }}{% else %}none{% endif %}
-    </span>
-  </div>
+</div>
 
-  {% if others %}
-  <div class="overflow-x-auto">
-    <table class="w-full text-small">
-      <thead>
-        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-          <th class="text-left px-5 py-2.5 font-medium">Version</th>
-          <th class="text-left px-5 py-2.5 font-medium">File</th>
-          <th class="text-left px-5 py-2.5 font-medium">Scanned</th>
-          <th class="text-left px-5 py-2.5 font-medium">Hash</th>
-          <th class="text-right px-5 py-2.5 font-medium">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for o in others %}
-        <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
-          <td class="px-5 py-3">
-            <span class="font-medium text-text-primary">{{ o.version_name|default:"—" }}</span>
-          </td>
-          <td class="px-5 py-3 text-text-secondary truncate max-w-xs" title="{{ o.file_name }}">{{ o.file_name|default:o.app_name }}</td>
-          <td class="px-5 py-3 text-text-secondary whitespace-nowrap">
-            {% if o.timestamp %}{{ o.timestamp|date:"Y-m-d H:i" }}{% else %}<span class="text-text-tertiary">—</span>{% endif %}
-          </td>
-          <td class="px-5 py-3 font-mono text-mono text-text-tertiary truncate">{{ o.md5|slice:":12" }}…</td>
-          <td class="px-5 py-3 text-right">
-            <a class="btn btn-primary btn-sm" href="{% url 'compare_apps' hash1=checksum hash2=o.md5 %}">
-              {% icon "git-compare" size=12 %} Compare
-            </a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="card-body">
-    <div class="py-10 text-center text-text-tertiary">
-      <p class="text-text-secondary">No other versions of this app have been scanned yet.</p>
-      <p class="text-tiny mt-1">
-        {% if package %}
-        Scan another build with the same package name
-        (<span class="font-mono">{{ package }}</span>)
-        {% else %}
-        No package name could be parsed for this scan; scan another build
-        with the same file name (<span class="font-mono">{{ file_name }}</span>)
-        {% endif %}
-        to compare it here.
-        <a href="{% url 'home' %}" class="text-text-brand hover:underline">Upload a version</a>.
-      </p>
-    </div>
-  </div>
-  {% endif %}
-</section>
+<script>
+  // ── Presentational-only additions (view-layer). No scan/compare logic is
+  // touched — every link, href and url tag above still points at its
+  // original endpoint. All counts/filters below operate on real data
+  // already rendered into the DOM from the Django context; nothing is mocked.
 
+  // Animated count-up for the "other versions" badge.
+  (function () {
+    function animateTo(el, end) {
+      if (!Number.isFinite(end) || end <= 0) { el.textContent = String(end || 0); return; }
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) { el.textContent = String(end); return; }
+      const dur = 700;
+      const start = performance.now();
+      function tick(t) {
+        const p = Math.min((t - start) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = String(Math.round(eased * end));
+        if (p < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    document.querySelectorAll('[data-count-up]').forEach((el) => {
+      animateTo(el, parseInt(el.getAttribute('data-count-up'), 10));
+    });
+  })();
+
+  // Copy a full MD5 hash (base version, or any comparison row) to the clipboard.
+  document.addEventListener('click', function (ev) {
+    const btn = ev.target.closest('.mi-copy-hash');
+    if (!btn) return;
+    const hash = btn.getAttribute('data-hash');
+    if (!hash || !navigator.clipboard) return;
+    navigator.clipboard.writeText(hash).then(function () {
+      const prevTitle = btn.getAttribute('title');
+      btn.classList.add('is-copied');
+      btn.setAttribute('title', 'Copied!');
+      setTimeout(function () {
+        btn.classList.remove('is-copied');
+        btn.setAttribute('title', prevTitle || 'Copy full hash');
+      }, 1200);
+    }).catch(function () { /* clipboard unavailable — no-op */ });
+  });
+
+  // Client-side filter over the comparison table — narrows rows already
+  // rendered on this page; never refetches or changes any link/href.
+  (function () {
+    const input = document.getElementById('miCompareSearch');
+    const table = document.getElementById('miCompareTable');
+    if (!input || !table) return;
+    const noMatch = document.getElementById('miCompareNoMatch');
+    const rows = Array.from(table.querySelectorAll('tbody tr.mi-row'));
+    input.addEventListener('input', function () {
+      const q = input.value.trim().toLowerCase();
+      let visible = 0;
+      rows.forEach((row) => {
+        const match = !q || row.textContent.toLowerCase().includes(q);
+        row.classList.toggle('hidden', !match);
+        if (match) visible += 1;
+      });
+      if (noMatch) noMatch.classList.toggle('hidden', visible !== 0);
+    });
+  })();
+</script>
 {% endblock %}

@@ -54,60 +54,244 @@
     word-break: break-word;
   }
 
+  /* Frida log console panel */
+  #frida-logs {
+    background: rgb(var(--surface-2));
+    border: 1px solid rgb(var(--border-subtle));
+    border-radius: 0.5rem;
+    padding: 10px 12px;
+    max-height: 360px;
+    overflow: auto;
+    color: rgb(var(--text-secondary));
+  }
+
   /* Dark-mode friendly phone frame background */
   .marvel-device .screen { background-color: #000; }
 
   /* Tab buttons */
-  .mi-tab { position: relative; }
+  .mi-tab { position: relative; transition: color .15s ease; }
+  .mi-tab:hover { color: rgb(var(--text-secondary)); }
   .mi-tab[aria-selected="true"] { color: rgb(var(--text-primary)); }
   .mi-tab[aria-selected="true"]::after {
     content: ""; position: absolute; left: 0; right: 0; bottom: -1px;
     height: 2px; background: rgb(var(--text-brand)); border-radius: 2px;
+  }
+
+  /* Toolbar segmented groups */
+  .tb-group + .tb-group {
+    border-left: 1px solid rgb(var(--border-subtle));
+    padding-left: 2rem;
+  }
+  @media (max-width: 1023px) {
+    .tb-group + .tb-group { border-left: 0; padding-left: 0; }
+  }
+
+  /* Section header icon chip */
+  .hdr-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 0.5rem;
+    background: rgb(var(--text-brand) / 0.1); color: rgb(var(--text-brand));
+    flex-shrink: 0;
+  }
+
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero { position: relative; background: rgb(var(--surface-1)); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .5;
+  }
+  .mi-hero-glow::before {
+    width: 320px; height: 320px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgb(var(--text-brand) / .5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 260px; height: 260px; bottom: -130px; left: -40px;
+    background: radial-gradient(circle at center, rgb(22 163 74 / .3), transparent 70%);
+    animation: mi-float 20s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 75% 75% at 85% 0%, #000 10%, transparent 72%);
+            mask-image: radial-gradient(ellipse 75% 75% at 85% 0%, #000 10%, transparent 72%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .3; }
+
+  /* ── Metric tiles: accent bar + hover lift + count-up ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 32px -18px rgb(0 0 0 / .4); border-color: rgb(var(--border-default)); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Toolbar buttons: tinted lift on hover ── */
+  .mi-tool-btn { position: relative; transition: transform .15s ease, box-shadow .15s ease; }
+  .mi-tool-btn:hover { transform: translateY(-1px);
+    box-shadow: 0 6px 16px -8px var(--mi-accent, rgb(254 74 35 / .5)); }
+
+  /* ── Live pulse dot (real-time indicators) ── */
+  .mi-pulse-dot { position: relative; width: 7px; height: 7px; border-radius: 9999px; background: currentColor; display: inline-block; flex-shrink: 0; }
+  .mi-pulse-dot::after {
+    content: ''; position: absolute; inset: -5px; border-radius: 9999px;
+    background: currentColor; opacity: .5; animation: mi-pulse 1.8s ease-out infinite;
+  }
+
+  /* ── Ambient glow behind the device frame ── */
+  .mi-phone-glow {
+    position: absolute; inset: 8% 8% auto 8%; height: 72%;
+    background: radial-gradient(closest-side, rgb(var(--text-brand) / .2), transparent 75%);
+    filter: blur(30px); pointer-events: none;
+  }
+
+  /* ── Terminal / shell chrome ── */
+  .mi-term-dot { width: 0.65rem; height: 0.65rem; border-radius: 9999px; flex-shrink: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after,
+    .mi-pulse-dot::after { animation: none; }
+    .mi-stat, .mi-tool-btn { transition: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-22px,0); }
+  }
+  @keyframes mi-pulse {
+    0%   { transform: scale(.6); opacity: .55; }
+    100% { transform: scale(2.2); opacity: 0; }
   }
 </style>
 {% endblock %}
 
 {% block content %}
 
-{# ─────────────────── Page header ─────────────────── #}
-<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-  <div class="flex items-center gap-4 min-w-0">
-    <span class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
-      {% icon "activity" size=24 %}
-    </span>
-    <div class="min-w-0">
-      <p class="text-tiny uppercase text-text-tertiary">Dynamic · Android · Live analyzer</p>
-      <h1 class="text-h2 truncate" title="{{ package }}">{{ package }}</h1>
+{# ─────────────────── Ambient hero header ─────────────────── #}
+<section class="mi-hero card relative overflow-hidden p-0 mb-6" data-reveal>
+  <div class="mi-hero-grid" aria-hidden="true"></div>
+  <div class="mi-hero-glow" aria-hidden="true"></div>
+
+  <div class="relative z-10 px-6 py-7 md:px-8 md:py-8">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+      <div class="flex items-start gap-4 min-w-0">
+        <span class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0 shadow-elevation-1">
+          {% icon "activity" size=26 %}
+        </span>
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1.5 inline-flex items-center gap-1.5">
+            {% icon "smartphone" size=13 %} Dynamic · Android · Live analyzer
+          </p>
+          <h1 class="text-h1 md:text-display truncate" title="{{ package }}">{{ package }}</h1>
+          <div class="flex flex-wrap items-center gap-2 mt-3">
+            <span class="badge badge-neutral gap-1.5">{% icon "check" size=12 %} Android API {{ android_version }}</span>
+            <span class="badge badge-neutral gap-1.5">{% icon "package" size=12 %} {{ activities|length }} activit{{ activities|length|pluralize:"y,ies" }}</span>
+            <span class="badge badge-neutral gap-1.5">{% icon "layers" size=12 %} {{ deeplinks|length }} deep link{{ deeplinks|length|pluralize }}</span>
+            <span
+              class="badge badge-neutral gap-1.5 font-mono cursor-pointer select-none"
+              x-data="{ copied: false }"
+              @click="navigator.clipboard && navigator.clipboard.writeText('{{ hash }}'); copied = true; setTimeout(() => copied = false, 1400)"
+              title="Click to copy the full scan hash"
+            >
+              <span x-show="!copied">{% icon "copy" size=12 %} {{ hash|slice:":10" }}…</span>
+              <span x-show="copied" x-cloak>{% icon "check" size=12 %} Copied</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <a href="{% url 'dynamic' %}" class="btn btn-ghost btn-md">
+          {% icon "chevron-left" size=14 %} All platforms
+        </a>
+        <button id="stop" type="button" class="mi-pillbtn btn btn-md">
+          {% icon "file-text" size=14 %} Generate Report
+        </button>
+      </div>
     </div>
   </div>
-  <div class="flex items-center gap-2">
-    <a href="{% url 'dynamic' %}" class="btn btn-ghost btn-md">
-      {% icon "chevron-left" size=14 %} All platforms
-    </a>
-    <button id="stop" type="button" class="btn btn-primary btn-md">
-      {% icon "file-text" size=14 %} Generate Report
-    </button>
+</section>
+
+{# ─────────────────── Manifest insight tiles (real counts) ─────────────────── #}
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" data-reveal>
+  <div class="mi-stat card mi-glass card-body" x-data="counter({{ android_version|default:0 }})">
+    <div class="flex items-start justify-between gap-2">
+      <span class="w-10 h-10 rounded-lg bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">
+        {% icon "gauge" size=18 %}
+      </span>
+    </div>
+    <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+    <p class="text-small text-text-secondary">Android API level</p>
   </div>
-</header>
+  <div class="mi-stat card mi-glass card-body" x-data="counter({{ activities|length }})">
+    <div class="flex items-start justify-between gap-2">
+      <span class="w-10 h-10 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+        {% icon "package" size=18 %}
+      </span>
+    </div>
+    <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+    <p class="text-small text-text-secondary">Activities</p>
+  </div>
+  <div class="mi-stat card mi-glass card-body" x-data="counter({{ exported_activities|length }})">
+    <div class="flex items-start justify-between gap-2">
+      <span class="w-10 h-10 rounded-lg bg-system-warning/15 text-system-warning inline-flex items-center justify-center flex-shrink-0">
+        {% icon "shield-alert" size=18 %}
+      </span>
+    </div>
+    <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+    <p class="text-small text-text-secondary">Exported activities</p>
+  </div>
+  <div class="mi-stat card mi-glass card-body" x-data="counter({{ deeplinks|length }})">
+    <div class="flex items-start justify-between gap-2">
+      <span class="w-10 h-10 rounded-lg bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">
+        {% icon "layers" size=18 %}
+      </span>
+    </div>
+    <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+    <p class="text-small text-text-secondary">Deep links</p>
+  </div>
+</section>
 
 {# ─────────────────── Action toolbar ─────────────────── #}
-<section class="card mb-6" data-reveal>
+<section class="card mi-glass mb-6" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "sliders" size=16 %}</span> Analysis Controls</h2>
+  </div>
   <div class="card-body">
-    <div id="but" class="flex flex-wrap gap-2">
-      <a href="#" id="screen" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-mobile-alt"></i> Show Screen</a>
-      <a href="#" id="rootca" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-certificate"></i> Remove Root CA</a>
-      {% if android_version >= 5 %}
-      <a href="#" id="proxy" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-eye-slash"></i> Unset HTTP(S) Proxy</a>
-      <a href="#" id="tls_test" class="btn btn-secondary btn-sm" role="button" onclick="document.getElementById('tls_modal').showModal();return false;"><i class="fa fa-lock"></i> TLS/SSL Security Tester</a>
-      {% endif %}
-      <a href="#" id="expactt" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-language"></i> Exported Activity Tester</a>
-      <a href="#" id="actt" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-rocket"></i> Activity Tester</a>
-      {% if android_version >= 5 %}
-      <a href="#" id="deps" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-running"></i> Get Dependencies</a>
-      {% endif %}
-      <a href="#" id="ss" class="btn btn-secondary btn-sm" role="button"><i class="fa fa-camera"></i> Take a Screenshot</a>
-      <a href="#" id="logstream" class="btn btn-secondary btn-sm"><i class="fa fa-water"></i> Logcat Stream</a>
-      <a href="{% url 'live_api' %}?hash={{ hash }}&amp;package={{ package }}" id="apimon" target="_blank" class="btn btn-secondary btn-sm" style='display: none'><i class="fa fa-search"></i> Live API Monitor</a>
+    <div id="but" class="flex flex-wrap items-start gap-x-8 gap-y-6">
+      {# ── Environment ── #}
+      <div class="tb-group flex flex-col gap-2">
+        <span class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold inline-flex items-center gap-1.5">{% icon "settings" size=13 %} Environment</span>
+        <div class="flex flex-wrap gap-2">
+          <a href="#" id="rootca" class="btn btn-secondary btn-sm mi-tool-btn" role="button"><i class="fa fa-certificate"></i> Remove Root CA</a>
+          {% if android_version >= 5 %}
+          <a href="#" id="proxy" class="btn btn-secondary btn-sm mi-tool-btn" role="button"><i class="fas fa-eye-slash"></i> Unset HTTP(S) Proxy</a>
+          <a href="#" id="deps" class="btn btn-secondary btn-sm mi-tool-btn" role="button"><i class="fas fa-running"></i> Get Dependencies</a>
+          {% endif %}
+        </div>
+      </div>
+      {# ── Testing ── #}
+      <div class="tb-group flex flex-col gap-2">
+        <span class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold inline-flex items-center gap-1.5">{% icon "zap" size=13 %} Testing</span>
+        <div class="flex flex-wrap gap-2">
+          {% if android_version >= 5 %}
+          <a href="#" id="tls_test" class="btn btn-secondary btn-sm mi-tool-btn" role="button" onclick="document.getElementById('tls_modal').showModal();return false;"><i class="fa fa-lock"></i> TLS/SSL Security Tester</a>
+          {% endif %}
+          <a href="#" id="expactt" class="btn btn-secondary btn-sm mi-tool-btn" role="button"><i class="fa fa-language"></i> Exported Activity Tester</a>
+          <a href="#" id="actt" class="btn btn-secondary btn-sm mi-tool-btn" role="button"><i class="fa fa-rocket"></i> Activity Tester</a>
+        </div>
+      </div>
+      {# ── Capture & Monitor ── #}
+      <div class="tb-group flex flex-col gap-2">
+        <span class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold inline-flex items-center gap-1.5">{% icon "eye" size=13 %} Capture &amp; Monitor</span>
+        <div class="flex flex-wrap gap-2">
+          <a href="#" id="screen" class="btn btn-secondary btn-sm mi-tool-btn" role="button"><i class="fa fa-mobile-alt"></i> Show Screen</a>
+          <a href="#" id="ss" class="btn btn-secondary btn-sm mi-tool-btn" role="button"><i class="fa fa-camera"></i> Take a Screenshot</a>
+          <a href="#" id="logstream" class="btn btn-secondary btn-sm mi-tool-btn"><i class="fa fa-water"></i> Logcat Stream</a>
+          <a href="{% url 'live_api' %}?hash={{ hash }}&amp;package={{ package }}" id="apimon" target="_blank" class="btn btn-secondary btn-sm mi-tool-btn" style='display: none'><i class="fa fa-search"></i> Live API Monitor</a>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -115,13 +299,17 @@
 <section class="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-6">
 
   {# ── Device screen ── #}
-  <div class="card xl:col-span-3" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2">{% icon "smartphone" size=18 %} Device</h2>
+  <div class="card mi-glass xl:col-span-3" data-reveal>
+    <div class="card-header flex items-center justify-between gap-2">
+      <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "smartphone" size=16 %}</span> Device</h2>
+      <span id="screen-live-dot" class="hidden items-center gap-1.5 text-tiny font-medium text-severity-passed dark:text-severity-passed-dark">
+        <span class="mi-pulse-dot"></span> Live
+      </span>
     </div>
     <div class="card-body">
-      <div class="flex justify-center">
-        <div class="marvel-device htc-one">
+      <div class="relative flex justify-center">
+        <div class="mi-phone-glow" aria-hidden="true"></div>
+        <div class="marvel-device htc-one relative z-10">
           <div class="top-bar"></div>
           <div class="camera"></div>
           <div class="sensor"></div>
@@ -141,13 +329,13 @@
   </div>
 
   {# ── Analyzer / Instrumentation ── #}
-  <div class="card xl:col-span-4" data-reveal x-data="{ tab: 'dm' }">
+  <div class="card mi-glass xl:col-span-4" data-reveal x-data="{ tab: 'dm' }">
     <div class="card-header p-0">
       <div class="flex border-b border-border-subtle w-full">
-        <button type="button" class="mi-tab px-4 py-3 text-small font-medium text-text-tertiary"
-                :aria-selected="tab === 'dm'" @click="tab = 'dm'" aria-selected="true">Dynamic Analyzer</button>
-        <button type="button" class="mi-tab px-4 py-3 text-small font-medium text-text-tertiary"
-                :aria-selected="tab === 'errors'" @click="tab = 'errors'" aria-selected="false">Errors</button>
+        <button type="button" class="mi-tab px-4 py-3 text-small font-medium text-text-tertiary inline-flex items-center gap-1.5"
+                :aria-selected="tab === 'dm'" @click="tab = 'dm'" aria-selected="true">{% icon "zap" size=14 %} Dynamic Analyzer</button>
+        <button type="button" class="mi-tab px-4 py-3 text-small font-medium text-text-tertiary inline-flex items-center gap-1.5"
+                :aria-selected="tab === 'errors'" @click="tab = 'errors'" aria-selected="false">{% icon "alert-triangle" size=14 %} Errors</button>
       </div>
     </div>
     <div class="card-body">
@@ -162,35 +350,35 @@
           <div id="frida_options" class="space-y-5">
             {# Default hooks #}
             <div>
-              <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Default Frida Scripts</h4>
-              <div class="space-y-1.5 text-small text-text-secondary">
-                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="api_monitor" checked> API Monitoring</label>
-                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="ssl_pinning_bypass" checked> SSL Pinning Bypass</label>
-                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="root_bypass" checked> Root Detection Bypass</label>
-                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="debugger_check_bypass" checked> Debugger Check Bypass</label>
-                <label class="flex items-center gap-2"><input name="default_hooks" type="checkbox" value="dump_clipboard" checked> Clipboard Monitor</label>
+              <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "check" size=12 %} Default Frida Scripts</h4>
+              <div class="space-y-1 text-small text-text-secondary">
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input name="default_hooks" type="checkbox" value="api_monitor" checked> API Monitoring</label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input name="default_hooks" type="checkbox" value="ssl_pinning_bypass" checked> SSL Pinning Bypass</label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input name="default_hooks" type="checkbox" value="root_bypass" checked> Root Detection Bypass</label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input name="default_hooks" type="checkbox" value="debugger_check_bypass" checked> Debugger Check Bypass</label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input name="default_hooks" type="checkbox" value="dump_clipboard" checked> Clipboard Monitor</label>
               </div>
             </div>
 
             {# Auxiliary hooks #}
             <div class="pt-4 border-t border-border-subtle">
-              <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Auxiliary Frida Scripts</h4>
-              <div class="space-y-2 text-small text-text-secondary">
-                <label class="flex items-center gap-2"><input name="auxiliary" type="checkbox" value="enum_class" id="enum_class"> Enumerate Loaded Classes</label>
-                <label class="flex items-center gap-2"><input name="auxiliary" type="checkbox" value="string_catch" id="string_catch"> Capture Strings</label>
-                <label class="flex items-center gap-2"><input name="auxiliary" type="checkbox" value="string_compare" id="string_compare"> Capture String Comparisons</label>
-                <label class="flex items-center gap-2"><input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="enum_methods" id="enum_methods"> Enumerate Class methods</label>
+              <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "search" size=12 %} Auxiliary Frida Scripts</h4>
+              <div class="space-y-1.5 text-small text-text-secondary">
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input name="auxiliary" type="checkbox" value="enum_class" id="enum_class"> Enumerate Loaded Classes</label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input name="auxiliary" type="checkbox" value="string_catch" id="string_catch"> Capture Strings</label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input name="auxiliary" type="checkbox" value="string_compare" id="string_compare"> Capture String Comparisons</label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="enum_methods" id="enum_methods"> Enumerate Class methods</label>
                 <input type="text" class="input" id="class_name" placeholder="java.io.File">
-                <label class="flex items-center gap-2"><input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_class" id="search_class"> Search Class Pattern</label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_class" id="search_class"> Search Class Pattern</label>
                 <input type="text" class="input" id="class_search" placeholder="ssl\.Trust*">
-                <label class="flex items-center gap-2"><input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="trace_class" id="trace_class"> Trace Class Methods</label>
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors duration-fast cursor-pointer"><input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="trace_class" id="trace_class"> Trace Class Methods</label>
                 <input type="text" class="input" id="class_trace" placeholder="java.net.Socket,java.io.File,java.lang.String">
               </div>
             </div>
 
             {# Instrumentation #}
             <div class="pt-4 border-t border-border-subtle">
-              <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2">Instrumentation</h4>
+              <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "zap" size=12 %} Instrumentation</h4>
               <div class="flex flex-wrap gap-2">
                 <button id="frida_spawn" type="submit" class="btn btn-primary btn-sm"><i class="far fa-play-circle"></i> Spawn &amp; Inject</button>
                 <button id="frida_session" type="submit" class="btn btn-secondary btn-sm" disabled><i class="fas fa-redo"></i> Inject</button>
@@ -202,7 +390,7 @@
 
           {# User interface: activities + deeplinks #}
           <div class="pt-4 mt-5 border-t border-border-subtle space-y-4">
-            <h4 class="text-tiny uppercase text-text-tertiary font-medium">User Interface</h4>
+            <h4 class="text-tiny uppercase text-text-tertiary font-medium inline-flex items-center gap-1.5">{% icon "layers" size=12 %} User Interface</h4>
 
             {% if activities or exported_activities %}
             <div id="start_activity_form">
@@ -259,9 +447,10 @@
   </div>
 
   {# ── Frida code editor ── #}
-  <div class="card xl:col-span-5" id="codeedit" data-reveal>
-    <div class="card-header">
-      <h2 class="text-h3 flex items-center gap-2">{% icon "edit" size=18 %} Frida Code Editor</h2>
+  <div class="card mi-glass xl:col-span-5" id="codeedit" data-reveal>
+    <div class="card-header flex items-center justify-between gap-2">
+      <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "edit" size=16 %}</span> Frida Code Editor</h2>
+      <span class="text-tiny text-text-tertiary font-mono hidden sm:inline">JavaScript</span>
     </div>
     <div class="card-body">
       <div id="code-editor">
@@ -281,25 +470,36 @@
 </section>
 
 {# ─────────────────── Shell ─────────────────── #}
-<section class="card mb-6" data-reveal>
+<section class="card mi-glass mb-6" data-reveal>
   <div class="card-header">
-    <h2 class="text-h3 flex items-center gap-2">{% icon "monitor" size=18 %} Shell Access</h2>
+    <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "monitor" size=16 %}</span> Shell Access</h2>
   </div>
-  <div class="card-body">
-    <div id="shell">
-      <output></output>
-      <div id="input-line" class="input-line">
-        <div class="prompt"></div><div><input class="cmdline" autofocus /></div>
+  <div class="card-body p-0">
+    <div class="flex items-center gap-1.5 px-4 py-2.5 border-b border-border-subtle bg-surface-2/60">
+      <span class="mi-term-dot bg-text-tertiary/50"></span>
+      <span class="mi-term-dot bg-text-tertiary/35"></span>
+      <span class="mi-term-dot bg-text-tertiary/20"></span>
+      <span class="text-tiny text-text-tertiary ml-2 font-mono truncate">root@android — adb shell</span>
+    </div>
+    <div class="p-4">
+      <div id="shell">
+        <output></output>
+        <div id="input-line" class="input-line">
+          <div class="prompt"></div><div><input class="cmdline" autofocus /></div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
 {# ─────────────────── Frida logs ─────────────────── #}
-<section class="card mb-6" data-reveal>
-  <div class="card-header">
-    <h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Frida Logs</h2>
-    <span class="text-tiny text-text-tertiary" id="messages">Data refreshed every 3 seconds.</span>
+<section class="card mi-glass mb-6" data-reveal>
+  <div class="card-header flex items-center justify-between">
+    <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "file-text" size=16 %}</span> Frida Logs</h2>
+    <span class="inline-flex items-center gap-2 rounded-md border border-border-subtle bg-surface-2 px-2.5 py-1 text-tiny uppercase tracking-wide text-text-secondary">
+      <span class="mi-pulse-dot text-severity-passed dark:text-severity-passed-dark"></span>
+      <span id="messages">Data refreshed every 3 seconds.</span>
+    </span>
   </div>
   <div class="card-body">
     <pre class="frida-pre" id="frida-logs"></pre>
@@ -316,7 +516,7 @@
 {# ─────────────────── Attach-to-process modal ─────────────────── #}
 <dialog id="frida_attach_mdl" class="rounded-xl backdrop:bg-black/40 max-w-lg w-full p-0 bg-surface-1 text-text-primary border border-border-subtle shadow-elevation-3">
   <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
-    <h3 class="text-h3">Attach to a Running Process</h3>
+    <h3 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "zap" size=16 %}</span> Attach to a Running Process</h3>
     <button type="button" class="text-text-tertiary hover:text-text-primary" onclick="document.getElementById('frida_attach_mdl').close()">{% icon "x" size=18 %}</button>
   </div>
   <div class="px-5 py-4">
@@ -330,7 +530,7 @@
 {# ─────────────────── Injected script modal ─────────────────── #}
 <dialog id="get_code_modal" class="rounded-xl backdrop:bg-black/40 max-w-4xl w-full p-0 bg-surface-1 text-text-primary border border-border-subtle shadow-elevation-3">
   <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
-    <h3 class="text-h3">Injected Frida Script</h3>
+    <h3 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "edit" size=16 %}</span> Injected Frida Script</h3>
     <button type="button" class="text-text-tertiary hover:text-text-primary" onclick="document.getElementById('get_code_modal').close()">{% icon "x" size=18 %}</button>
   </div>
   <div class="px-5 py-4 max-h-[70vh] overflow-auto" id="injected_content"></div>
@@ -339,7 +539,7 @@
 {# ─────────────────── TLS/SSL tester modal ─────────────────── #}
 <dialog id="tls_modal" class="rounded-xl backdrop:bg-black/40 max-w-3xl w-full p-0 bg-surface-1 text-text-primary border border-border-subtle shadow-elevation-3">
   <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
-    <h3 class="text-h3">Run TLS/SSL Security Tests — {{ package }}</h3>
+    <h3 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "lock" size=16 %}</span> Run TLS/SSL Security Tests — {{ package }}</h3>
     <button type="button" class="text-text-tertiary hover:text-text-primary" onclick="document.getElementById('tls_modal').close()">{% icon "x" size=18 %}</button>
   </div>
   <div class="px-5 py-4 space-y-4 max-h-[70vh] overflow-auto">
@@ -366,10 +566,10 @@
           </tr>
         </thead>
         <tbody>
-          <tr class="border-b border-border-subtle"><td class="px-4 py-2">TLS Misconfiguration Test</td><td id="tls_1" class="px-4 py-2">-</td></tr>
-          <tr class="border-b border-border-subtle"><td class="px-4 py-2">TLS Pinning/Certificate Transparency Test</td><td id="tls_2" class="px-4 py-2">-</td></tr>
-          <tr class="border-b border-border-subtle"><td class="px-4 py-2">TLS Pinning/Certificate Transparency Bypass Test</td><td id="tls_3" class="px-4 py-2">-</td></tr>
-          <tr><td class="px-4 py-2">Cleartext Traffic Test</td><td id="tls_4" class="px-4 py-2">-</td></tr>
+          <tr class="border-b border-border-subtle hover:bg-surface-2/50 transition-colors duration-fast"><td class="px-4 py-2">TLS Misconfiguration Test</td><td id="tls_1" class="px-4 py-2 text-center">-</td></tr>
+          <tr class="border-b border-border-subtle hover:bg-surface-2/50 transition-colors duration-fast"><td class="px-4 py-2">TLS Pinning/Certificate Transparency Test</td><td id="tls_2" class="px-4 py-2 text-center">-</td></tr>
+          <tr class="border-b border-border-subtle hover:bg-surface-2/50 transition-colors duration-fast"><td class="px-4 py-2">TLS Pinning/Certificate Transparency Bypass Test</td><td id="tls_3" class="px-4 py-2 text-center">-</td></tr>
+          <tr class="hover:bg-surface-2/50 transition-colors duration-fast"><td class="px-4 py-2">Cleartext Traffic Test</td><td id="tls_4" class="px-4 py-2 text-center">-</td></tr>
         </tbody>
       </table>
     </div>
@@ -1316,5 +1516,50 @@ $("#stop").one( "click", function() {
 
 //end document.ready
 });
+</script>
+
+{# ─── Presentational-only additions: count-up tiles + live screen indicator. ───
+     Purely additive; does not read from or modify any of the functional
+     jQuery/Frida/Terminal logic above. ─── #}
+<script>
+  // Animated count-up for the manifest insight tiles (real backend counts).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+
+  // Mirror the real "Show Screen" button state onto a small pulsing "Live"
+  // indicator in the Device card header. Purely observational — never
+  // triggers clicks or mutates existing elements.
+  (function () {
+    var screenBtn = document.getElementById('screen');
+    var dot = document.getElementById('screen-live-dot');
+    if (!screenBtn || !dot) return;
+    var sync = function () {
+      var isLive = screenBtn.textContent.indexOf('Stop Screen') !== -1;
+      dot.classList.toggle('hidden', !isLive);
+      dot.classList.toggle('flex', isLive);
+    };
+    new MutationObserver(sync).observe(screenBtn, {
+      childList: true, subtree: true, characterData: true,
+    });
+    sync();
+  })();
 </script>
 {% endblock %}

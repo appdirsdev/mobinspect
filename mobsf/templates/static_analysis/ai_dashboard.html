@@ -3,29 +3,304 @@
 
 {% block page_title %}AI Dashboard — {{ checksum }}{% endblock %}
 
-{% block content %}
-<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
-  <div class="min-w-0">
-    <p class="text-tiny uppercase text-text-tertiary">AI Security Analysis</p>
-    <h1 class="text-h2 truncate">AI Dashboard</h1>
-    <p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ checksum }}</p>
-  </div>
-  <a href="/static_analyzer/{{ checksum }}/" class="btn btn-secondary btn-md">
-    {% icon "chevron-left" size=14 %} Back to report
-  </a>
-</header>
+{% block extra_head %}
+<style>
+  /* ── AI Dashboard — ambient header, status pulse, meta sidebar ──
+     Theme-aware (data-theme on <html>), reduced-motion safe. Scoped to this page. */
+  .mi-ai-hero { background: rgb(var(--surface-1)); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(60px); opacity: .5;
+    width: 300px; height: 300px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 18s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(60px); opacity: .32;
+    width: 240px; height: 240px; bottom: -120px; left: -60px;
+    background: radial-gradient(circle at center, rgba(59,130,246,.4), transparent 70%);
+    animation: mi-float 22s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 70% 70% at 90% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 70% at 90% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .32; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .2; }
 
-{% if ai_page_status == 'disabled' %}
-  <div class="card"><div class="p-6 text-small text-text-secondary">
-    AI analysis is not enabled on this deployment.
-  </div></div>
-{% elif ai_page_status == 'invalid' %}
-  <div class="card"><div class="p-6 text-small text-text-tertiary">
-    Invalid scan reference.
-  </div></div>
-{% elif ai_page_status == 'none' %}
-  {% include "static_analysis/_ai_analysis.html" with ai_status='pending' checksum=checksum %}
-{% else %}
-  {% include "static_analysis/_ai_analysis.html" %}
-{% endif %}
+  .mi-icon-chip {
+    background: linear-gradient(135deg, rgba(37,99,235,.18), rgba(37,99,235,.06));
+    box-shadow: inset 0 0 0 1px rgba(37,99,235,.18);
+  }
+
+  /* Live status pulse (mirrors real ai_page_status, not simulated) */
+  .mi-live-dot { position: relative; }
+  .mi-live-dot::before {
+    content: ''; position: absolute; inset: 0; border-radius: 9999px;
+    background: currentColor; opacity: .55;
+    animation: mi-pulse 2s ease-out infinite;
+  }
+
+  /* Empty states */
+  .mi-empty-ico { position: relative; }
+
+  /* Meta / sidebar cards */
+  .mi-meta-card { transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+  .mi-meta-card:hover { transform: translateY(-2px); box-shadow: 0 12px 30px -18px rgba(0,0,0,.35); }
+  .mi-chk { word-break: break-all; }
+  .mi-copy-btn { transition: color .15s ease, border-color .15s ease, transform .15s ease; }
+  .mi-copy-btn:active { transform: scale(.94); }
+  .mi-copy-btn.is-copied { color: #16A34A !important; border-color: #16A34A !important; }
+
+  /* Executive summary — brand top accent */
+  .mi-summary { position: relative; overflow: hidden; }
+  .mi-summary::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #2563EB, transparent 85%);
+  }
+
+  /* "How it works" step rail */
+  .mi-steps { position: relative; }
+  .mi-step { position: relative; padding-left: 26px; }
+  .mi-step:not(:last-child)::before {
+    content: ''; position: absolute; left: 7px; top: 20px; bottom: -14px; width: 1px;
+    background: rgb(var(--border-subtle));
+  }
+  .mi-step-dot {
+    position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 9999px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgb(var(--surface-2)); box-shadow: inset 0 0 0 1px rgb(var(--border-default));
+  }
+  .mi-step.is-active .mi-step-dot {
+    background: #2563EB; box-shadow: inset 0 0 0 1px #2563EB; position: relative;
+  }
+  .mi-step.is-active .mi-step-dot::after {
+    content: ''; position: absolute; inset: 0; border-radius: 9999px;
+    background: #2563EB; opacity: .55; animation: mi-pulse 2s ease-out infinite;
+  }
+  .mi-step.is-done .mi-step-dot {
+    background: #16A34A; box-shadow: inset 0 0 0 1px #16A34A;
+  }
+
+  @keyframes mi-float { 0%, 100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-22px,0); } }
+  @keyframes mi-pulse { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(2.4); opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-live-dot::before { animation: none; opacity: 0; }
+    .mi-step.is-active .mi-step-dot::after { animation: none; opacity: 0; }
+    .mi-meta-card, .mi-copy-btn { transition: none; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  {# ══════════════════ Ambient header ══════════════════ #}
+  <header class="mi-ai-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-6 md:px-8 md:py-7">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="mi-icon-chip w-11 h-11 rounded-xl text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+            {% icon "zap" size=20 %}
+          </span>
+          <div class="min-w-0">
+            <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold inline-flex items-center gap-1.5">
+              {% icon "shield-check" size=12 %} AI Security Analysis · Local LLM
+            </p>
+            <h1 class="text-h1 truncate mt-0.5">AI Dashboard</h1>
+            <div class="flex flex-wrap items-center gap-2 mt-2">
+              <span class="badge badge-unknown gap-1.5 font-mono max-w-full">
+                {% icon "smartphone" size=11 %} <span class="break-all">{{ checksum }}</span>
+              </span>
+              {% if ai_page_status == 'disabled' %}
+                <span class="badge badge-unknown gap-1.5">{% icon "x" size=11 %} Disabled</span>
+              {% elif ai_page_status == 'invalid' %}
+                <span class="badge badge-unknown gap-1.5">{% icon "alert-triangle" size=11 %} Invalid reference</span>
+              {% elif ai_page_status == 'none' or ai_page_status == 'pending' or ai_page_status == 'running' %}
+                <span class="badge badge-medium gap-1.5">
+                  <span class="mi-live-dot w-1.5 h-1.5 rounded-full bg-current inline-block"></span> Analyzing…
+                </span>
+              {% elif ai_page_status == 'failed' %}
+                <span class="badge badge-unknown gap-1.5">{% icon "alert-triangle" size=11 %} Unavailable</span>
+              {% else %}
+                <span class="badge badge-passed gap-1.5">{% icon "check" size=11 %} Complete</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <a href="/static_analyzer/{{ checksum }}/" class="btn btn-secondary btn-md flex-shrink-0">
+          {% icon "chevron-left" size=14 %} Back to report
+        </a>
+      </div>
+    </div>
+  </header>
+
+  {% if ai_page_status == 'disabled' %}
+    {# ══════════════════ Empty state — AI not enabled ══════════════════ #}
+    <section class="card" data-reveal>
+      <div class="p-10 md:p-14 flex flex-col items-center text-center max-w-lg mx-auto">
+        <span class="mi-empty-ico w-16 h-16 rounded-2xl bg-text-secondary/10 text-text-secondary inline-flex items-center justify-center mb-5">
+          {% icon "zap" size=28 %}
+        </span>
+        <h2 class="text-h3">AI analysis is not enabled</h2>
+        <p class="text-small text-text-secondary mt-2">
+          This deployment hasn't turned on local AI enrichment. An administrator can enable
+          <span class="font-mono text-tiny text-text-tertiary">MOBINSPECT_AI_ENABLED</span>
+          to unlock advisory summaries for every scan.
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-2 mt-6">
+          <a href="/static_analyzer/{{ checksum }}/" class="btn btn-secondary btn-md">
+            {% icon "chevron-left" size=14 %} Back to report
+          </a>
+          <a href="{% url 'recent' %}" class="btn btn-ghost btn-md">
+            {% icon "layers" size=14 %} Recent scans
+          </a>
+        </div>
+      </div>
+    </section>
+  {% elif ai_page_status == 'invalid' %}
+    {# ══════════════════ Empty state — invalid reference ══════════════════ #}
+    <section class="card" data-reveal>
+      <div class="p-10 md:p-14 flex flex-col items-center text-center max-w-lg mx-auto">
+        <span class="mi-empty-ico w-16 h-16 rounded-2xl bg-severity-medium/10 text-severity-medium inline-flex items-center justify-center mb-5">
+          {% icon "alert-triangle" size=28 %}
+        </span>
+        <h2 class="text-h3">Invalid scan reference</h2>
+        <p class="text-small text-text-secondary mt-2">
+          <span class="font-mono text-tiny">{{ checksum }}</span> doesn't look like a valid scan checksum,
+          so there's nothing to analyze here.
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-2 mt-6">
+          <a href="{% url 'recent' %}" class="btn btn-primary btn-md">
+            {% icon "layers" size=14 %} Browse recent scans
+          </a>
+        </div>
+      </div>
+    </section>
+  {% elif ai_page_status == 'none' %}
+    {# ══════════════════ Queued — background job hasn't landed yet ══════════════════ #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5" data-reveal>
+      <div class="lg:col-span-2 min-w-0">
+        {% include "static_analysis/_ai_analysis.html" with ai_status='pending' checksum=checksum %}
+      </div>
+      <aside class="space-y-4">
+        <div class="mi-meta-card card card-body">
+          <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-3">How local analysis works</p>
+          <div class="mi-steps space-y-4">
+            <div class="mi-step is-active">
+              <span class="mi-step-dot"></span>
+              <p class="text-small font-medium text-text-primary">Queued</p>
+              <p class="text-tiny text-text-tertiary mt-0.5">Waiting for a local worker to pick up this scan.</p>
+            </div>
+            <div class="mi-step">
+              <span class="mi-step-dot"></span>
+              <p class="text-small font-medium text-text-secondary">Analyzing</p>
+              <p class="text-tiny text-text-tertiary mt-0.5">The on-device model reads the static-analysis results.</p>
+            </div>
+            <div class="mi-step">
+              <span class="mi-step-dot"></span>
+              <p class="text-small font-medium text-text-secondary">Complete</p>
+              <p class="text-tiny text-text-tertiary mt-0.5">Advisory findings appear here — this panel refreshes itself.</p>
+            </div>
+          </div>
+        </div>
+        <div class="mi-meta-card card card-body" x-data="{ copied: false }">
+          <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2">Scan reference</p>
+          <div class="flex items-start gap-2">
+            <code x-ref="chk" class="mi-chk font-mono text-tiny text-text-primary flex-1">{{ checksum }}</code>
+            <button type="button"
+                    class="mi-copy-btn btn btn-ghost btn-sm flex-shrink-0"
+                    :class="copied ? 'is-copied' : ''"
+                    @click="navigator.clipboard.writeText($refs.chk.textContent.trim()).then(() => { copied = true; setTimeout(() => copied = false, 1600); })">
+              <span x-show="!copied">{% icon "copy" size=13 %}</span>
+              <span x-show="copied" x-cloak>{% icon "check" size=13 %}</span>
+            </button>
+          </div>
+        </div>
+        <div class="mi-meta-card card card-body">
+          <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "lock" size=12 %} Privacy & scope
+          </p>
+          <p class="text-tiny text-text-secondary">
+            Runs entirely on this deployment's local model — nothing leaves the network.
+            It's advisory only and never changes the security score.
+          </p>
+        </div>
+      </aside>
+    </div>
+  {% else %}
+    {# ══════════════════ Result — pending / running / failed / done ══════════════════ #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5" data-reveal>
+      <div class="lg:col-span-2 min-w-0 space-y-5">
+        {% if ai_summary %}
+        <section class="mi-summary card" data-reveal>
+          <div class="card-header flex items-center justify-between">
+            <h2 class="text-h4 flex items-center gap-2">
+              {% icon "zap" size=16 class="text-mobinspect-500" %} Executive summary
+            </h2>
+            <span class="badge badge-medium text-tiny">AI-generated · unverified</span>
+          </div>
+          <div class="p-5">
+            <p class="text-small text-text-secondary" style="white-space:pre-wrap; word-wrap:break-word;">{{ ai_summary }}</p>
+          </div>
+        </section>
+        {% endif %}
+        {% include "static_analysis/_ai_analysis.html" %}
+      </div>
+      <aside class="space-y-4">
+        <div class="mi-meta-card card card-body" x-data="{ copied: false }">
+          <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2">Scan reference</p>
+          <div class="flex items-start gap-2">
+            <code x-ref="chk" class="mi-chk font-mono text-tiny text-text-primary flex-1">{{ checksum }}</code>
+            <button type="button"
+                    class="mi-copy-btn btn btn-ghost btn-sm flex-shrink-0"
+                    :class="copied ? 'is-copied' : ''"
+                    @click="navigator.clipboard.writeText($refs.chk.textContent.trim()).then(() => { copied = true; setTimeout(() => copied = false, 1600); })">
+              <span x-show="!copied">{% icon "copy" size=13 %}</span>
+              <span x-show="copied" x-cloak>{% icon "check" size=13 %}</span>
+            </button>
+          </div>
+        </div>
+        {% if ai_model %}
+        <div class="mi-meta-card card card-body">
+          <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "database" size=12 %} Model
+          </p>
+          <p class="text-small font-mono text-text-primary break-all">{{ ai_model }}</p>
+          <p class="text-tiny text-text-tertiary mt-1">Running locally, on-device.</p>
+        </div>
+        {% endif %}
+        {% if ai_secrets %}
+        <div class="mi-meta-card card card-body">
+          <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "key" size=12 %} Secrets triage
+          </p>
+          <p class="text-tiny text-text-secondary" style="white-space:pre-wrap; word-wrap:break-word;">{{ ai_secrets }}</p>
+        </div>
+        {% endif %}
+        <div class="mi-meta-card card card-body">
+          <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "lock" size=12 %} Privacy & scope
+          </p>
+          <p class="text-tiny text-text-secondary">
+            Generated from this scan's complete static-analysis results (untrusted app content).
+            Advisory only — verify every claim against the findings before acting on it.
+          </p>
+        </div>
+      </aside>
+    </div>
+  {% endif %}
+
+</div>
 {% endblock %}

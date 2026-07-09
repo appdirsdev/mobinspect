@@ -3,234 +3,668 @@
 
 {% block page_title %}Compare — {{ first_app.name_ver }} vs {{ second_app.name_ver }}{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero { background: var(--surface-1); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .55;
+  }
+  .mi-hero-glow::before {
+    width: 320px; height: 320px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 260px; height: 260px; bottom: -130px; left: -40px;
+    background: radial-gradient(circle at center, rgba(217,119,6,.35), transparent 70%);
+    animation: mi-float 20s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .5;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .3; }
+
+  /* ── KPI tiles: accent bar + hover lift + count-up ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── VS duel cards: role-accent bar + corner glow on hover ── */
+  .mi-appcard { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease; }
+  .mi-appcard::before { content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: linear-gradient(90deg, var(--mi-role, #2563EB), transparent 85%); opacity: .9; }
+  .mi-appcard::after { content: ''; position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(120% 90% at 100% 0%, var(--mi-role, #2563EB), transparent 60%);
+    transition: opacity .22s ease; }
+  .mi-appcard:hover { transform: translateY(-2px); box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); }
+  .mi-appcard:hover::after { opacity: .08; }
+
+  /* ── VS badge: gradient chip with a slow breathing glow ── */
+  .mi-vs {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 52px; height: 52px; border-radius: 9999px; flex-shrink: 0;
+    background: linear-gradient(135deg, #2563EB, #D97706);
+    color: #fff; font: 700 12px/1 var(--font-mono, monospace);
+    letter-spacing: .06em;
+    box-shadow: 0 0 0 4px rgb(var(--surface-1)), 0 8px 24px -8px rgba(37,99,235,.55);
+    animation: mi-pulse 3.2s ease-in-out infinite;
+  }
+
+  /* ── Footprint proportion bars ── */
+  .mi-bar-row + .mi-bar-row { margin-top: .85rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after, .mi-vs { animation: none; }
+    .mi-stat, .mi-appcard { transition: none; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-24px,0); }
+  }
+  @keyframes mi-pulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgb(var(--surface-1)), 0 8px 24px -8px rgba(37,99,235,.55); }
+    50%      { box-shadow: 0 0 0 4px rgb(var(--surface-1)), 0 10px 30px -6px rgba(217,119,6,.55); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<header class="mb-6">
-  <p class="text-tiny uppercase text-text-tertiary">Static · Compare</p>
-  <h1 class="text-h2 mt-1">App diff</h1>
-  <p class="text-text-secondary mt-1">
-    Side-by-side comparison of <strong>{{ first_app.name_ver }}</strong> and <strong>{{ second_app.name_ver }}</strong>.
-  </p>
-</header>
+<div class="space-y-6">
 
-{# ─── App pair header ─── #}
-<section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-  <div class="card" data-reveal>
-    <div class="card-body flex items-center gap-4">
-      <img src="{% if first_app.icon_path %}/download/{{ first_app.icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
-           alt="" class="w-16 h-16 rounded-lg bg-surface-2 object-contain flex-shrink-0" />
-      <div class="min-w-0 flex-1">
-        <p class="text-tiny uppercase text-text-tertiary">App A</p>
-        <p class="text-h4 truncate">{{ first_app.name_ver }}</p>
-        <p class="text-tiny text-text-tertiary truncate font-mono">{{ first_app.md5 }}</p>
-        <p class="text-tiny text-text-secondary mt-1">{{ first_app.size }}</p>
+{% with pc=permissions.common|length pa=permissions.only_first|length pb=permissions.only_second|length uc=urls.common|length ua=urls.only_first|length ub=urls.only_second|length ac=android_api.common|length aa=android_api.only_first|length ab=android_api.only_second|length bc=common_browsable_activities|length ba=browsable_activities.only_first|length bb=browsable_activities.only_second|length kc=apkid.common|length ka=apkid.only_first|length kb=apkid.only_second|length %}
+{% with total_common=pc|add:uc|add:ac|add:bc|add:kc onlya=pa|add:ua|add:aa|add:ba|add:ka onlyb=pb|add:ub|add:ab|add:bb|add:kb %}
+{% with total_diff=onlya|add:onlyb %}
+
+  {# ══════════════════ Ambient hero ══════════════════ #}
+  <section class="mi-hero card mi-glass relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-8 md:px-10 md:py-9">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "git-compare" size=13 %} Static · Compare
+          </p>
+          <h1 class="text-display font-bold leading-tight">App diff</h1>
+          <p class="text-body text-text-secondary mt-2 max-w-2xl">
+            Side-by-side comparison of <strong class="text-text-primary">{{ first_app.name_ver }}</strong>
+            and <strong class="text-text-primary">{{ second_app.name_ver }}</strong>.
+          </p>
+
+          {# quick-nav chips — real counts, jump to each diff section #}
+          <div class="flex flex-wrap items-center gap-2 mt-4">
+            <a href="#permissions-diff" class="badge badge-neutral gap-1.5 hover:opacity-80 transition-opacity duration-fast">
+              {% icon "shield-alert" size=12 %} {{ pa|add:pb }} permission diff{{ pa|add:pb|pluralize }}
+            </a>
+            <a href="#urls-diff" class="badge badge-neutral gap-1.5 hover:opacity-80 transition-opacity duration-fast">
+              {% icon "external-link" size=12 %} {{ ua|add:ub }} URL diff{{ ua|add:ub|pluralize }}
+            </a>
+            <a href="#api-diff" class="badge badge-neutral gap-1.5 hover:opacity-80 transition-opacity duration-fast">
+              {% icon "zap" size=12 %} {{ aa|add:ab }} API diff{{ aa|add:ab|pluralize }}
+            </a>
+            <a href="#browsable-diff" class="badge badge-neutral gap-1.5 hover:opacity-80 transition-opacity duration-fast">
+              {% icon "layers" size=12 %} {{ ba|add:bb }} browsable diff{{ ba|add:bb|pluralize }}
+            </a>
+            <a href="#apkid-diff" class="badge badge-neutral gap-1.5 hover:opacity-80 transition-opacity duration-fast">
+              {% icon "search" size=12 %} {{ ka|add:kb }} APKiD diff{{ ka|add:kb|pluralize }}
+            </a>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="card" data-reveal>
-    <div class="card-body flex items-center gap-4">
-      <img src="{% if second_app.icon_path %}/download/{{ second_app.icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
-           alt="" class="w-16 h-16 rounded-lg bg-surface-2 object-contain flex-shrink-0" />
-      <div class="min-w-0 flex-1">
-        <p class="text-tiny uppercase text-text-tertiary">App B</p>
-        <p class="text-h4 truncate">{{ second_app.name_ver }}</p>
-        <p class="text-tiny text-text-tertiary truncate font-mono">{{ second_app.md5 }}</p>
-        <p class="text-tiny text-text-secondary mt-1">{{ second_app.size }}</p>
+  </section>
+
+  {# ══════════════════ KPI tiles (animated, real aggregated counts) ══════════════════ #}
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-4" data-reveal>
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ total_common }})">
+      <span class="w-10 h-10 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+        {% icon "check" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Shared elements</p>
+    </div>
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ total_diff }})">
+      <span class="w-10 h-10 rounded-lg bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">
+        {% icon "git-compare" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Total differences</p>
+    </div>
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ onlya }})">
+      <span class="w-10 h-10 rounded-lg bg-severity-low/15 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark inline-flex items-center justify-center flex-shrink-0 text-tiny font-bold">A</span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary truncate" title="{{ first_app.name_ver }}">Only in {{ first_app.name_ver }}</p>
+    </div>
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ onlyb }})">
+      <span class="w-10 h-10 rounded-lg bg-severity-medium/15 text-severity-medium dark:bg-severity-medium-dark/15 dark:text-severity-medium-dark inline-flex items-center justify-center flex-shrink-0 text-tiny font-bold">B</span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary truncate" title="{{ second_app.name_ver }}">Only in {{ second_app.name_ver }}</p>
+    </div>
+  </section>
+
+{% endwith %}
+{% endwith %}
+{% endwith %}
+
+  {# ══════════════════ App pair — VS duel ══════════════════ #}
+  <section class="flex flex-col md:flex-row items-stretch md:items-center gap-4" data-reveal>
+    <div class="mi-appcard card mi-glass card-hover flex-1 min-w-0" style="--mi-role:#2563EB">
+      <div class="card-body">
+        <div class="flex items-center gap-4">
+          <img src="{% if first_app.icon_path %}/download/{{ first_app.icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+               alt="" class="w-16 h-16 rounded-lg bg-surface-2 object-contain flex-shrink-0" />
+          <div class="min-w-0 flex-1">
+            <p class="text-tiny uppercase text-text-tertiary flex items-center gap-1.5">
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-severity-low/15 text-severity-low dark:bg-severity-low-dark/20 dark:text-severity-low-dark text-[9px] font-bold flex-shrink-0">A</span>
+              App A
+            </p>
+            <p class="text-h4 truncate" title="{{ first_app.name_ver }}">{{ first_app.name_ver }}</p>
+            <div class="flex items-center gap-1.5 mt-0.5 min-w-0">
+              <p class="text-tiny text-text-tertiary truncate font-mono" title="{{ first_app.md5 }}">{{ first_app.md5 }}</p>
+              <button type="button" x-data="{copied:false}"
+                      @click="navigator.clipboard.writeText('{{ first_app.md5|escapejs }}'); copied=true; setTimeout(()=>copied=false,1400)"
+                      class="text-text-tertiary hover:text-text-brand transition-colors duration-fast flex-shrink-0"
+                      title="Copy MD5" aria-label="Copy App A MD5 hash">
+                <span x-show="!copied">{% icon "copy" size=11 %}</span>
+                <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=11 %}</span>
+              </button>
+            </div>
+            <p class="text-tiny text-text-secondary mt-1">{{ first_app.size }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a href="{% url 'static_analyzer' checksum=first_app.md5 %}" class="btn btn-ghost btn-sm w-full justify-center">
+          {% icon "file-text" size=13 %} Open full report
+        </a>
       </div>
     </div>
-  </div>
-</section>
 
-{# ─── App information table ─── #}
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "info" size=18 %} App information</h2></div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-small">
-      <thead>
-        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-          <th class="text-left px-5 py-2.5 font-medium w-32"></th>
-          <th class="text-left px-5 py-2.5 font-medium">{{ first_app.name_ver }}</th>
-          <th class="text-left px-5 py-2.5 font-medium">{{ second_app.name_ver }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="border-b border-border-subtle hover:bg-surface-2/40">
-          <td class="px-5 py-2.5"><span class="badge badge-low">File name</span></td>
-          <td class="px-5 py-2.5 font-mono text-mono">{{ first_app.file_name }}</td>
-          <td class="px-5 py-2.5 font-mono text-mono">{{ second_app.file_name }}</td>
-        </tr>
-        <tr class="border-b border-border-subtle hover:bg-surface-2/40">
-          <td class="px-5 py-2.5"><span class="badge badge-low">MD5</span></td>
-          <td class="px-5 py-2.5 font-mono text-mono">{{ first_app.md5 }}</td>
-          <td class="px-5 py-2.5 font-mono text-mono">{{ second_app.md5 }}</td>
-        </tr>
-        <tr class="border-b border-border-subtle hover:bg-surface-2/40">
-          <td class="px-5 py-2.5"><span class="badge badge-low">Size</span></td>
-          <td class="px-5 py-2.5">{{ first_app.size }}</td>
-          <td class="px-5 py-2.5">{{ second_app.size }}</td>
-        </tr>
-        <tr class="hover:bg-surface-2/40">
-          <td class="px-5 py-2.5"><span class="badge badge-low">Certificate</span></td>
-          <td class="px-5 py-2.5 text-text-secondary">{{ first_app.cert_subject|default:"—" }}</td>
-          <td class="px-5 py-2.5 text-text-secondary">{{ second_app.cert_subject|default:"—" }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</section>
+    <span class="mi-vs mx-auto md:mx-0" aria-hidden="true">VS</span>
 
-{# ─── Component counts ─── #}
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "package" size=18 %} Components</h2></div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-small">
-      <thead>
-        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-          <th class="text-left px-5 py-2.5 font-medium"></th>
-          <th class="text-right px-5 py-2.5 font-medium">Activities</th>
-          <th class="text-right px-5 py-2.5 font-medium">Exp. act.</th>
-          <th class="text-right px-5 py-2.5 font-medium">Services</th>
-          <th class="text-right px-5 py-2.5 font-medium">Exp. svc.</th>
-          <th class="text-right px-5 py-2.5 font-medium">Receivers</th>
-          <th class="text-right px-5 py-2.5 font-medium">Exp. recv.</th>
-          <th class="text-right px-5 py-2.5 font-medium">Providers</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="border-b border-border-subtle">
-          <td class="px-5 py-2.5 font-medium text-text-primary">{{ first_app.name_ver }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ first_app.activities|length }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ first_app.exported_count.exported_activities }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ first_app.services|length }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ first_app.exported_count.exported_services }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ first_app.receivers|length }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ first_app.exported_count.exported_receivers }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ first_app.providers|length }}</td>
-        </tr>
-        <tr>
-          <td class="px-5 py-2.5 font-medium text-text-primary">{{ second_app.name_ver }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ second_app.activities|length }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ second_app.exported_count.exported_activities }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ second_app.services|length }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ second_app.exported_count.exported_services }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ second_app.receivers|length }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ second_app.exported_count.exported_receivers }}</td>
-          <td class="px-5 py-2.5 text-right tabular">{{ second_app.providers|length }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-{# ─── Permissions diff ─── #}
-<section class="card mb-6" data-reveal>
-  <div class="card-header">
-    <h2 class="text-h3 flex items-center gap-2">{% icon "shield" size=18 %} Permissions</h2>
-    <span class="text-tiny text-text-tertiary">
-      {{ permissions.common|length }} common · {{ permissions.only_first|length }} only A · {{ permissions.only_second|length }} only B
-    </span>
-  </div>
-  <div class="card-body space-y-6">
-    {% if permissions.common %}
-      <div>
-        <h3 class="text-tiny uppercase text-text-secondary mb-2">Common</h3>
-        <div class="overflow-x-auto rounded-md border border-border-subtle">
-          <table class="w-full text-small">
-            <thead>
-              <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-                <th class="text-left px-4 py-2 font-medium">Permission</th>
-                <th class="text-left px-4 py-2 font-medium">Status</th>
-                <th class="text-left px-4 py-2 font-medium">Info</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for perm, desc in permissions.common %}
-                <tr class="border-b border-border-subtle hover:bg-surface-2/40">
-                  <td class="px-4 py-2 font-mono text-mono">{{ perm }}</td>
-                  <td class="px-4 py-2">
-                    {% if desc.status == 'dangerous' %}<span class="badge badge-critical">Dangerous</span>
-                    {% elif desc.status == 'normal' %}<span class="badge badge-low">Normal</span>
-                    {% elif desc.status == 'signatureOrSystem' %}<span class="badge badge-medium">SystemOrSig</span>
-                    {% elif desc.status == 'signature' %}<span class="badge badge-passed">Signature</span>
-                    {% else %}<span class="badge badge-unknown">Unknown</span>{% endif %}
-                  </td>
-                  <td class="px-4 py-2 text-text-secondary">{{ desc.info }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+    <div class="mi-appcard card mi-glass card-hover flex-1 min-w-0" style="--mi-role:#D97706">
+      <div class="card-body">
+        <div class="flex items-center gap-4">
+          <img src="{% if second_app.icon_path %}/download/{{ second_app.icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+               alt="" class="w-16 h-16 rounded-lg bg-surface-2 object-contain flex-shrink-0" />
+          <div class="min-w-0 flex-1">
+            <p class="text-tiny uppercase text-text-tertiary flex items-center gap-1.5">
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-severity-medium/15 text-severity-medium dark:bg-severity-medium-dark/20 dark:text-severity-medium-dark text-[9px] font-bold flex-shrink-0">B</span>
+              App B
+            </p>
+            <p class="text-h4 truncate" title="{{ second_app.name_ver }}">{{ second_app.name_ver }}</p>
+            <div class="flex items-center gap-1.5 mt-0.5 min-w-0">
+              <p class="text-tiny text-text-tertiary truncate font-mono" title="{{ second_app.md5 }}">{{ second_app.md5 }}</p>
+              <button type="button" x-data="{copied:false}"
+                      @click="navigator.clipboard.writeText('{{ second_app.md5|escapejs }}'); copied=true; setTimeout(()=>copied=false,1400)"
+                      class="text-text-tertiary hover:text-text-brand transition-colors duration-fast flex-shrink-0"
+                      title="Copy MD5" aria-label="Copy App B MD5 hash">
+                <span x-show="!copied">{% icon "copy" size=11 %}</span>
+                <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=11 %}</span>
+              </button>
+            </div>
+            <p class="text-tiny text-text-secondary mt-1">{{ second_app.size }}</p>
+          </div>
         </div>
       </div>
-    {% endif %}
+      <div class="card-footer">
+        <a href="{% url 'static_analyzer' checksum=second_app.md5 %}" class="btn btn-ghost btn-sm w-full justify-center">
+          {% icon "file-text" size=13 %} Open full report
+        </a>
+      </div>
+    </div>
+  </section>
 
-    {% if permissions.only_first %}
-      <div>
-        <h3 class="text-tiny uppercase text-severity-low dark:text-severity-low-dark mb-2">Only in {{ first_app.name_ver }}</h3>
-        <div class="overflow-x-auto rounded-md border border-border-subtle">
-          <table class="w-full text-small">
-            <thead>
-              <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-                <th class="text-left px-4 py-2 font-medium">Permission</th>
-                <th class="text-left px-4 py-2 font-medium">Status</th>
-                <th class="text-left px-4 py-2 font-medium">Info</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for perm, desc in permissions.only_first %}
-                <tr class="border-b border-border-subtle hover:bg-surface-2/40">
-                  <td class="px-4 py-2 font-mono text-mono">{{ perm }}</td>
-                  <td class="px-4 py-2">
-                    {% if desc.status == 'dangerous' %}<span class="badge badge-critical">Dangerous</span>
-                    {% elif desc.status == 'normal' %}<span class="badge badge-low">Normal</span>
-                    {% elif desc.status == 'signatureOrSystem' %}<span class="badge badge-medium">SystemOrSig</span>
-                    {% elif desc.status == 'signature' %}<span class="badge badge-passed">Signature</span>
-                    {% else %}<span class="badge badge-unknown">Unknown</span>{% endif %}
-                  </td>
-                  <td class="px-4 py-2 text-text-secondary">{{ desc.info }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+  {# ═══════════════════ App information ═══════════════════ #}
+  <section id="app-info" class="card mi-glass card-hover scroll-mt-4" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2">
+        <span class="w-9 h-9 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">
+          {% icon "info" size=16 %}
+        </span>
+        App information
+      </h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium w-40"></th>
+            <th class="text-left px-5 py-2.5 font-medium">{{ first_app.name_ver }}</th>
+            <th class="text-left px-5 py-2.5 font-medium">{{ second_app.name_ver }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+            <td class="px-5 py-2.5">
+              <span class="inline-flex items-center gap-1.5 text-tiny font-semibold uppercase tracking-wide text-text-tertiary">
+                {% icon "file-text" size=12 %} File name
+              </span>
+            </td>
+            <td class="px-5 py-2.5 font-mono text-mono break-all">{{ first_app.file_name }}</td>
+            <td class="px-5 py-2.5 font-mono text-mono break-all">{{ second_app.file_name }}</td>
+          </tr>
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+            <td class="px-5 py-2.5">
+              <span class="inline-flex items-center gap-1.5 text-tiny font-semibold uppercase tracking-wide text-text-tertiary">
+                {% icon "key" size=12 %} MD5
+              </span>
+            </td>
+            <td class="px-5 py-2.5 font-mono text-mono break-all">{{ first_app.md5 }}</td>
+            <td class="px-5 py-2.5 font-mono text-mono break-all">{{ second_app.md5 }}</td>
+          </tr>
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+            <td class="px-5 py-2.5">
+              <span class="inline-flex items-center gap-1.5 text-tiny font-semibold uppercase tracking-wide text-text-tertiary">
+                {% icon "database" size=12 %} Size
+              </span>
+            </td>
+            <td class="px-5 py-2.5 tabular">{{ first_app.size }}</td>
+            <td class="px-5 py-2.5 tabular">{{ second_app.size }}</td>
+          </tr>
+          <tr class="hover:bg-surface-2/40 transition-colors duration-fast">
+            <td class="px-5 py-2.5">
+              <span class="inline-flex items-center gap-1.5 text-tiny font-semibold uppercase tracking-wide text-text-tertiary">
+                {% icon "shield-check" size=12 %} Certificate
+              </span>
+            </td>
+            <td class="px-5 py-2.5 text-text-secondary break-all">{{ first_app.cert_subject|default:"—" }}</td>
+            <td class="px-5 py-2.5 text-text-secondary break-all">{{ second_app.cert_subject|default:"—" }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ═══════════════════ Components ═══════════════════ #}
+  <section id="components" class="card mi-glass card-hover scroll-mt-4" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2">
+        <span class="w-9 h-9 rounded-md bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">
+          {% icon "package" size=16 %}
+        </span>
+        Components
+      </h2>
+      <div class="flex items-center gap-3 text-tiny text-text-tertiary flex-shrink-0">
+        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-severity-low dark:bg-severity-low-dark"></span>A</span>
+        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-severity-medium dark:bg-severity-medium-dark"></span>B</span>
+      </div>
+    </div>
+
+    {# ── Footprint at a glance — real counts, proportional bars ── #}
+    <div class="card-body border-b border-border-subtle">
+      <h3 class="text-tiny uppercase text-text-secondary mb-3">Footprint at a glance</h3>
+
+      {% with av=first_app.activities|length bv=second_app.activities|length %}
+      {% if av or bv %}
+      <div class="mi-bar-row">
+        <div class="flex items-center justify-between text-tiny mb-1">
+          <span class="text-text-secondary">Activities</span>
+          <span class="tabular text-text-tertiary">
+            <span class="text-severity-low dark:text-severity-low-dark font-semibold">{{ av }}</span> ·
+            <span class="text-severity-medium dark:text-severity-medium-dark font-semibold">{{ bv }}</span>
+          </span>
+        </div>
+        <div class="flex h-1.5 w-full rounded-full overflow-hidden bg-surface-2 ring-1 ring-inset ring-border-subtle">
+          {% if av %}<div style="flex-grow:{{ av }}" class="bg-severity-low dark:bg-severity-low-dark" title="{{ first_app.name_ver }}: {{ av }}"></div>{% endif %}
+          {% if bv %}<div style="flex-grow:{{ bv }}" class="bg-severity-medium dark:bg-severity-medium-dark" title="{{ second_app.name_ver }}: {{ bv }}"></div>{% endif %}
         </div>
       </div>
-    {% endif %}
+      {% endif %}
+      {% endwith %}
 
-    {% if permissions.only_second %}
-      <div>
-        <h3 class="text-tiny uppercase text-severity-medium dark:text-severity-medium-dark mb-2">Only in {{ second_app.name_ver }}</h3>
-        <div class="overflow-x-auto rounded-md border border-border-subtle">
-          <table class="w-full text-small">
-            <thead>
-              <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-                <th class="text-left px-4 py-2 font-medium">Permission</th>
-                <th class="text-left px-4 py-2 font-medium">Status</th>
-                <th class="text-left px-4 py-2 font-medium">Info</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for perm, desc in permissions.only_second %}
-                <tr class="border-b border-border-subtle hover:bg-surface-2/40">
-                  <td class="px-4 py-2 font-mono text-mono">{{ perm }}</td>
-                  <td class="px-4 py-2">
-                    {% if desc.status == 'dangerous' %}<span class="badge badge-critical">Dangerous</span>
-                    {% elif desc.status == 'normal' %}<span class="badge badge-low">Normal</span>
-                    {% elif desc.status == 'signatureOrSystem' %}<span class="badge badge-medium">SystemOrSig</span>
-                    {% elif desc.status == 'signature' %}<span class="badge badge-passed">Signature</span>
-                    {% else %}<span class="badge badge-unknown">Unknown</span>{% endif %}
-                  </td>
-                  <td class="px-4 py-2 text-text-secondary">{{ desc.info }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+      {% with av=first_app.exported_count.exported_activities bv=second_app.exported_count.exported_activities %}
+      {% if av or bv %}
+      <div class="mi-bar-row">
+        <div class="flex items-center justify-between text-tiny mb-1">
+          <span class="text-text-secondary">Exported activities</span>
+          <span class="tabular text-text-tertiary">
+            <span class="text-severity-low dark:text-severity-low-dark font-semibold">{{ av }}</span> ·
+            <span class="text-severity-medium dark:text-severity-medium-dark font-semibold">{{ bv }}</span>
+          </span>
+        </div>
+        <div class="flex h-1.5 w-full rounded-full overflow-hidden bg-surface-2 ring-1 ring-inset ring-border-subtle">
+          {% if av %}<div style="flex-grow:{{ av }}" class="bg-severity-low dark:bg-severity-low-dark" title="{{ first_app.name_ver }}: {{ av }}"></div>{% endif %}
+          {% if bv %}<div style="flex-grow:{{ bv }}" class="bg-severity-medium dark:bg-severity-medium-dark" title="{{ second_app.name_ver }}: {{ bv }}"></div>{% endif %}
         </div>
       </div>
-    {% endif %}
+      {% endif %}
+      {% endwith %}
+
+      {% with av=first_app.services|length bv=second_app.services|length %}
+      {% if av or bv %}
+      <div class="mi-bar-row">
+        <div class="flex items-center justify-between text-tiny mb-1">
+          <span class="text-text-secondary">Services</span>
+          <span class="tabular text-text-tertiary">
+            <span class="text-severity-low dark:text-severity-low-dark font-semibold">{{ av }}</span> ·
+            <span class="text-severity-medium dark:text-severity-medium-dark font-semibold">{{ bv }}</span>
+          </span>
+        </div>
+        <div class="flex h-1.5 w-full rounded-full overflow-hidden bg-surface-2 ring-1 ring-inset ring-border-subtle">
+          {% if av %}<div style="flex-grow:{{ av }}" class="bg-severity-low dark:bg-severity-low-dark" title="{{ first_app.name_ver }}: {{ av }}"></div>{% endif %}
+          {% if bv %}<div style="flex-grow:{{ bv }}" class="bg-severity-medium dark:bg-severity-medium-dark" title="{{ second_app.name_ver }}: {{ bv }}"></div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      {% with av=first_app.exported_count.exported_services bv=second_app.exported_count.exported_services %}
+      {% if av or bv %}
+      <div class="mi-bar-row">
+        <div class="flex items-center justify-between text-tiny mb-1">
+          <span class="text-text-secondary">Exported services</span>
+          <span class="tabular text-text-tertiary">
+            <span class="text-severity-low dark:text-severity-low-dark font-semibold">{{ av }}</span> ·
+            <span class="text-severity-medium dark:text-severity-medium-dark font-semibold">{{ bv }}</span>
+          </span>
+        </div>
+        <div class="flex h-1.5 w-full rounded-full overflow-hidden bg-surface-2 ring-1 ring-inset ring-border-subtle">
+          {% if av %}<div style="flex-grow:{{ av }}" class="bg-severity-low dark:bg-severity-low-dark" title="{{ first_app.name_ver }}: {{ av }}"></div>{% endif %}
+          {% if bv %}<div style="flex-grow:{{ bv }}" class="bg-severity-medium dark:bg-severity-medium-dark" title="{{ second_app.name_ver }}: {{ bv }}"></div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      {% with av=first_app.receivers|length bv=second_app.receivers|length %}
+      {% if av or bv %}
+      <div class="mi-bar-row">
+        <div class="flex items-center justify-between text-tiny mb-1">
+          <span class="text-text-secondary">Receivers</span>
+          <span class="tabular text-text-tertiary">
+            <span class="text-severity-low dark:text-severity-low-dark font-semibold">{{ av }}</span> ·
+            <span class="text-severity-medium dark:text-severity-medium-dark font-semibold">{{ bv }}</span>
+          </span>
+        </div>
+        <div class="flex h-1.5 w-full rounded-full overflow-hidden bg-surface-2 ring-1 ring-inset ring-border-subtle">
+          {% if av %}<div style="flex-grow:{{ av }}" class="bg-severity-low dark:bg-severity-low-dark" title="{{ first_app.name_ver }}: {{ av }}"></div>{% endif %}
+          {% if bv %}<div style="flex-grow:{{ bv }}" class="bg-severity-medium dark:bg-severity-medium-dark" title="{{ second_app.name_ver }}: {{ bv }}"></div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      {% with av=first_app.exported_count.exported_receivers bv=second_app.exported_count.exported_receivers %}
+      {% if av or bv %}
+      <div class="mi-bar-row">
+        <div class="flex items-center justify-between text-tiny mb-1">
+          <span class="text-text-secondary">Exported receivers</span>
+          <span class="tabular text-text-tertiary">
+            <span class="text-severity-low dark:text-severity-low-dark font-semibold">{{ av }}</span> ·
+            <span class="text-severity-medium dark:text-severity-medium-dark font-semibold">{{ bv }}</span>
+          </span>
+        </div>
+        <div class="flex h-1.5 w-full rounded-full overflow-hidden bg-surface-2 ring-1 ring-inset ring-border-subtle">
+          {% if av %}<div style="flex-grow:{{ av }}" class="bg-severity-low dark:bg-severity-low-dark" title="{{ first_app.name_ver }}: {{ av }}"></div>{% endif %}
+          {% if bv %}<div style="flex-grow:{{ bv }}" class="bg-severity-medium dark:bg-severity-medium-dark" title="{{ second_app.name_ver }}: {{ bv }}"></div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      {% with av=first_app.providers|length bv=second_app.providers|length %}
+      {% if av or bv %}
+      <div class="mi-bar-row">
+        <div class="flex items-center justify-between text-tiny mb-1">
+          <span class="text-text-secondary">Providers</span>
+          <span class="tabular text-text-tertiary">
+            <span class="text-severity-low dark:text-severity-low-dark font-semibold">{{ av }}</span> ·
+            <span class="text-severity-medium dark:text-severity-medium-dark font-semibold">{{ bv }}</span>
+          </span>
+        </div>
+        <div class="flex h-1.5 w-full rounded-full overflow-hidden bg-surface-2 ring-1 ring-inset ring-border-subtle">
+          {% if av %}<div style="flex-grow:{{ av }}" class="bg-severity-low dark:bg-severity-low-dark" title="{{ first_app.name_ver }}: {{ av }}"></div>{% endif %}
+          {% if bv %}<div style="flex-grow:{{ bv }}" class="bg-severity-medium dark:bg-severity-medium-dark" title="{{ second_app.name_ver }}: {{ bv }}"></div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endwith %}
+    </div>
+
+    {# ── Full breakdown — exact source numbers ── #}
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left px-5 py-2.5 font-medium"></th>
+            <th class="text-right px-5 py-2.5 font-medium">Activities</th>
+            <th class="text-right px-5 py-2.5 font-medium text-severity-medium dark:text-severity-medium-dark">Exp. act.</th>
+            <th class="text-right px-5 py-2.5 font-medium">Services</th>
+            <th class="text-right px-5 py-2.5 font-medium text-severity-medium dark:text-severity-medium-dark">Exp. svc.</th>
+            <th class="text-right px-5 py-2.5 font-medium">Receivers</th>
+            <th class="text-right px-5 py-2.5 font-medium text-severity-medium dark:text-severity-medium-dark">Exp. recv.</th>
+            <th class="text-right px-5 py-2.5 font-medium">Providers</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
+            <td class="px-5 py-2.5 font-medium text-text-primary">
+              <span class="inline-flex items-center gap-1.5 min-w-0">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-severity-low/15 text-severity-low dark:bg-severity-low-dark/20 dark:text-severity-low-dark text-[9px] font-bold flex-shrink-0">A</span>
+                <span class="truncate">{{ first_app.name_ver }}</span>
+              </span>
+            </td>
+            <td class="px-5 py-2.5 text-right tabular">{{ first_app.activities|length }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ first_app.exported_count.exported_activities }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ first_app.services|length }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ first_app.exported_count.exported_services }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ first_app.receivers|length }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ first_app.exported_count.exported_receivers }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ first_app.providers|length }}</td>
+          </tr>
+          <tr class="hover:bg-surface-2/40 transition-colors duration-fast">
+            <td class="px-5 py-2.5 font-medium text-text-primary">
+              <span class="inline-flex items-center gap-1.5 min-w-0">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-severity-medium/15 text-severity-medium dark:bg-severity-medium-dark/20 dark:text-severity-medium-dark text-[9px] font-bold flex-shrink-0">B</span>
+                <span class="truncate">{{ second_app.name_ver }}</span>
+              </span>
+            </td>
+            <td class="px-5 py-2.5 text-right tabular">{{ second_app.activities|length }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ second_app.exported_count.exported_activities }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ second_app.services|length }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ second_app.exported_count.exported_services }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ second_app.receivers|length }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ second_app.exported_count.exported_receivers }}</td>
+            <td class="px-5 py-2.5 text-right tabular">{{ second_app.providers|length }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ═══════════════════ Permissions diff ═══════════════════ #}
+  <section id="permissions-diff" class="card mi-glass card-hover scroll-mt-4" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2">
+        <span class="w-9 h-9 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">
+          {% icon "shield-alert" size=16 %}
+        </span>
+        Permissions
+      </h2>
+      <div class="flex items-center gap-2 flex-wrap flex-shrink-0">
+        <span class="badge badge-neutral gap-1.5" title="Present in both apps">{% icon "check" size=11 %} {{ permissions.common|length }} common</span>
+        <span class="badge badge-neutral gap-1.5" title="Only in {{ first_app.name_ver }}">A · {{ permissions.only_first|length }} only</span>
+        <span class="badge badge-neutral gap-1.5" title="Only in {{ second_app.name_ver }}">B · {{ permissions.only_second|length }} only</span>
+      </div>
+    </div>
+    <div class="card-body space-y-6" x-data="{ q: '' }">
+
+      <div class="relative max-w-sm">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
+          {% icon "search" size=14 %}
+        </span>
+        <input
+          type="search"
+          x-model="q"
+          placeholder="Filter permissions…"
+          class="input h-8 pl-9 text-small"
+          aria-label="Filter permissions"
+        />
+      </div>
+
+      {% if permissions.common %}
+        <div>
+          <h3 class="text-tiny uppercase text-text-secondary mb-2">Common</h3>
+          <div class="overflow-x-auto rounded-md border border-border-subtle">
+            <table class="w-full text-small">
+              <thead>
+                <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                  <th class="text-left px-4 py-2 font-medium">Permission</th>
+                  <th class="text-left px-4 py-2 font-medium">Status</th>
+                  <th class="text-left px-4 py-2 font-medium">Info</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for perm, desc in permissions.common %}
+                  <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast"
+                      x-show="!q || '{{ perm|escapejs }}'.toLowerCase().includes(q.toLowerCase())">
+                    <td class="px-4 py-2 font-mono text-mono">{{ perm }}</td>
+                    <td class="px-4 py-2">
+                      {% if desc.status == 'dangerous' %}<span class="badge badge-critical">Dangerous</span>
+                      {% elif desc.status == 'normal' %}<span class="badge badge-low">Normal</span>
+                      {% elif desc.status == 'signatureOrSystem' %}<span class="badge badge-medium">SystemOrSig</span>
+                      {% elif desc.status == 'signature' %}<span class="badge badge-passed">Signature</span>
+                      {% else %}<span class="badge badge-unknown">Unknown</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-text-secondary">{{ desc.info }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if permissions.only_first %}
+        <div>
+          <h3 class="text-tiny uppercase text-text-secondary mb-2 flex items-center gap-1.5">
+            <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-severity-low/15 text-severity-low dark:bg-severity-low-dark/20 dark:text-severity-low-dark text-[9px] font-bold flex-shrink-0">A</span>
+            Only in {{ first_app.name_ver }}
+          </h3>
+          <div class="overflow-x-auto rounded-md border border-border-subtle">
+            <table class="w-full text-small">
+              <thead>
+                <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                  <th class="text-left px-4 py-2 font-medium">Permission</th>
+                  <th class="text-left px-4 py-2 font-medium">Status</th>
+                  <th class="text-left px-4 py-2 font-medium">Info</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for perm, desc in permissions.only_first %}
+                  <tr class="border-b border-border-subtle border-l-2 border-l-severity-low/40 dark:border-l-severity-low-dark/40 hover:bg-severity-low/5 transition-colors duration-fast"
+                      x-show="!q || '{{ perm|escapejs }}'.toLowerCase().includes(q.toLowerCase())">
+                    <td class="px-4 py-2 font-mono text-mono">{{ perm }}</td>
+                    <td class="px-4 py-2">
+                      {% if desc.status == 'dangerous' %}<span class="badge badge-critical">Dangerous</span>
+                      {% elif desc.status == 'normal' %}<span class="badge badge-low">Normal</span>
+                      {% elif desc.status == 'signatureOrSystem' %}<span class="badge badge-medium">SystemOrSig</span>
+                      {% elif desc.status == 'signature' %}<span class="badge badge-passed">Signature</span>
+                      {% else %}<span class="badge badge-unknown">Unknown</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-text-secondary">{{ desc.info }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if permissions.only_second %}
+        <div>
+          <h3 class="text-tiny uppercase text-text-secondary mb-2 flex items-center gap-1.5">
+            <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-severity-medium/15 text-severity-medium dark:bg-severity-medium-dark/20 dark:text-severity-medium-dark text-[9px] font-bold flex-shrink-0">B</span>
+            Only in {{ second_app.name_ver }}
+          </h3>
+          <div class="overflow-x-auto rounded-md border border-border-subtle">
+            <table class="w-full text-small">
+              <thead>
+                <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                  <th class="text-left px-4 py-2 font-medium">Permission</th>
+                  <th class="text-left px-4 py-2 font-medium">Status</th>
+                  <th class="text-left px-4 py-2 font-medium">Info</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for perm, desc in permissions.only_second %}
+                  <tr class="border-b border-border-subtle border-l-2 border-l-severity-medium/40 dark:border-l-severity-medium-dark/40 hover:bg-severity-medium/5 transition-colors duration-fast"
+                      x-show="!q || '{{ perm|escapejs }}'.toLowerCase().includes(q.toLowerCase())">
+                    <td class="px-4 py-2 font-mono text-mono">{{ perm }}</td>
+                    <td class="px-4 py-2">
+                      {% if desc.status == 'dangerous' %}<span class="badge badge-critical">Dangerous</span>
+                      {% elif desc.status == 'normal' %}<span class="badge badge-low">Normal</span>
+                      {% elif desc.status == 'signatureOrSystem' %}<span class="badge badge-medium">SystemOrSig</span>
+                      {% elif desc.status == 'signature' %}<span class="badge badge-passed">Signature</span>
+                      {% else %}<span class="badge badge-unknown">Unknown</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-text-secondary">{{ desc.info }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  {# ═══════════════════ URL / API / Browsable / APKID three-way diffs ═══════════════════ #}
+  <div class="space-y-6">
+    <div id="urls-diff" class="scroll-mt-4">
+      {% include 'static_analysis/_compare_section.html' with title="Hardcoded URLs"      icon="external-link" common=urls.common                 only_first=urls.only_first                 only_second=urls.only_second                 first_label=first_app.name_ver second_label=second_app.name_ver %}
+    </div>
+    <div id="api-diff" class="scroll-mt-4">
+      {% include 'static_analysis/_compare_section.html' with title="Android API calls"   icon="zap"           common=android_api.common          only_first=android_api.only_first          only_second=android_api.only_second          first_label=first_app.name_ver second_label=second_app.name_ver %}
+    </div>
+    <div id="browsable-diff" class="scroll-mt-4">
+      {% include 'static_analysis/_compare_section.html' with title="Browsable activities" icon="layers"        common=common_browsable_activities only_first=browsable_activities.only_first only_second=browsable_activities.only_second first_label=first_app.name_ver second_label=second_app.name_ver %}
+    </div>
+    <div id="apkid-diff" class="scroll-mt-4">
+      {% include 'static_analysis/_compare_section.html' with title="APKiD detections"    icon="search"        common=apkid.common                only_first=apkid.only_first                only_second=apkid.only_second                first_label=first_app.name_ver second_label=second_app.name_ver %}
+    </div>
   </div>
-</section>
 
-{# ─── URL / API / Browsable / APKID three-way diffs ─── #}
-{% include 'static_analysis/_compare_section.html' with title="Hardcoded URLs"      icon="external-link" common=urls.common                 only_first=urls.only_first                 only_second=urls.only_second                 first_label=first_app.name_ver second_label=second_app.name_ver %}
-{% include 'static_analysis/_compare_section.html' with title="Android API calls"   icon="zap"           common=android_api.common          only_first=android_api.only_first          only_second=android_api.only_second          first_label=first_app.name_ver second_label=second_app.name_ver %}
-{% include 'static_analysis/_compare_section.html' with title="Browsable activities" icon="layers"        common=common_browsable_activities only_first=browsable_activities.only_first only_second=browsable_activities.only_second first_label=first_app.name_ver second_label=second_app.name_ver %}
-{% include 'static_analysis/_compare_section.html' with title="APKiD detections"    icon="search"        common=apkid.common                only_first=apkid.only_first                only_second=apkid.only_second                first_label=first_app.name_ver second_label=second_app.name_ver %}
+</div>
+
+<script>
+  // Animated count-up for the KPI tiles (additive; presentation only, no data changes).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+</script>
 {% endblock %}

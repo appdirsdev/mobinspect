@@ -3,72 +3,226 @@
 
 {% block page_title %}Dynamic Analyzer{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* ── Ambient header: faint grid + floating brand-blobs, theme-aware ── */
+  .mi-dh-hero { background: var(--surface-1); }
+  .mi-dh-grid, .mi-dh-glow { position: absolute; inset: 0; pointer-events: none; }
+  .mi-dh-glow::before, .mi-dh-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(60px); opacity: .5;
+  }
+  .mi-dh-glow::before {
+    width: 280px; height: 280px; top: -110px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-dh-float 16s ease-in-out infinite;
+  }
+  .mi-dh-glow::after {
+    width: 220px; height: 220px; bottom: -120px; left: 8%;
+    background: radial-gradient(circle at center, rgba(59,130,246,.35), transparent 70%);
+    animation: mi-dh-float 21s ease-in-out infinite reverse;
+  }
+  .mi-dh-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 75% 85% at 80% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 75% 85% at 80% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-dh-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-dh-glow::after  { opacity: .3; }
+
+  /* ── Platform choice cards: accent top-bar + lift + radial glow ── */
+  .mi-choice { position: relative; overflow: hidden;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+  .mi-choice:hover { transform: translateY(-4px);
+    box-shadow: 0 20px 44px -22px rgba(0,0,0,.45); border-color: var(--border-default); }
+  .mi-choice::after { content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: linear-gradient(90deg, var(--mi-accent, #2563EB), transparent 85%); }
+  .mi-choice::before { content: ''; position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(120% 120% at 100% 0%, var(--mi-accent, #2563EB), transparent 55%);
+    transition: opacity .22s ease; }
+  .mi-choice:hover::before { opacity: .08; }
+  .mi-choice-ico { transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+  .mi-choice:hover .mi-choice-ico { transform: scale(1.08) translateY(-2px); }
+
+  /* ── "How it works" step rail: connector line only makes sense once
+         steps sit in a single row (lg: 4-col), so it's gated to that
+         breakpoint — avoids a stray line when steps wrap to 2 columns. ── */
+  .mi-step-num { position: relative; z-index: 1; }
+  .mi-step-line {
+    display: none; position: absolute; top: 1.35rem; right: 50%; width: 100%; height: 2px;
+    background: var(--border-subtle); z-index: 0;
+  }
+  @media (min-width: 1024px) {
+    .mi-step:not(:first-child) .mi-step-line { display: block; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-dh-glow::before, .mi-dh-glow::after { animation: none; }
+    .mi-choice, .mi-choice-ico { transition: none; }
+  }
+  @keyframes mi-dh-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-22px,0); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<header class="mb-8">
-  <h1 class="text-h1">Dynamic Analyzer</h1>
-  <p class="text-text-secondary mt-1">
-    Run instrumented analysis against a live device or emulator. Pick the platform you want to analyze.
-  </p>
-</header>
+<div class="space-y-6">
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
-
-  {# ─────────── Android ─────────── #}
-  <a href="{% url 'dynamic_android' %}" class="card card-hover group" data-reveal>
-    <div class="card-body p-8">
-      <div class="flex items-start justify-between gap-4">
-        <span class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark transition-transform duration-fast group-hover:scale-105">
-          {% icon "smartphone" size=28 %}
+  {# ══════════════════ Ambient header ══════════════════ #}
+  <section class="mi-dh-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-dh-grid" aria-hidden="true"></div>
+    <div class="mi-dh-glow" aria-hidden="true"></div>
+    <div class="relative z-10 px-6 py-8 md:px-10 md:py-9">
+      <div class="flex items-start gap-4">
+        <span class="hidden sm:inline-flex items-center justify-center w-12 h-12 rounded-xl bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0 shadow-elevation-1">
+          {% icon "activity" size=24 %}
         </span>
-        <span class="text-text-tertiary group-hover:text-text-brand transition-colors duration-fast">
-          {% icon "arrow-up-right" size=18 %}
-        </span>
-      </div>
-      <h2 class="text-h2 mt-5">Android</h2>
-      <p class="text-text-secondary mt-2">
-        Run on a Genymotion VM or Android Studio emulator. Frida instrumentation,
-        live API monitor, logcat, screenshot capture.
-      </p>
-      <ul class="mt-4 space-y-1.5 text-small text-text-secondary">
-        <li class="flex items-center gap-2">{% icon "check" size=14 %} APK / XAPK / APKS / AAB</li>
-        <li class="flex items-center gap-2">{% icon "check" size=14 %} ADB control + screen mirroring</li>
-        <li class="flex items-center gap-2">{% icon "check" size=14 %} TLS pinning bypass via Frida</li>
-      </ul>
-    </div>
-  </a>
-
-  {# ─────────── iOS ─────────── #}
-  <div class="card group" x-data="{ open: false }" data-reveal>
-    <div class="card-body p-8">
-      <div class="flex items-start justify-between gap-4">
-        <span class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-surface-3 text-text-secondary transition-transform duration-fast group-hover:scale-105">
-          {% icon "smartphone" size=28 %}
-        </span>
-      </div>
-      <h2 class="text-h2 mt-5">iOS</h2>
-      <p class="text-text-secondary mt-2">
-        Choose a Corellium-hosted virtual device or your own jailbroken hardware.
-      </p>
-
-      <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <a href="{% url 'dynamic_ios' %}" class="btn btn-secondary btn-md justify-start">
-          {% icon "zap" size=14 %} Corellium VM
-        </a>
-        <a href="{% url 'dynamic_ios_device' %}" class="btn btn-secondary btn-md justify-start">
-          {% icon "smartphone" size=14 %} Jailbroken device
-        </a>
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "zap" size=13 %} Runtime Security Testing
+          </p>
+          <h1 class="text-h1">Dynamic Analyzer</h1>
+          <p class="text-body text-text-secondary mt-2 max-w-xl">
+            Run instrumented analysis against a live device or emulator. Pick the
+            platform you want to analyze — MobInspect handles instrumentation,
+            traffic capture, and live monitoring for you.
+          </p>
+          <div class="flex flex-wrap items-center gap-2 mt-4">
+            <span class="badge badge-passed gap-1.5">{% icon "smartphone" size=12 %} Android</span>
+            <span class="badge badge-unknown gap-1.5">{% icon "smartphone" size=12 %} iOS</span>
+            <span class="badge badge-low gap-1.5">{% icon "shield-check" size=12 %} Frida instrumented</span>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
+  </section>
 
-<div class="mt-8 text-small text-text-tertiary max-w-2xl">
-  <p class="flex items-start gap-2">
-    {% icon "info" size=14 class="mt-0.5 flex-shrink-0" %}
-    <span>Dynamic analysis requires a running emulator or jailbroken device. See the
-      <a href="https://mobsf.github.io/docs/" class="text-text-brand hover:underline" target="_blank" rel="noopener">setup docs</a>
-      for environment configuration.
-    </span>
-  </p>
+  {# ══════════════════ Platform choice cards ══════════════════ #}
+  <section class="grid grid-cols-1 md:grid-cols-2 gap-6" data-reveal>
+
+    {# ─────────── Android ─────────── #}
+    <a href="{% url 'dynamic_android' %}" class="mi-choice card group" style="--mi-accent:#16A34A">
+      <div class="card-body p-8 relative z-10">
+        <div class="flex items-start justify-between gap-4">
+          <span class="mi-choice-ico inline-flex items-center justify-center w-14 h-14 rounded-xl bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark">
+            {% icon "smartphone" size=28 %}
+          </span>
+          <span class="text-text-tertiary group-hover:text-text-brand transition-colors duration-fast">
+            {% icon "arrow-up-right" size=18 %}
+          </span>
+        </div>
+        <h2 class="text-h2 mt-5">Android</h2>
+        <p class="text-text-secondary mt-2">
+          Run on a Genymotion VM or Android Studio emulator. Frida instrumentation,
+          live API monitor, logcat, screenshot capture.
+        </p>
+        <ul class="mt-4 space-y-1.5 text-small text-text-secondary">
+          <li class="flex items-center gap-2">{% icon "check" size=14 class="text-severity-passed flex-shrink-0" %} APK / XAPK / APKS / AAB</li>
+          <li class="flex items-center gap-2">{% icon "check" size=14 class="text-severity-passed flex-shrink-0" %} ADB control + screen mirroring</li>
+          <li class="flex items-center gap-2">{% icon "check" size=14 class="text-severity-passed flex-shrink-0" %} TLS pinning bypass via Frida</li>
+        </ul>
+        <span class="mt-6 inline-flex items-center gap-1.5 text-small font-medium text-severity-passed">
+          Start Android analysis
+          <span class="transition-transform duration-fast group-hover:translate-x-1">{% icon "chevron-right" size=14 %}</span>
+        </span>
+      </div>
+    </a>
+
+    {# ─────────── iOS ─────────── #}
+    <div class="mi-choice card group" style="--mi-accent:#64748B" x-data="{ open: false }">
+      <div class="card-body p-8 relative z-10">
+        <div class="flex items-start justify-between gap-4">
+          <span class="mi-choice-ico inline-flex items-center justify-center w-14 h-14 rounded-xl bg-surface-3 text-text-secondary">
+            {% icon "smartphone" size=28 %}
+          </span>
+        </div>
+        <h2 class="text-h2 mt-5">iOS</h2>
+        <p class="text-text-secondary mt-2">
+          Choose a Corellium-hosted virtual device or your own jailbroken hardware.
+        </p>
+
+        <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <a href="{% url 'dynamic_ios' %}" class="btn btn-secondary btn-md justify-start">
+            {% icon "zap" size=14 %} Corellium VM
+          </a>
+          <a href="{% url 'dynamic_ios_device' %}" class="btn btn-secondary btn-md justify-start">
+            {% icon "smartphone" size=14 %} Jailbroken device
+          </a>
+        </div>
+
+        <button type="button" class="mt-4 text-tiny text-text-tertiary hover:text-text-brand inline-flex items-center gap-1 transition-colors duration-fast" @click="open = !open">
+          What's the difference?
+          <span class="transition-transform duration-fast" :class="open ? 'rotate-90' : ''">{% icon "chevron-right" size=12 %}</span>
+        </button>
+        <div x-show="open" x-cloak x-transition class="mt-3 space-y-2 text-tiny text-text-secondary border-t border-border-subtle pt-3">
+          <p class="flex items-start gap-2"><span class="font-medium text-text-primary flex-shrink-0">Corellium VM —</span> cloud-hosted virtual iOS device, no physical hardware or jailbreak needed. Fast to spin up.</p>
+          <p class="flex items-start gap-2"><span class="font-medium text-text-primary flex-shrink-0">Jailbroken device —</span> bring your own jailbroken iPhone/iPad over SSH for full hardware fidelity.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ══════════════════ How it works ══════════════════ #}
+  <section class="card" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3">How it works</h2>
+    </div>
+    <div class="card-body">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="mi-step relative">
+          <span class="mi-step-line"></span>
+          <span class="mi-step-num w-10 h-10 rounded-full bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center font-semibold">
+            {% icon "smartphone" size=18 %}
+          </span>
+          <h3 class="text-h4 mt-3">1. Connect</h3>
+          <p class="text-small text-text-secondary mt-1">Attach a VM, emulator, Corellium instance, or jailbroken device over ADB/SSH.</p>
+        </div>
+        <div class="mi-step relative">
+          <span class="mi-step-line"></span>
+          <span class="mi-step-num w-10 h-10 rounded-full bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center font-semibold">
+            {% icon "zap" size=18 %}
+          </span>
+          <h3 class="text-h4 mt-3">2. Instrument</h3>
+          <p class="text-small text-text-secondary mt-1">MobInspect installs the target and hooks it with Frida for runtime introspection.</p>
+        </div>
+        <div class="mi-step relative">
+          <span class="mi-step-line"></span>
+          <span class="mi-step-num w-10 h-10 rounded-full bg-mobinspect-400/15 text-mobinspect-400 inline-flex items-center justify-center font-semibold">
+            {% icon "activity" size=18 %}
+          </span>
+          <h3 class="text-h4 mt-3">3. Exercise</h3>
+          <p class="text-small text-text-secondary mt-1">Drive the app while the live API monitor, logcat, and screen mirroring capture activity.</p>
+        </div>
+        <div class="mi-step relative">
+          <span class="mi-step-line"></span>
+          <span class="mi-step-num w-10 h-10 rounded-full bg-text-secondary/15 text-text-secondary inline-flex items-center justify-center font-semibold">
+            {% icon "file-text" size=18 %}
+          </span>
+          <h3 class="text-h4 mt-3">4. Review</h3>
+          <p class="text-small text-text-secondary mt-1">Traffic, API calls, and behavioral findings are compiled into the scan report.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ══════════════════ Setup note ══════════════════ #}
+  <section class="card" data-reveal>
+    <div class="card-body flex items-start gap-3">
+      <span class="w-8 h-8 rounded-md bg-surface-3 text-text-tertiary inline-flex items-center justify-center flex-shrink-0">
+        {% icon "info" size=16 %}
+      </span>
+      <p class="text-small text-text-secondary">
+        Dynamic analysis requires a running emulator or jailbroken device. See the
+        <a href="https://mobsf.github.io/docs/" class="text-text-brand hover:underline" target="_blank" rel="noopener">setup docs</a>
+        for environment configuration.
+      </p>
+    </div>
+  </section>
+
 </div>
 {% endblock %}

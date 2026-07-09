@@ -1,20 +1,198 @@
 {% extends "base/app.html" %}
 {% load mi_icons %}
 
-{% block content %}
-<header class="mb-6">
-  <h1 class="text-h1">Permissions catalog</h1>
-  <p class="text-text-secondary mt-1">
-    Read-only reference. Permissions are defined in code; admins assign them to roles.
-  </p>
-</header>
+{% block extra_head %}
+<style>
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero { background: var(--surface-1); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .55;
+  }
+  .mi-hero-glow::before {
+    width: 300px; height: 300px; top: -110px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 240px; height: 240px; bottom: -120px; left: -40px;
+    background: radial-gradient(circle at center, rgba(124,58,237,.3), transparent 70%);
+    animation: mi-float 21s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 78% 85% at 82% 0%, #000 10%, transparent 74%);
+            mask-image: radial-gradient(ellipse 78% 85% at 82% 0%, #000 10%, transparent 74%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .24; }
 
-<div class="space-y-6">
+  /* ── Metric tiles: accent top-bar + hover lift + count-up ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Category cards: accent top-bar + soft radial glow on hover ── */
+  .mi-cat-card { position: relative; overflow: hidden;
+    transition: box-shadow .18s ease, border-color .18s ease; }
+  .mi-cat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; opacity: .9; background: linear-gradient(90deg, var(--mi-accent, #2563EB), transparent 85%); }
+  .mi-cat-card::after { content: ''; position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(60% 60% at 100% 0%, var(--mi-accent, #2563EB), transparent 70%);
+    transition: opacity .25s ease; }
+  .mi-cat-card:hover { box-shadow: 0 14px 32px -20px rgba(0,0,0,.35); border-color: var(--border-default); }
+  .mi-cat-card:hover::after { opacity: .06; }
+
+  /* ── Dangerous row: left accent rail ── */
+  .mi-row-dangerous { position: relative; }
+  .mi-row-dangerous::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: #DC2626; opacity: .55;
+  }
+
+  /* ── Search: focus glow ── */
+  .mi-search-wrap:focus-within { box-shadow: 0 0 0 4px rgba(37,99,235,.14); border-radius: .5rem; }
+
+  /* ── Quick-filter chip: lift on hover ── */
+  .mi-chip { transition: transform .15s ease, opacity .15s ease; cursor: pointer; }
+  .mi-chip:hover { transform: translateY(-1px); opacity: .85; }
+
+  /* ── Empty state well ── */
+  .mi-empty { border: 1.5px dashed var(--border-default); background: var(--surface-2); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-stat, .mi-cat-card, .mi-chip { transition: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-22px,0); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="permBrowser()">
+
+  {# ══════════════════ Ambient hero ══════════════════ #}
+  <section class="mi-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-7 md:px-8 md:py-8">
+      <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div class="flex items-start gap-3 min-w-0">
+          <span class="w-11 h-11 rounded-xl bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0 mt-0.5 shadow-elevation-1">
+            {% icon "key" size=20 %}
+          </span>
+          <div class="min-w-0">
+            <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1 inline-flex items-center gap-1.5">
+              {% icon "shield-check" size=12 %} Access control
+            </p>
+            <h1 class="text-h1">Permissions catalog</h1>
+            <p class="text-small text-text-secondary mt-1 max-w-xl">
+              Read-only reference. Permissions are defined in code; admins assign them to roles.
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+          <span class="badge badge-neutral">{% icon "layers" size=12 %} {{ grouped_perms|length }} categor{{ grouped_perms|length|pluralize:"y,ies" }}</span>
+          <a href="{% url 'rbac:roles_list' %}" class="btn btn-secondary btn-md">
+            {% icon "shield-check" size=14 %} Roles
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ══════════════════ Live stat tiles (animated, derived from the rendered catalog) ══════════════════ #}
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-4" data-reveal>
+    <div class="mi-stat card card-body" x-data="counter({{ grouped_perms|length }})">
+      <span class="w-10 h-10 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+        {% icon "layers" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Categories</p>
+    </div>
+    <div class="mi-stat card card-body" x-data="counter(document.querySelectorAll('.perm-row').length)">
+      <span class="w-10 h-10 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+        {% icon "key" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Total permissions</p>
+    </div>
+    <div class="mi-stat card card-body" x-data="counter(document.querySelectorAll('[data-dangerous]').length)">
+      <span class="w-10 h-10 rounded-lg bg-severity-critical/15 text-severity-critical inline-flex items-center justify-center flex-shrink-0">
+        {% icon "alert-triangle" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Dangerous</p>
+    </div>
+    <div class="mi-stat card card-body" x-data="counter(sumHeld())">
+      <span class="w-10 h-10 rounded-lg bg-mobinspect-400/15 text-mobinspect-400 inline-flex items-center justify-center flex-shrink-0">
+        {% icon "users" size=20 %}
+      </span>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Role assignments</p>
+    </div>
+  </section>
+
+  {# ══════════════════ Search & quick filter (client-side, over the server-rendered rows) ══════════════════ #}
+  <section class="card" data-reveal>
+    <div class="card-body flex flex-col sm:flex-row sm:items-center gap-3">
+      <div class="mi-search-wrap relative flex-1 min-w-0 transition-shadow duration-fast">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{% icon "search" size=14 %}</span>
+        <input
+          type="search"
+          x-model.debounce.100ms="query"
+          placeholder="Search by codename or description…"
+          class="input pl-9"
+          aria-label="Search permissions"
+        />
+      </div>
+      <button
+        type="button"
+        class="mi-chip badge flex-shrink-0"
+        :class="dangerousOnly ? 'badge-critical' : 'badge-unknown'"
+        :aria-pressed="dangerousOnly.toString()"
+        @click="dangerousOnly = !dangerousOnly"
+      >
+        {% icon "alert-triangle" size=11 %}
+        <span x-text="dangerousOnly ? 'Dangerous only ✓' : 'Dangerous only'"></span>
+      </button>
+      <span class="text-tiny text-text-tertiary tabular whitespace-nowrap" x-text="`${visibleCount} of ${totalCount} shown`"></span>
+    </div>
+  </section>
+
+  {# ══════════════════ Categories ══════════════════ #}
   {% for category, perms in grouped_perms.items %}
-    <section class="card" data-reveal>
+    {% cycle "#2563EB" "#16A34A" "#D97706" "#7C3AED" "#0891B2" "#64748B" as cat_accent silent %}
+    <section class="mi-cat-card card" style="--mi-accent: {{ cat_accent }};" data-reveal x-show="categoryVisible($el)">
       <div class="card-header">
-        <h2 class="text-h3 capitalize">{{ category }}</h2>
-        <span class="text-small text-text-tertiary">{{ perms|length }} permission{{ perms|length|pluralize }}</span>
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="w-9 h-9 rounded-lg inline-flex items-center justify-center flex-shrink-0 text-white shadow-elevation-1" style="background-color: {{ cat_accent }};">
+            {% if category == 'scan' %}{% icon "smartphone" size=16 %}
+            {% elif category == 'finding' %}{% icon "zap" size=16 %}
+            {% elif category == 'dynamic' %}{% icon "activity" size=16 %}
+            {% elif category == 'integration' %}{% icon "package" size=16 %}
+            {% elif category == 'api' %}{% icon "key" size=16 %}
+            {% elif category == 'analytics' %}{% icon "gauge" size=16 %}
+            {% elif category == 'admin' %}{% icon "users" size=16 %}
+            {% elif category == 'rbac' %}{% icon "shield-check" size=16 %}
+            {% elif category == 'settings' %}{% icon "sliders" size=16 %}
+            {% elif category == 'audit' %}{% icon "file-text" size=16 %}
+            {% else %}{% icon "layers" size=16 %}
+            {% endif %}
+          </span>
+          <h2 class="text-h3 capitalize">{{ category }}</h2>
+        </div>
+        <span class="badge badge-neutral">{{ perms|length }} permission{{ perms|length|pluralize }}</span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-small">
@@ -27,7 +205,13 @@
           </thead>
           <tbody>
             {% for p in perms %}
-              <tr class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
+              <tr
+                class="perm-row border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast{% if p.is_dangerous %} mi-row-dangerous{% endif %}"
+                data-search="{{ p.codename|lower }} {{ p.description|default:p.name|lower }}"
+                {% if p.is_dangerous %}data-dangerous="1"{% endif %}
+                data-held="{{ p.roles.count }}"
+                x-show="rowVisible($el)"
+              >
                 <td class="px-5 py-3">
                   <div class="flex items-center gap-2">
                     <code class="font-mono text-mono text-mobinspect-500 dark:text-mobinspect-400">{{ p.codename }}</code>
@@ -37,13 +221,112 @@
                   </div>
                 </td>
                 <td class="px-5 py-3 text-text-secondary">{{ p.description|default:p.name }}</td>
-                <td class="px-5 py-3 text-right text-text-secondary tabular">{{ p.roles.count }}</td>
+                <td class="px-5 py-3 text-right">
+                  <span class="inline-flex items-center justify-end gap-1.5 text-text-secondary tabular">
+                    {% icon "users" size=12 class="text-text-tertiary" %}{{ p.roles.count }}
+                  </span>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </section>
+  {% empty %}
+    <div class="mi-empty card card-body text-center py-14 rounded-lg" data-reveal>
+      <span class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-mobinspect-500/15 text-mobinspect-500 mx-auto shadow-elevation-1">
+        {% icon "key" size=26 %}
+      </span>
+      <h3 class="text-h3 mt-4">No permissions defined</h3>
+      <p class="text-small text-text-secondary mt-1">Run migrations to seed the permission catalog.</p>
+    </div>
   {% endfor %}
+
+  {# ══════════════════ No search results (client-side filter empty state) ══════════════════ #}
+  <div x-show="noResults" x-cloak class="mi-empty card card-body text-center py-14 rounded-lg" data-reveal>
+    <span class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-surface-2 text-text-tertiary mx-auto">
+      {% icon "search" size=24 %}
+    </span>
+    <h3 class="text-h3 mt-4">No permissions match your search</h3>
+    <p class="text-small text-text-secondary mt-1">
+      Try a different codename or description<span x-show="dangerousOnly"> — or clear the "Dangerous only" filter</span>.
+    </p>
+    <div class="mt-5">
+      <button type="button" class="btn btn-secondary btn-sm" @click="query = ''; dangerousOnly = false;">
+        {% icon "x" size=14 %} Clear filters
+      </button>
+    </div>
+  </div>
+
 </div>
+
+<script>
+  // Animated count-up for the metric tiles (additive; presentation only).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+
+  // Real "held by" total across the rendered catalog — sums each row's
+  // data-held, which mirrors the server-rendered p.roles.count. No mock data.
+  function sumHeld() {
+    let total = 0;
+    document.querySelectorAll('.perm-row').forEach((row) => {
+      total += Number(row.dataset.held) || 0;
+    });
+    return total;
+  }
+
+  // Client-side search + "dangerous only" filter over the server-rendered
+  // catalog. Purely presentational — never mutates or hides real data,
+  // only toggles visibility of the exact rows Django already rendered.
+  function permBrowser() {
+    return {
+      query: '',
+      dangerousOnly: false,
+      rowVisible(row) {
+        const q = this.query.trim().toLowerCase();
+        const textOk = q === '' || (row.dataset.search || '').includes(q);
+        const dangerOk = !this.dangerousOnly || row.dataset.dangerous === '1';
+        return textOk && dangerOk;
+      },
+      categoryVisible(section) {
+        const rows = section.querySelectorAll('.perm-row');
+        for (let i = 0; i < rows.length; i += 1) {
+          if (this.rowVisible(rows[i])) return true;
+        }
+        return false;
+      },
+      get totalCount() {
+        return document.querySelectorAll('.perm-row').length;
+      },
+      get visibleCount() {
+        let n = 0;
+        document.querySelectorAll('.perm-row').forEach((row) => {
+          if (this.rowVisible(row)) n += 1;
+        });
+        return n;
+      },
+      get noResults() {
+        return this.totalCount > 0 && this.visibleCount === 0;
+      },
+    };
+  }
+</script>
 {% endblock %}

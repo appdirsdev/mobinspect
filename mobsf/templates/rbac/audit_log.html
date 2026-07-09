@@ -1,87 +1,337 @@
 {% extends "base/app.html" %}
 {% load mi_icons %}
 
+{% block page_title %}Audit log{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Ambient header: faint brand/amber glow + masked grid, theme-aware ── */
+  .mi-ahero { background: var(--surface-1); }
+  .mi-ahero-glow, .mi-ahero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-ahero-glow::before, .mi-ahero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(60px); opacity: .5;
+  }
+  .mi-ahero-glow::before {
+    width: 260px; height: 260px; top: -110px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-audit-float 16s ease-in-out infinite;
+  }
+  .mi-ahero-glow::after {
+    width: 220px; height: 220px; bottom: -120px; left: -40px;
+    background: radial-gradient(circle at center, rgba(217,119,6,.30), transparent 70%);
+    animation: mi-audit-float 22s ease-in-out infinite reverse;
+  }
+  .mi-ahero-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 75% 90% at 85% 0%, #000 10%, transparent 72%);
+            mask-image: radial-gradient(ellipse 75% 90% at 85% 0%, #000 10%, transparent 72%);
+  }
+  :root[data-theme="dark"] .mi-ahero-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-ahero-glow::after  { opacity: .26; }
+
+  /* ── Metric tiles: accent top-bar + hover lift ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Table: sticky header inside the scroll container + accent rail on row hover ── */
+  .mi-thead th { position: sticky; top: 0; z-index: 1; background: rgb(var(--surface-2)); }
+  .mi-row { position: relative; }
+  .mi-row::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: transparent; transition: background .15s ease;
+  }
+  .mi-row:hover::before { background: #2563EB; }
+
+  /* ── Filter inputs: focus glow ── */
+  .mi-audit-filters .input:focus { box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+
+  /* ── Quick-filter chips: lift on hover ── */
+  .mi-chip { transition: transform .15s ease, opacity .15s ease; }
+  .mi-chip:hover { transform: translateY(-1px); opacity: .85; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-ahero-glow::before, .mi-ahero-glow::after { animation: none; }
+    .mi-stat, .mi-row::before, .mi-chip { transition: none; }
+  }
+  @keyframes mi-audit-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-20px,0); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<header class="mb-6">
-  <h1 class="text-h1">Audit log</h1>
-  <p class="text-text-secondary mt-1">
-    Append-only record of all user activity: logins, logouts, role grants, scan operations, API key management, and all admin CRUD actions.
-  </p>
-</header>
+<div class="space-y-6">
 
-<form method="get" class="card mb-4">
-  <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-    <div>
-      <label class="label" for="action">Action</label>
-      <input id="action" name="action" value="{{ action_filter }}" class="input" placeholder="role.assign / denied / …" />
-    </div>
-    <div>
-      <label class="label" for="actor">Actor</label>
-      <input id="actor" name="actor" value="{{ actor_filter }}" class="input" placeholder="username" />
-    </div>
-    <div class="flex gap-2">
-      <button type="submit" class="btn btn-primary btn-md">{% icon "search" size=14 %} Filter</button>
-      <a href="{% url 'rbac:audit_log' %}" class="btn btn-ghost btn-md">Reset</a>
-    </div>
-  </div>
-</form>
+  {# ══════════════════ Ambient header ══════════════════ #}
+  <section class="mi-ahero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-ahero-grid" aria-hidden="true"></div>
+    <div class="mi-ahero-glow" aria-hidden="true"></div>
 
-<div class="card">
-  <div class="overflow-x-auto">
-    <table class="w-full text-small">
-      <thead>
-        <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-          <th class="text-left px-5 py-2.5 font-medium">When</th>
-          <th class="text-left px-5 py-2.5 font-medium">Actor</th>
-          <th class="text-left px-5 py-2.5 font-medium">Action</th>
-          <th class="text-left px-5 py-2.5 font-medium">Target</th>
-          <th class="text-left px-5 py-2.5 font-medium">IP</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for ev in page %}
-          <tr class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
-            <td class="px-5 py-3 text-text-secondary tabular whitespace-nowrap">
-              {{ ev.occurred_at|date:"Y-m-d H:i:s" }}
-            </td>
-            <td class="px-5 py-3">
-              {% if ev.actor %}
-                <span class="text-text-primary">{{ ev.actor.username }}</span>
-              {% else %}
-                <span class="text-text-tertiary italic">system</span>
-              {% endif %}
-            </td>
-            <td class="px-5 py-3">
-              <code class="font-mono text-mono text-mobinspect-500 dark:text-mobinspect-400">{{ ev.action }}</code>
-            </td>
-            <td class="px-5 py-3 text-text-secondary">
-              {% if ev.target_type %}{{ ev.target_type }}:{{ ev.target_id }}{% else %}—{% endif %}
-            </td>
-            <td class="px-5 py-3 text-text-secondary tabular">{{ ev.ip_address|default:"—" }}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="5" class="px-5 py-8 text-center text-text-tertiary">No events recorded.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  {% if page.has_other_pages %}
-    <div class="card-footer flex items-center justify-between">
-      <span class="text-tiny text-text-tertiary">
-        Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} event{{ page.paginator.count|pluralize }}
-      </span>
-      <div class="flex gap-1">
-        {% if page.has_previous %}
-          <a href="?page={{ page.previous_page_number }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if actor_filter %}&actor={{ actor_filter }}{% endif %}"
-             class="btn btn-secondary btn-sm">{% icon "chevron-left" size=14 %} Prev</a>
-        {% endif %}
-        {% if page.has_next %}
-          <a href="?page={{ page.next_page_number }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if actor_filter %}&actor={{ actor_filter }}{% endif %}"
-             class="btn btn-secondary btn-sm">Next {% icon "chevron-right" size=14 %}</a>
-        {% endif %}
+    <div class="relative z-10 px-6 py-7 md:px-8 md:py-8">
+      <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div class="flex items-start gap-3 min-w-0">
+          <span class="w-11 h-11 rounded-xl bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0 mt-0.5 shadow-elevation-1">
+            {% icon "file-text" size=20 %}
+          </span>
+          <div class="min-w-0">
+            <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1 inline-flex items-center gap-1.5">
+              {% icon "shield-check" size=12 %} Access control
+            </p>
+            <h1 class="text-h1">Audit log</h1>
+            <p class="text-small text-text-secondary mt-1 max-w-xl">
+              Append-only record of all user activity: logins, logouts, role grants, scan operations, API key management, and all admin CRUD actions.
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+          <span class="badge badge-neutral gap-1.5">{% icon "layers" size=12 %} {{ page.paginator.count }} event{{ page.paginator.count|pluralize }}</span>
+          {% if action_filter %}
+            <span class="badge badge-neutral gap-1.5">{% icon "search" size=12 %} action: {{ action_filter }}</span>
+          {% endif %}
+          {% if actor_filter %}
+            <span class="badge badge-neutral gap-1.5">{% icon "user" size=12 %} actor: {{ actor_filter }}</span>
+          {% endif %}
+        </div>
       </div>
     </div>
-  {% endif %}
+  </section>
+
+  {# ══════════════════ At-a-glance tiles (real paginator data) ══════════════════ #}
+  <section class="grid grid-cols-1 sm:grid-cols-3 gap-4" data-reveal>
+    <div class="mi-stat card card-body" x-data="counter({{ page.paginator.count }})">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+          {% icon "file-text" size=18 %}
+        </span>
+      </div>
+      <p class="mi-num text-h1 font-bold mt-3 tabular" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Matched events</p>
+    </div>
+
+    <div class="mi-stat card card-body">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+          {% icon "layers" size=18 %}
+        </span>
+      </div>
+      <p class="mi-num text-h1 font-bold mt-3 tabular">
+        {{ page.number }}<span class="text-text-tertiary text-small font-normal"> / {{ page.paginator.num_pages }}</span>
+      </p>
+      <p class="text-small text-text-secondary">Current page</p>
+      <div class="mt-3 h-1.5 rounded-full bg-surface-2 overflow-hidden">
+        <div class="h-full rounded-full bg-severity-passed transition-[width] duration-fast" style="width:{% widthratio page.number page.paginator.num_pages 100 %}%"></div>
+      </div>
+    </div>
+
+    <div class="mi-stat card card-body">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-system-warning/15 text-system-warning inline-flex items-center justify-center flex-shrink-0">
+          {% icon "sliders" size=18 %}
+        </span>
+      </div>
+      <p class="mi-num text-h1 font-bold mt-3">
+        {% if action_filter or actor_filter %}Active{% else %}None{% endif %}
+      </p>
+      <p class="text-small text-text-secondary">
+        {% if action_filter and actor_filter %}Filtering by action &amp; actor
+        {% elif action_filter %}Filtering by action
+        {% elif actor_filter %}Filtering by actor
+        {% else %}Showing all events{% endif %}
+      </p>
+    </div>
+  </section>
+
+  {# ─────────── Filter ─────────── #}
+  <section class="mi-audit-filters card" data-reveal>
+    <div class="card-header flex items-center gap-2">
+      <span class="w-9 h-9 rounded-md bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+        {% icon "search" size=16 %}
+      </span>
+      <div class="min-w-0 flex-1">
+        <h2 class="text-h3">Filter events</h2>
+        <p class="text-tiny text-text-tertiary">Narrow the log by action name or actor username</p>
+      </div>
+    </div>
+    <form method="get" class="card-body">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+        <div>
+          <label class="label" for="action">Action</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{% icon "zap" size=14 %}</span>
+            <input id="action" name="action" value="{{ action_filter }}" class="input pl-9" placeholder="role.assign / denied / …" />
+          </div>
+        </div>
+        <div>
+          <label class="label" for="actor">Actor</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{% icon "user" size=14 %}</span>
+            <input id="actor" name="actor" value="{{ actor_filter }}" class="input pl-9" placeholder="username" />
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary btn-md">{% icon "search" size=14 %} Filter</button>
+          <a href="{% url 'rbac:audit_log' %}" class="btn btn-ghost btn-md">{% icon "x" size=14 %} Reset</a>
+        </div>
+      </div>
+    </form>
+    {# quick filters — same ?action= GET param the form above submits, pre-filled with real action-name prefixes used across the system #}
+    <div class="card-footer flex flex-wrap items-center gap-2">
+      <span class="text-tiny uppercase text-text-tertiary mr-1">Quick filters</span>
+      <a href="?action=denied" class="mi-chip badge badge-critical">{% icon "shield-alert" size=11 %} Denied</a>
+      <a href="?action=auth.login.fail" class="mi-chip badge badge-high">{% icon "alert-triangle" size=11 %} Login failures</a>
+      <a href="?action=role." class="mi-chip badge badge-low">{% icon "users" size=11 %} Role changes</a>
+      <a href="?action=api_key." class="mi-chip badge badge-low">{% icon "key" size=11 %} API keys</a>
+      <a href="?action=integration." class="mi-chip badge badge-unknown">{% icon "sliders" size=11 %} Integrations</a>
+    </div>
+  </section>
+
+  {# ─────────── Events ─────────── #}
+  <section class="card" data-reveal>
+    <div class="card-header flex items-center justify-between">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="w-9 h-9 rounded-md bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+          {% icon "activity" size=16 %}
+        </span>
+        <h2 class="text-h3">Events</h2>
+      </div>
+      {% if page.paginator.count %}
+        <span class="text-small text-text-tertiary tabular">{{ page.paginator.count }} event{{ page.paginator.count|pluralize }}</span>
+      {% endif %}
+    </div>
+    <div class="overflow-x-auto overflow-y-auto max-h-[560px]">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="mi-thead text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2">
+            <th class="text-left px-5 py-2.5 font-medium">When</th>
+            <th class="text-left px-5 py-2.5 font-medium">Actor</th>
+            <th class="text-left px-5 py-2.5 font-medium">Action</th>
+            <th class="text-left px-5 py-2.5 font-medium">Target</th>
+            <th class="text-left px-5 py-2.5 font-medium">IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ev in page %}
+            <tr class="mi-row border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
+              <td class="px-5 py-3 text-text-secondary tabular whitespace-nowrap">
+                <div>{{ ev.occurred_at|date:"Y-m-d H:i:s" }}</div>
+                <div class="text-tiny text-text-tertiary">{{ ev.occurred_at|timesince }} ago</div>
+              </td>
+              <td class="px-5 py-3">
+                {% if ev.actor %}
+                  <span class="inline-flex items-center gap-2 text-text-primary">
+                    <span class="w-6 h-6 rounded-full bg-mobinspect-500/15 text-mobinspect-500 text-tiny font-semibold inline-flex items-center justify-center flex-shrink-0">
+                      {{ ev.actor.username|first|upper }}
+                    </span>
+                    {% icon "user" size=13 %}{{ ev.actor.username }}
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-2 text-text-tertiary italic">
+                    <span class="w-6 h-6 rounded-full bg-surface-2 inline-flex items-center justify-center flex-shrink-0">
+                      {% icon "settings" size=12 %}
+                    </span>
+                    system
+                  </span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3">
+                {% if "fail" in ev.action or ev.action == "denied" %}
+                  <span class="badge badge-critical font-mono">{% icon "shield-alert" size=11 %} {{ ev.action }}</span>
+                {% elif "delete" in ev.action or "revoke" in ev.action or "remove" in ev.action or "unassign" in ev.action %}
+                  <span class="badge badge-high font-mono">{% icon "trash" size=11 %} {{ ev.action }}</span>
+                {% elif "create" in ev.action or "assign" in ev.action or ".ok" in ev.action or "save" in ev.action or "add" in ev.action or "set_active" in ev.action %}
+                  <span class="badge badge-passed font-mono">{% icon "check" size=11 %} {{ ev.action }}</span>
+                {% else %}
+                  <span class="badge badge-low font-mono">{% icon "zap" size=11 %} {{ ev.action }}</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3 text-text-secondary font-mono">
+                {% if ev.target_type %}
+                  <span class="inline-flex items-center gap-1.5">
+                    {% icon "database" size=12 class="text-text-tertiary" %}{{ ev.target_type }}<span class="text-text-tertiary">:</span>{{ ev.target_id }}
+                  </span>
+                {% else %}—{% endif %}
+              </td>
+              <td class="px-5 py-3 text-text-secondary tabular font-mono">{{ ev.ip_address|default:"—" }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="px-5 py-14">
+                <div class="flex flex-col items-center text-center gap-3">
+                  <span class="w-14 h-14 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center">
+                    {% icon "file-text" size=24 %}
+                  </span>
+                  <p class="text-h3">No events recorded</p>
+                  <p class="text-small text-text-secondary max-w-sm">
+                    {% if action_filter or actor_filter %}
+                      No events match the current filter. Try widening your search or
+                      <a href="{% url 'rbac:audit_log' %}" class="text-text-brand hover:underline">clear filters</a>.
+                    {% else %}
+                      User activity will appear here as it happens.
+                    {% endif %}
+                  </p>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page.has_other_pages %}
+      <div class="card-footer flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="text-tiny text-text-tertiary whitespace-nowrap">
+            Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} event{{ page.paginator.count|pluralize }}
+          </span>
+          <span class="hidden sm:block h-1.5 w-32 rounded-full bg-surface-2 overflow-hidden flex-shrink-0">
+            <span class="block h-full rounded-full bg-mobinspect-500 transition-[width] duration-fast" style="width:{% widthratio page.number page.paginator.num_pages 100 %}%"></span>
+          </span>
+        </div>
+        <div class="flex gap-1">
+          {% if page.has_previous %}
+            <a href="?page={{ page.previous_page_number }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if actor_filter %}&actor={{ actor_filter }}{% endif %}"
+               class="btn btn-secondary btn-sm">{% icon "chevron-left" size=14 %} Prev</a>
+          {% endif %}
+          {% if page.has_next %}
+            <a href="?page={{ page.next_page_number }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if actor_filter %}&actor={{ actor_filter }}{% endif %}"
+               class="btn btn-secondary btn-sm">Next {% icon "chevron-right" size=14 %}</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </section>
+
 </div>
+
+<script>
+  // Animated count-up for the "Matched events" tile (additive; presentation only).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+</script>
 {% endblock %}

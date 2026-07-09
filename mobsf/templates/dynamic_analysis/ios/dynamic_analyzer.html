@@ -1,6 +1,6 @@
 
 {% extends "base/legacy_app.html" %}
-{% load static %}
+{% load static %}{% load mi_icons %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static "others/css/terminal.css" %}" type="text/css">
 <link rel="stylesheet" href="{% static "others/css/devices.min.css" %}" type="text/css">
@@ -10,423 +10,538 @@
 <link rel="stylesheet" href="{% static "others/css/spinner.css" %}">
 <link href="{% static "adminlte/plugins/sweetalert2/sweetalert2.min.css" %}" rel="stylesheet">
 <style>
-     #stat {
-        width: 100%;
-        height: 170px;
-        -moz-border-bottom-colors: none;
-        -moz-border-left-colors: none;
-        -moz-border-right-colors: none;
-        -moz-border-top-colors: none;
-        background: rgb(var(--surface-2));
-        border-color: rgb(var(--border-default));
-        border-image: none;
-        border-radius: 6px 6px 6px 6px;
-        border-style: none solid solid none;
-        border-width: medium 1px 1px medium;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12) inset;
-        color: rgb(var(--text-primary));
-        font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
-        font-size: 1em;
-        line-height: 1.4em;
-        padding: 5px 8px;
-        transition: background-color 0.2s ease 0s;
-    }
-    #stat:focus {
-        background: rgb(var(--surface-1));
-        outline-width: 0;
-    }
-    .highlight { border: solid 2px #1e6dff;}
-    #code-editor{
-      transform: scale(1.25) !important;
-      transform-origin: top left;
-      width: 80%;
-      height: auto;
-      overflow: auto;
-      max-height: 600px;
-      border: 1px solid rgb(var(--border-subtle));
-      border-radius: 4px;
-      padding: 10px;
-      background: rgb(var(--surface-2));
-      margin-bottom: 150px;
-      position: relative;
-      z-index: 1;
-      scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* Internet Explorer 10+ */
-    }
+  [x-cloak] { display: none !important; }
 
-    #code-editor::-webkit-scrollbar {
-      display: none; /* Chrome, Safari, Opera */
-    }
+  /* Status console */
+  #stat {
+    width: 100%;
+    height: 170px;
+    border-radius: 0.5rem;
+    background: rgb(var(--surface-2));
+    border: 1px solid rgb(var(--border-subtle));
+    color: rgb(var(--text-secondary));
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    line-height: 1.4em;
+    padding: 8px 10px;
+    resize: vertical;
+    transition: background-color .2s ease;
+  }
+  #stat:focus { outline: 2px solid rgb(var(--text-brand) / .4); outline-offset: -1px; background: rgb(var(--surface-1)); }
 
-    .CodeMirror {
-        height: 610px;
-        font-size: 11px;
-        border: 1px solid rgb(var(--border-subtle));
-      }
-    .form-group {
-        position: relative;
-        z-index: 2;
-        margin-top: 20px;
-    }
-    .frida-pre {
-      font-family: "courier new", courier, monospace;
-      font-size: 11px;
-    }
-    #start_activity{
-        margin-top: 5px;
-    }
-    #start_activity_form{
-        margin-top: 10px;
-    }
+  .highlight { outline: 2px solid rgb(var(--text-brand)); border-radius: 0.375rem; }
 
+  #code-editor {
+    width: 100%;
+    height: auto;
+    overflow: auto;
+    max-height: 600px;
+    border: 1px solid rgb(var(--border-subtle));
+    border-radius: 0.5rem;
+    background: rgb(var(--surface-2));
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
+  #code-editor::-webkit-scrollbar { display: none; /* Chrome, Safari, Opera */ }
+  .CodeMirror { height: 560px; font-size: 12px; border-radius: 0.5rem; }
+
+  .form-group { margin-top: 1rem; }
+
+  .frida-pre {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #frida-logs {
+    background: rgb(var(--surface-2));
+    border: 1px solid rgb(var(--border-subtle));
+    border-radius: 0.5rem;
+    padding: 10px 12px;
+    max-height: 360px;
+    overflow: auto;
+    color: rgb(var(--text-secondary));
+  }
+
+  .marvel-device .screen { background-color: #000; }
+
+  /* Section header icon chip */
+  .hdr-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 0.5rem;
+    background: rgb(var(--text-brand) / .1); color: rgb(var(--text-brand));
+    flex-shrink: 0;
+  }
+
+  /* Pill-style status/meta chips (avoids colliding with Bootstrap .badge) */
+  .mi-chip {
+    display: inline-flex; align-items: center; gap: .375rem;
+    padding: .25rem .625rem; border-radius: 9999px;
+    font-size: .6875rem; font-weight: 600; letter-spacing: .01em; text-transform: none;
+    border: 1px solid rgb(var(--border-subtle));
+    background: rgb(var(--surface-2)); color: rgb(var(--text-secondary));
+    line-height: 1.3; white-space: nowrap;
+  }
+  .mi-chip-brand { background: rgb(var(--text-brand) / .1); color: rgb(var(--text-brand)); border-color: transparent; }
+  .mi-chip-success { background: rgb(22 163 74 / .12); color: rgb(22 163 74); border-color: transparent; }
+  :root[data-theme="dark"] .mi-chip-success { background: rgb(34 197 94 / .16); color: rgb(74 222 128); }
+
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero { position: relative; background: rgb(var(--surface-1)); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px; filter: blur(64px); opacity: .5;
+  }
+  .mi-hero-glow::before {
+    width: 320px; height: 320px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgb(var(--text-brand) / .5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 260px; height: 260px; bottom: -130px; left: -40px;
+    background: radial-gradient(circle at center, rgb(22 163 74 / .3), transparent 70%);
+    animation: mi-float 20s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 75% 75% at 85% 0%, #000 10%, transparent 72%);
+            mask-image: radial-gradient(ellipse 75% 75% at 85% 0%, #000 10%, transparent 72%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .38; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .3; }
+
+  /* ── Toolbar buttons: tinted lift on hover ── */
+  .mi-tool-btn { position: relative; transition: transform .15s ease, box-shadow .15s ease; }
+  .mi-tool-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgb(37 99 235 / .5); }
+
+  .tb-group + .tb-group { border-left: 1px solid rgb(var(--border-subtle)); padding-left: 2rem; }
+  @media (max-width: 1023px) { .tb-group + .tb-group { border-left: 0; padding-left: 0; } }
+
+  /* ── Live pulse dot (real, DOM-observed state — see appended script) ── */
+  .mi-pulse-dot { position: relative; width: 7px; height: 7px; border-radius: 9999px; background: currentColor; display: inline-block; flex-shrink: 0; }
+  .mi-pulse-dot::after {
+    content: ''; position: absolute; inset: -5px; border-radius: 9999px;
+    background: currentColor; opacity: .5; animation: mi-pulse 1.8s ease-out infinite;
+  }
+
+  .mi-phone-glow {
+    position: absolute; inset: 8% 8% auto 8%; height: 72%;
+    background: radial-gradient(closest-side, rgb(var(--text-brand) / .2), transparent 75%);
+    filter: blur(30px); pointer-events: none;
+  }
+
+  .mi-term-dot { width: .65rem; height: .65rem; border-radius: 9999px; flex-shrink: 0; }
+
+  /* ── Bootstrap pill-tab override: clean underline tabs ── */
+  .nav-tabs { border-bottom: 1px solid rgb(var(--border-subtle)); }
+  .nav-tabs .nav-link.mi-tab {
+    border: 0; background: transparent; color: rgb(var(--text-tertiary));
+    font-weight: 500; font-size: .8125rem; padding: .75rem 1rem; position: relative;
+    transition: color .15s ease;
+  }
+  .nav-tabs .nav-link.mi-tab:hover { color: rgb(var(--text-secondary)); }
+  .nav-tabs .nav-link.mi-tab.active { color: rgb(var(--text-primary)); background: transparent; }
+  .nav-tabs .nav-link.mi-tab.active::after {
+    content: ''; position: absolute; left: 1rem; right: 1rem; bottom: -1px;
+    height: 2px; background: rgb(var(--text-brand)); border-radius: 2px;
+  }
+
+  .mi-hook-label {
+    display: flex; align-items: center; gap: .5rem; padding: .375rem .5rem; border-radius: .375rem;
+    font-size: .8125rem; color: rgb(var(--text-secondary)); cursor: pointer;
+    transition: background-color .15s ease;
+  }
+  .mi-hook-label:hover { background: rgb(var(--surface-2)); }
+  input[type="checkbox"] { accent-color: #2563EB; width: 1rem; height: 1rem; }
+
+  /* ── Modernize Bootstrap buttons/forms/modals within this legacy page ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+    border-radius: 8px; font-weight: 500; font-size: .8125rem; line-height: 1.4;
+    padding: .5rem .875rem; border: 1px solid transparent; cursor: pointer;
+    box-shadow: none; text-decoration: none !important;
+    transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  }
+  .btn.btn-sm { padding: .4rem .7rem; font-size: .75rem; }
+  .btn.disabled, .btn:disabled { opacity: .5; pointer-events: none; }
+  .btn-primary, .btn-primary:focus { background-color: #2563EB !important; border-color: #2563EB !important; color: #fff !important; }
+  .btn-primary:hover { background-color: #1D4ED8 !important; border-color: #1D4ED8 !important; }
+  .btn-primary:active { background-color: #1E40AF !important; border-color: #1E40AF !important; }
+  .btn-success, .btn-success:focus { background-color: rgb(22 163 74) !important; border-color: rgb(22 163 74) !important; color: #fff !important; }
+  .btn-success:hover { filter: brightness(.92); }
+  :root[data-theme="dark"] .btn-success, :root[data-theme="dark"] .btn-success:focus { background-color: rgb(34 197 94) !important; border-color: rgb(34 197 94) !important; }
+  .btn-info, .btn-info:focus { background-color: rgb(var(--surface-2)) !important; border-color: rgb(var(--border-default)) !important; color: rgb(var(--text-primary)) !important; }
+  .btn-info:hover:not(.disabled) { background-color: rgb(var(--surface-3)) !important; }
+
+  .form-control, .form-select { border-radius: 8px !important; }
+
+  .modal .close {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 9999px; opacity: .65;
+    transition: opacity .15s ease, background-color .15s ease;
+  }
+  .modal .close:hover { opacity: 1; background-color: rgb(var(--surface-2)); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after, .mi-pulse-dot::after { animation: none; }
+    .mi-tool-btn, .btn { transition: none; }
+  }
+  @keyframes mi-float { 0%,100%{transform:translate3d(0,0,0);} 50%{transform:translate3d(0,-22px,0);} }
+  @keyframes mi-pulse { 0%{transform:scale(.6);opacity:.55;} 100%{transform:scale(2.2);opacity:0;} }
 </style>
-
 {% endblock %}
 {% block content %}
 
 <script src="{% static "adminlte/plugins/jquery.min.js" %}"></script>
 
-<div class="content-wrapper">
-  <div class="content-header">
-    <div class="container-fluid">
-      <div class="row mb-2">
-        <div id="mobsf_header" align="center" style="padding-left: 20px;">
-            <h2><strong>Dynamic Analyzer </strong>- {{ bundle_id }}</h2>
+{# ─────────────────── Ambient hero header ─────────────────── #}
+<section class="mi-hero card relative overflow-hidden p-0 mb-6" data-reveal>
+  <div class="mi-hero-grid" aria-hidden="true"></div>
+  <div class="mi-hero-glow" aria-hidden="true"></div>
+
+  <div class="relative z-10 px-6 py-7 md:px-8 md:py-8">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+      <div class="flex items-start gap-4 min-w-0">
+        <span class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-mobinspect-500/10 text-mobinspect-500 flex-shrink-0 shadow-elevation-1">
+          {% icon "smartphone" size=26 %}
+        </span>
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1.5 inline-flex items-center gap-1.5">
+            {% icon "shield-check" size=13 %} Dynamic &middot; iOS &middot; Corellium instance
+          </p>
+          <h1 class="text-h1 md:text-display truncate" title="{{ bundle_id }}">{{ bundle_id }}</h1>
+          <div class="flex flex-wrap items-center gap-2 mt-3">
+            <span class="mi-chip mi-chip-brand font-mono">{% icon "package" size=12 %} Instance {{ instance_id }}</span>
+            <span
+              class="mi-chip font-mono cursor-pointer select-none"
+              x-data="{ copied: false }"
+              @click="navigator.clipboard && navigator.clipboard.writeText('{{ checksum }}'); copied = true; setTimeout(() => copied = false, 1400)"
+              title="Click to copy the full scan hash"
+            >
+              <span x-show="!copied">{% icon "copy" size=12 %} {{ checksum|slice:":10" }}&hellip;</span>
+              <span x-show="copied" x-cloak>{% icon "check" size=12 %} Copied</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <a href="#" id="report" class="btn btn-info disabled mi-tool-btn" role="button"><i class="fa fa-file-alt"></i> Generate Report</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Analysis controls toolbar ─────────────────── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header">
+    <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "sliders" size=16 %}</span> Analysis Controls</h2>
+  </div>
+  <div class="card-body">
+    <div id="but" class="flex flex-wrap items-start gap-x-8 gap-y-5">
+      <div class="tb-group flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold inline-flex items-center gap-1.5"><i class="fa fa-desktop"></i> Capture &amp; Monitor</span>
+          <span id="screen-live-dot" class="hidden mi-chip mi-chip-success"><span class="mi-pulse-dot"></span> Live</span>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a href="#" id="screen" class="btn btn-primary btn-sm mi-tool-btn" role="button"><i class="fa fa-mobile-alt"></i> Show Screen</a>
+          <a href="#" id="ss" class="btn btn-primary btn-sm mi-tool-btn" role="button"><i class="fa fa-camera"></i> Take a Screenshot</a>
+          <a href="{% url 'ios_api_monitor' %}?checksum={{ checksum }}&bundle_id={{ bundle_id }}" id="apimon" target="_blank" class="btn btn-primary btn-sm mi-tool-btn" style='display: none'><i class="fa fa-search"></i> Live API Monitor</a>
+        </div>
+      </div>
+      <div class="tb-group flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold inline-flex items-center gap-1.5"><i class="fa fa-globe"></i> Network &amp; Logs</span>
+          <span id="network-live-dot" class="hidden mi-chip mi-chip-success"><span class="mi-pulse-dot"></span> Capturing</span>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a href="#" id="network" class="btn btn-primary btn-sm mi-tool-btn" role="button"><i class="fa fa-certificate"></i> Start Network Capture</a>
+          <a href="{% url 'ios_live_pcap_download' %}?instance_id={{instance_id}}" id="pcap" class="btn btn-primary btn-sm mi-tool-btn" role="button"><i class="fas fa-globe"></i> Download Live Packet Capture</a>
+          <a href="{% url 'ios_system_logs' %}?instance_id={{instance_id}}" target="_blank" id="system_logs" class="btn btn-primary btn-sm mi-tool-btn"><i class="fa fa-water"></i> System Logs</a>
         </div>
       </div>
     </div>
   </div>
-   <div class="container-fluid">
+</section>
 
-   
-   <div class="row">
-          <div class="col-md-12">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                 <div id="but" align="center">
-                  <a href="#" id="screen" class="btn btn-primary" role="button"><i class="fa fa-mobile-alt"></i> Show Screen</a>
-                  <a href="#" id="network" class="btn btn-primary" role="button"><i class="fa fa-certificate"></i> Start Network Capture</a>
-                  <a href="{% url 'ios_live_pcap_download' %}?instance_id={{instance_id}}" id="pcap" class="btn btn-primary" role="button"><i class="fas fa-globe"></i> Download Live Packet Capture</a>
-                  <a href="#" id="ss" class="btn btn-primary" role="button"><i class="fa fa-camera"></i> Take a Screenshot</a>
-                  <a href="{% url 'ios_system_logs' %}?instance_id={{instance_id}}" target="_blank" id="system_logs" class="btn btn-primary"><i class="fa fa-water"></i> System Logs</a>
-                  <a href="{% url 'ios_api_monitor' %}?checksum={{ checksum }}&bundle_id={{ bundle_id }}" id="apimon" target="_blank" class="btn btn-primary" style='display: none'><i class="fa fa-search"></i> Live API Monitor</a>
-                  <a href="#" id="report" class="btn btn-info disabled" role="button"><i class="fa fa-file-alt"></i> Generate Report</a>
+<section class="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-6">
+
+  {# ── Device screen ── #}
+  <div class="card xl:col-span-3" data-reveal>
+    <div class="card-header flex items-center justify-between gap-2">
+      <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "smartphone" size=16 %}</span> Device</h2>
+    </div>
+    <div class="card-body">
+      <div class="relative flex justify-center">
+        <div class="mi-phone-glow" aria-hidden="true"></div>
+        <div align="center">
+          <div class="marvel-device iphone5s relative z-10">
+            <div class="top-bar"></div>
+            <div class="sleep"></div>
+            <div class="volume"></div>
+            <div class="camera"></div>
+            <div class="sensor"></div>
+            <div class="speaker"></div>
+          <div class="screen" id="container" tabindex="0" style="outline: none;">
+          <img width="320" height="570" src="../../download/screen/screen.png" id="my" onerror="$('#my').attr('src','/static/img/loading.jpg')" style="background-color:black;">
+          </div>
+          <div class="home" id="ios_home"></div>
+          <div class="bottom-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-group input-group-sm mt-4">
+        <input class="form-control form-control-navbar" id="ios_text" type="text" placeholder="Text Input" >
+        <div class="input-group-append">
+          <button id="ios_text_btn" class="btn btn-primary">
+            <i class="far fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Analyzer / Instrumentation ── #}
+  <div class="card xl:col-span-4" data-reveal>
+    <div class="card-header p-0 border-bottom-0">
+      <ul class="nav nav-tabs" id="tabnav" role="tablist">
+        <li class="nav-item">
+          <a class="nav-link active mi-tab" id="dm-tab" data-toggle="pill" href="#dm" role="tab" aria-controls="dm" aria-selected="true"><i class="fas fa-bolt mr-1"></i> Dynamic Analyzer</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link mi-tab" id="errors-tab" data-toggle="pill" href="#errors" role="tab" aria-controls="errors" aria-selected="false"><i class="fas fa-triangle-exclamation mr-1"></i> Errors</a>
+        </li>
+      </ul>
+    </div>
+    <div class="card-body">
+      <div class="tab-content" id="tabs">
+        <div class="tab-pane fade active show" id="dm" role="tabpanel" aria-labelledby="dm-tab">
+        <textarea id="stat"></textarea>
+        <div id="frida_options">
+            <form role="form">
+              <div class="mt-4">
+                <h4 class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2 flex items-center gap-1.5"><i class="fas fa-circle-check"></i> Default Frida Scripts</h4>
+                <div class="space-y-0.5">
+                  <label class="mi-hook-label">
+                  <input name="default_hooks" type="checkbox" value="jailbreak_bypass" checked>
+                   Jailbreak Detection Bypass
+                </label>
+                  <label class="mi-hook-label">
+                    <input name="default_hooks" type="checkbox" value="ssl_pinning" checked>
+                    SSL Pinning Bypass
+                  </label>
                 </div>
               </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-
-          <div class="col-md-3">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                
-                <div align="center">
-                  <div class="marvel-device iphone5s">
-                    <div class="top-bar"></div>
-                    <div class="sleep"></div>
-                    <div class="volume"></div>
-                    <div class="camera"></div>
-                    <div class="sensor"></div>
-                    <div class="speaker"></div>
-                  <div class="screen" id="container" tabindex="0" style="outline: none;">
-                  <img width="320" height="570" src="../../download/screen/screen.png" id="my" onerror="$('#my').attr('src','/static/img/loading.jpg')" style="background-color:black;">
-                  </div>
-                  <div class="home" id="ios_home"></div>
-                  <div class="bottom-bar"></div>
-                  </div>
+              <div class="mt-5 pt-4 border-t border-border-subtle">
+              <h4 class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2 flex items-center gap-1.5"><i class="fas fa-satellite-dish"></i> Trace Frida Scripts</h4>
+                <div class="space-y-0.5">
+                <label class="mi-hook-label">
+                  <input name="dump_hooks" type="checkbox" value="network" checked>
+                    Network
+                  </label>
+                  <label class="mi-hook-label">
+                  <input name="dump_hooks" type="checkbox" value="crypto" checked>
+                    Crypto
+                  </label>
+                  <label class="mi-hook-label">
+                    <input name="dump_hooks" type="checkbox" value="cookies" checked>
+                    Cookies
+                  </label>
+                    <label class="mi-hook-label">
+                    <input name="dump_hooks" type="checkbox" value="file-access" checked>
+                    File Access
+                  </label>
+                  <label class="mi-hook-label">
+                    <input name="dump_hooks" type="checkbox" value="json" checked>
+                    Json Data
+                  </label>
+                  <label class="mi-hook-label">
+                    <input name="dump_hooks" type="checkbox" value="sqlite" checked>
+                    Sqlite Query
+                  </label>
+                  <label class="mi-hook-label">
+                  <input name="dump_hooks" type="checkbox" value="data-dir" checked>
+                    Data Directory
+                  </label>
+                  <label class="mi-hook-label">
+                  <input name="dump_hooks" type="checkbox" value="keychain" checked>
+                    Keychain
+                  </label>
+                  <label class="mi-hook-label">
+                  <input name="dump_hooks" type="checkbox" value="nslog" checked>
+                    NSLog
+                  </label>
+                  <label class="mi-hook-label">
+                  <input name="dump_hooks" type="checkbox" value="text-inputs" checked>
+                    Text Inputs
+                  </label>
+                  <label class="mi-hook-label">
+                  <input name="dump_hooks" type="checkbox" value="nsurlcredentialstorage" checked>
+                    URL Credential Storage
+                  </label>
+                  <label class="mi-hook-label">
+                  <input name="dump_hooks" type="checkbox" value="nsuserdefaults" checked>
+                    User Defaults
+                  </label>
+                  <label class="mi-hook-label">
+                  <input name="dump_hooks" type="checkbox" value="pasteboard" checked>
+                    Pasteboard
+                  </label>
                 </div>
-
-                <div class="card-body">
-                  <p>
-                  <div class="input-group input-group-sm">
-                    <input class="form-control form-control-navbar" id="ios_text" type="text" placeholder="Text Input" >
-                    <div class="input-group-append">
-                      <button id="ios_text_btn" class="btn btn-primary">
-                        <i class="far fa-paper-plane"></i>
-                      </button>
+              </div>
+              <div class="mt-5 pt-4 border-t border-border-subtle">
+                <h4 class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2 flex items-center gap-1.5"><i class="fas fa-flask"></i> Auxiliary Frida Scripts</h4>
+                    <label class="mi-hook-label">
+                    <input name="auxiliary" type="checkbox" value="enum_class" id="enum_class">
+                      Enumerate Classes
+                    </label>
+                    <label class="mi-hook-label">
+                      <input name="auxiliary" type="checkbox" value="enum_class_methods" id="enum_class_methods">
+                        Enumerate Classes &amp; Methods
+                      </label>
+                     <label class="mi-hook-label">
+                    <input name="auxiliary" type="checkbox" value="string_capture" id="string_capture">
+                       Capture Strings
+                    </label>
+                     <label class="mi-hook-label">
+                    <input name="auxiliary" type="checkbox" value="string_compare" id="string_compare">
+                        Capture String Comparisons
+                    </label>
+                    <div class="mt-2 space-y-2">
+                     <div>
+                     <label class="mi-hook-label">
+                      <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="enum_methods" id="enum_methods">
+                      Enumerate Class Methods
+                    </label>
+                     <input type="text" class="form-control form-control-sm" id="class_name" placeholder="NSData">
+                     </div>
+                     <div>
+                     <label class="mi-hook-label">
+                      <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_class" id="search_class">
+                      Search Class Pattern
+                    </label>
+                     <input type="text" class="form-control form-control-sm" id="class_search" placeholder="Jailbreak*">
+                     </div>
+                     <div>
+                     <label class="mi-hook-label">
+                      <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_method" id="search_method">
+                      Find all classes with Specific Method
+                    </label>
+                     <input type="text" class="form-control form-control-sm" id="method_search" placeholder="MethodName">
+                     </div>
+                     <div>
+                     <label class="mi-hook-label">
+                     <input onclick="aux_click(this)" name="auxiliary" type="checkbox"  value="trace_class" id="trace_class">
+                      Trace Class Methods
+                    </label>
+                     <input type="text" class="form-control form-control-sm" id="class_trace" placeholder="NSURLConnection">
+                     </div>
                     </div>
-                  </div>
-                </p>
               </div>
 
-
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-           <div class="col-md-4">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-
-            <div class="card card-primary card-outline card-outline-tabs">
-              <div class="card-header p-0 border-bottom-0">
-                <ul class="nav nav-tabs" id="tabnav" role="tablist">
-                  <li class="nav-item">
-                    <a class="nav-link active" id="dm-tab" data-toggle="pill" href="#dm" role="tab" aria-controls="dm" aria-selected="true">Dynamic Analyzer</a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" id="errors-tab" data-toggle="pill" href="#errors" role="tab" aria-controls="errors" aria-selected="false">Errors</a>
-                  </li>
-                </ul>
-              </div>
-              <div class="card-body">
-                <div class="tab-content" id="tabs">
-                  <div class="tab-pane fade active show" id="dm" role="tabpanel" aria-labelledby="dm-tab">
-                  <textarea id="stat"></textarea>
-                <!--box-->
-                <div id="frida_options" class="box box-primary">
-                    <!-- /.box-header -->
-                    <!-- form start -->
-                    <form role="form">
-                      <div class="box-body">
-                        <div class="form-group">
-                            <hr/>
-                        <h4> Default Frida Scripts</h4>
-                             <label>
-                             <input name="default_hooks" type="checkbox" value="jailbreak_bypass" checked>
-                              Jailbreak Detection Bypass 
-                            </label>
-                            <label>
-                              <input name="default_hooks" type="checkbox" value="ssl_pinning" checked>
-                              SSL Pinning Bypass
-                            </label>
-                        </div>
-                        <hr/>
-                          <div class="form-group">
-                      <h4> Trace Frida Scripts</h4>
-                        <label>
-                          <input name="dump_hooks" type="checkbox" value="network" checked>
-                            Network
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="crypto" checked>
-                            Crypto
-                          </label>
-                          <label>
-                            <input name="dump_hooks" type="checkbox" value="cookies" checked>
-                            Cookies 
-                          </label>
-                            <label>
-                            <input name="dump_hooks" type="checkbox" value="file-access" checked>
-                            File Access 
-                          </label>
-                          <label>
-                            <input name="dump_hooks" type="checkbox" value="json" checked>
-                            Json Data
-                          </label>
-                          <label>
-                            <input name="dump_hooks" type="checkbox" value="sqlite" checked>
-                            Sqlite Query
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="data-dir" checked>
-                            Data Directory
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="keychain" checked>
-                            Keychain
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="nslog" checked>
-                            NSLog
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="text-inputs" checked>
-                            Text Inputs
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="nsurlcredentialstorage" checked>
-                            URL Credential Storage
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="nsuserdefaults" checked>
-                            User Defaults
-                          </label>
-                          <label>
-                          <input name="dump_hooks" type="checkbox" value="pasteboard" checked>
-                            Pasteboard
-                          </label>
-                      </div>
-                     <hr/>
-                        <div class="form-group">
-                        <h4> Auxiliary Frida Scripts</h4>
-                            <label>
-                            <input name="auxiliary" type="checkbox" value="enum_class" id="enum_class">
-                              Enumerate Classes
-                            </label> 
-                            <label>
-                              <input name="auxiliary" type="checkbox" value="enum_class_methods" id="enum_class_methods">
-                                Enumerate Classes &amp; Methods
-                              </label> 
-                             <label>
-                            <input name="auxiliary" type="checkbox" value="string_capture" id="string_capture">
-                               Capture Strings
-                            </label>
-                             <label>
-                            <input name="auxiliary" type="checkbox" value="string_compare" id="string_compare">
-                                Capture String Comparisons
-                            </label>
-                            <br />
-                             <label>
-                              <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="enum_methods" id="enum_methods">
-                              Enumerate Class Methods
-                            </label>
-                             <input type="text" class="form-control" id="class_name" placeholder="NSData">
-                             <label>
-                              <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_class" id="search_class">
-                              Search Class Pattern
-                            </label>
-                             <input type="text" class="form-control" id="class_search" placeholder="Jailbreak*">
-                             <label>
-                              <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_method" id="search_method">
-                              Find all classes with Specific Method
-                            </label>
-                             <input type="text" class="form-control" id="method_search" placeholder="MethodName">
-                             <label>
-                             <input onclick="aux_click(this)" name="auxiliary" type="checkbox"  value="trace_class" id="trace_class">
-                              Trace Class Methods
-                            </label>
-                             <input type="text" class="form-control" id="class_trace" placeholder="NSURLConnection">
-                        </div>
-
-                      </div>
-                      <!-- /.box-body -->
-                      <hr/>
-                      <div class="form-group">
-                        <h4> Instrumentation </h4>
-                      </div>
-                      <div class="box-footer">
-                      <button id="run" type="submit" class="btn btn-success btn-sm"><i class="fas fa-play"></i> Run</button>
-                      <button id="frida_spawn" type="submit" class="btn btn-success btn-sm"><i class="far fa-play-circle"></i> Spawn & Inject</button>
-                      <button id="frida_session" type="submit" class="btn btn-success btn-sm" disabled><i class="fas fa-redo"></i> Inject </button>
-                      <button id="frida_attach" type="submit" class="btn btn-success btn-sm"><i class="fas fa-bug"></i> Attach </button>
-                      <button id="frida_get" class="btn btn-primary btn-sm" hidden><i class="fas fa-code"></i> Injected Code</button>
-                    </div>
-                    </form>
-                  </div>
-
-              <!--tab end-->
-
-                  </div>
-                  <div class="tab-pane fade" id="errors" role="tabpanel" aria-labelledby="errors-tab">
-                    <iframe sandbox frameborder="0" width="100%" height="650px" id="er"></iframe>
-                  </div>
+              <div class="mt-5 pt-4 border-t border-border-subtle">
+                <h4 class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-3 flex items-center gap-1.5"><i class="fas fa-bolt"></i> Instrumentation</h4>
+                <div class="flex flex-wrap gap-2">
+                  <button id="run" type="submit" class="btn btn-success btn-sm"><i class="fas fa-play"></i> Run</button>
+                  <button id="frida_spawn" type="submit" class="btn btn-success btn-sm"><i class="far fa-play-circle"></i> Spawn & Inject</button>
+                  <button id="frida_session" type="submit" class="btn btn-success btn-sm" disabled><i class="fas fa-redo"></i> Inject </button>
+                  <button id="frida_attach" type="submit" class="btn btn-success btn-sm"><i class="fas fa-bug"></i> Attach </button>
+                  <button id="frida_get" class="btn btn-primary btn-sm" hidden><i class="fas fa-code"></i> Injected Code</button>
                 </div>
               </div>
-              <!-- /.card -->
-            </div>
-
-
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
+            </form>
           </div>
-          <!-- /.col -->
 
-           <div class="col-md-5" id="codeedit">
-            <div class="card card-default">
-              <div class="card-header">
-                <h3 class="card-title"><i class="fa fa-code"></i> Frida Code Editor </h3>
-                <!-- /.card-tools -->
-              </div>
-              <!-- /.card-header -->
-              <div class="card-body">
-                <div id="code-editor">
+          </div>
+          <div class="tab-pane fade" id="errors" role="tabpanel" aria-labelledby="errors-tab">
+            <div class="overflow-x-auto">
+            <iframe sandbox frameborder="0" width="100%" height="650px" id="er" class="rounded-md border border-border-subtle"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  {# ── Frida code editor ── #}
+  <div class="card xl:col-span-5" id="codeedit" data-reveal>
+    <div class="card-header flex items-center justify-between gap-2">
+      <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "edit" size=16 %}</span> Frida Code Editor</h2>
+      <span id="scripts-count" class="mi-chip hidden"></span>
+    </div>
+    <div class="card-body">
+      <div id="code-editor">
 <textarea id="code-js" rows="100">
   // Use send() for logging
 </textarea>
-                </div>
-                <br/>
-                <div class="form-group">
-                  <span class="box-title">Available Scripts (Use CTRL to choose multiple)  </span>
-                  <button id="loadscript" type="submit" class="btn btn-primary btn-sm">Load</button>
-                </div>
-                <div class="form-group">
-                  <select id="fd_scs" size="10" multiple="" class="form-control">
-                  </select>
-                </div>
-              
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-            <div class="col-md-12">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                <form style="display: flex; justify-content: flex-end">
-                  <label for="id_file" class="btn btn-primary btn-sm"><i class="fas fa-file-upload"></i> Upload to Device</label>
-                  <input type="file" style="visibility:hidden; width: 0%;" name="file" required="" id="id_file" onchange="uploadFile()">
-                </form>
-                   <div id="shell">
-                    <output></output>
-                    <div id="input-line" class="input-line">
-                      <div class="prompt"></div><div><input id="cmdinp" class="cmdline" autofocus /></div>
-                    </div>
-                  </div>
-              
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-        
-
-
-          <div class="col-md-12">
-            <div class="card card-default">
-              <!-- /.card-header -->
-              <div class="card-body">
-                   <div>
-                    <h4 class="page-header"><strong>Frida Logs </strong></h4>
-                    <div id="messages"></br>Data refreshed in every 3 seconds.</div>
-                    <pre class="frida-pre" id="frida-logs" style="font-size:15pt"></pre>
-                  </div>
-              </div>
-              <!-- /.card-body -->
-            </div>
-            <!-- /.card -->
-          </div>
-          <!-- /.col -->
-
-
-        </div>
-
-        </div>
-       </div>
-     </div>
+      </div>
+      <div class="flex items-center justify-between gap-2 mt-3">
+        <span class="text-tiny text-text-tertiary">Available Scripts (Use CTRL to choose multiple)</span>
+        <button id="loadscript" type="submit" class="btn btn-primary btn-sm">Load</button>
+      </div>
+      <select id="fd_scs" size="10" multiple="" class="form-control mt-2">
+      </select>
     </div>
-</div>
+  </div>
+</section>
 
-<!--Loader-->
+{# ─────────────────── Device file system &amp; shell ─────────────────── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header flex items-center justify-between gap-2 flex-wrap">
+    <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "package" size=16 %}</span> Device File System &amp; Shell</h2>
+    <form style="display: flex; justify-content: flex-end">
+      <label for="id_file" class="btn btn-primary btn-sm mb-0"><i class="fas fa-file-upload"></i> Upload to Device</label>
+      <input type="file" style="visibility:hidden; width: 0%;" name="file" required="" id="id_file" onchange="uploadFile()">
+    </form>
+  </div>
+  <div class="card-body p-0">
+    <div class="flex items-center gap-1.5 px-4 py-2.5 border-b border-border-subtle bg-surface-2/60">
+      <span class="mi-term-dot bg-text-tertiary/50"></span>
+      <span class="mi-term-dot bg-text-tertiary/35"></span>
+      <span class="mi-term-dot bg-text-tertiary/20"></span>
+      <span class="text-tiny text-text-tertiary ml-2 font-mono truncate">root@iPhone &mdash; ssh</span>
+    </div>
+    <div class="p-4">
+      <div id="shell">
+        <output></output>
+        <div id="input-line" class="input-line">
+          <div class="prompt"></div><div><input id="cmdinp" class="cmdline" autofocus /></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─────────────────── Frida logs ─────────────────── #}
+<section class="card mb-6" data-reveal>
+  <div class="card-header flex items-center justify-between gap-2 flex-wrap">
+    <h2 class="text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "file-text" size=16 %}</span> Frida Logs</h2>
+    <span class="mi-chip">
+      <span class="mi-pulse-dot text-severity-passed"></span>
+      <span id="messages">Data refreshed in every 3 seconds.</span>
+    </span>
+  </div>
+  <div class="card-body">
+    <pre class="frida-pre" id="frida-logs"></pre>
+  </div>
+</section>
+
+{# ─────────────────── Loader ─────────────────── #}
 <div class="hidden loading">
   <div class='uil-ring-css' style='transform:scale(0.79);'>
     <div></div>
   </div>
   </div>
 
-
-  <!-- Modal -->
+{# ─────────────────── Injected script modal ─────────────────── #}
  <div class="modal fade" id="get_code_modal" tabindex="-1" role="dialog">
   <div class="modal-dialog modal-xl">
-    <div class="modal-content">
+    <div class="modal-content rounded-xl shadow-elevation-3">
       <div class="modal-header">
-        <h4 class="modal-title">Injected Frida Script</h4>
+        <h4 class="modal-title flex items-center gap-2.5"><span class="hdr-chip">{% icon "edit" size=16 %}</span> Injected Frida Script</h4>
         <button type="button" class="close" data-dismiss="modal">&times;</button>
       </div>
       <div class="modal-body" id="injected_content">
@@ -435,14 +550,12 @@
   </div>
 </div>
 
-
-
-<!-- Modal -->
+{# ─────────────────── Attach-to-process modal ─────────────────── #}
 <div class="modal fade" id="frida_attach_mdl" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
   <div class="modal-dialog" role="document">
-    <div class="modal-content">
+    <div class="modal-content rounded-xl shadow-elevation-3">
       <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Attach to a Running Process</h5>
+        <h5 class="modal-title flex items-center gap-2.5" id="exampleModalLabel"><span class="hdr-chip">{% icon "zap" size=16 %}</span> Attach to a Running Process</h5>
         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
@@ -461,13 +574,6 @@
 
     </div>
   </div>
-</div>
-
-
-
-    <!-- /.modal-content -->
-  </div>
-  <!-- /.modal-dialog -->
 </div>
 <!-- End Modal -->
 
@@ -1317,5 +1423,48 @@ function print_status(message){
   $('#stat').scrollTop($('#stat')[0].scrollHeight);
 }
 
+</script>
+
+{# ─── Presentational-only additions: live status dots + script count. ───
+     Purely additive — reads DOM state via MutationObserver, never calls
+     or overrides any function defined above, and never mutates the
+     functional jQuery/Frida/Terminal logic. ─── #}
+<script>
+  // Mirror the real "Show Screen" / "Start Network Capture" button labels
+  // onto small pulsing status chips in the Analysis Controls toolbar.
+  // Purely observational — never triggers clicks or mutates existing elements.
+  (function () {
+    function wireLiveDot(buttonId, dotId, activeText) {
+      var btn = document.getElementById(buttonId);
+      var dot = document.getElementById(dotId);
+      if (!btn || !dot) return;
+      var sync = function () {
+        var isLive = btn.textContent.indexOf(activeText) !== -1;
+        dot.classList.toggle('hidden', !isLive);
+      };
+      new MutationObserver(sync).observe(btn, {
+        childList: true, subtree: true, characterData: true,
+      });
+      sync();
+    }
+    wireLiveDot('screen', 'screen-live-dot', 'Stop Screen');
+    wireLiveDot('network', 'network-live-dot', 'Stop Network Capture');
+  })();
+
+  // Reflect the real number of Frida scripts fetched from the backend
+  // (list_frida_scripts, populated into #fd_scs by load_frida_others())
+  // as a small chip next to the Code Editor header.
+  (function () {
+    var sel = document.getElementById('fd_scs');
+    var out = document.getElementById('scripts-count');
+    if (!sel || !out) return;
+    var sync = function () {
+      var n = sel.options.length;
+      out.textContent = n + (n === 1 ? ' script available' : ' scripts available');
+      out.classList.toggle('hidden', n === 0);
+    };
+    new MutationObserver(sync).observe(sel, { childList: true });
+    sync();
+  })();
 </script>
 {% endblock %}

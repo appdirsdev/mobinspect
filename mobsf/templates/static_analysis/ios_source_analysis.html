@@ -1,5 +1,5 @@
 {% extends "base/app.html" %}
-{% load static %}{% load mi_icons %}{% load rbac %}
+{% load static %}{% load mi_icons %}{% load rbac %}{% load mi_score %}
 
 {% block page_title %}Static · iOS — {{ app_name|default:file_name }}{% endblock %}
 
@@ -15,7 +15,6 @@
     }
   </style>
   <style>
-    #app_icon { width: 64px; height: 64px; }
     .pre-finding {
       white-space: pre-wrap;
       word-wrap: break-word;
@@ -26,89 +25,169 @@
     #chartdiv { width: 100%; height: 500px; overflow: hidden; }
     /* keep amCharts map readable on dark surfaces */
     #chartdiv text { fill: currentColor; }
+
+    /* DataTables controls inherit the theme palette */
+    .report-table .dataTables_wrapper { color: rgb(var(--text-secondary)); font-size: 13px; }
+    .report-table table.dataTable thead th { border-bottom: 1px solid rgb(var(--border-subtle)); }
+
+    /* ── Report hero: ambient glow (theme-aware) ── */
+    .mi-report-hero { position: relative; }
+    .mi-report-glow { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
+    .mi-report-glow::before {
+      content: ''; position: absolute; width: 320px; height: 320px; top: -150px; right: -60px;
+      border-radius: 9999px; filter: blur(60px); opacity: .5;
+      background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+      animation: mi-float 16s ease-in-out infinite;
+    }
+    :root[data-theme="dark"] .mi-report-glow::before { opacity: .36; }
+
+    /* ── Stat tiles: accent top-bar + hover lift, count-up driven ── */
+    .mi-stat { position: relative; overflow: hidden;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+    .mi-stat:hover { transform: translateY(-3px); box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); }
+    .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+    /* ── Section header icon-chip ── */
+    .mi-chip { transition: transform .18s ease; flex-shrink: 0; }
+    .card:hover > .card-header .mi-chip { transform: scale(1.06); }
+
+    /* ── Quick-jump nav ── */
+    .mi-quicknav a { transition: background .15s ease, color .15s ease, border-color .15s ease; white-space: nowrap; }
+    .mi-quicknav a.is-active { background: rgba(37,99,235,.12); border-color: rgba(37,99,235,.35); color: #2563EB; }
+    :root[data-theme="dark"] .mi-quicknav a.is-active { color: #60A5FA; }
+    .mi-quicknav-scroll::-webkit-scrollbar { height: 5px; }
+    .mi-quicknav-scroll::-webkit-scrollbar-thumb { background: rgb(var(--border-default)); border-radius: 9999px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mi-report-glow::before { animation: none !important; }
+      .mi-stat, .mi-chip, .mi-quicknav a { transition: none !important; }
+      .mi-stat:hover { transform: none; }
+    }
+    @keyframes mi-float {
+      0%, 100% { transform: translate3d(0,0,0); }
+      50%      { transform: translate3d(0,-22px,0); }
+    }
   </style>
 {% endblock %}
 
 {% block content %}
-<div x-data="{ open: '', plistOpen: false, supOpen: false, logsOpen: false }" class="space-y-8">
+<div x-data="{ open: '', plistOpen: false, supOpen: false, logsOpen: false }" class="space-y-6">
 
 {# ─────────── Header ─────────── #}
 <a id="information" class="anchor"></a>
-<header class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-  <div class="flex items-center gap-4 min-w-0">
-    <img id="app_icon"
-      src="{% if not appstore_details.error %}{{appstore_details.icon}}{% elif icon_path %}/download/{{ icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
-      class="rounded-lg bg-surface-2 object-contain flex-shrink-0"
-      alt=""/>
-    <div class="min-w-0">
-      <p class="text-tiny uppercase text-text-tertiary">Static · iOS</p>
-      <h1 class="text-h2 truncate">
-        {{ app_name }}
-        {% if app_version %}<span class="text-text-tertiary">v{{ app_version }}</span>{% endif %}
-      </h1>
-      {% if bundle_id %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ bundle_id }}</p>{% endif %}
-      <p class="text-tiny text-text-tertiary mt-0.5 font-mono truncate">{{ md5 }}</p>
+<header class="mi-report-hero card mi-glass relative overflow-hidden p-0" data-reveal>
+  <div class="mi-report-glow" aria-hidden="true"></div>
+  <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-6 py-6">
+    <div class="flex items-center gap-4 min-w-0">
+      <img id="app_icon"
+        src="{% if not appstore_details.error %}{{appstore_details.icon}}{% elif icon_path %}/download/{{ icon_path }}{% else %}{% static 'img/no_icon.png' %}{% endif %}"
+        onerror="this.src='{% static 'img/no_icon.png' %}'"
+        class="w-16 h-16 rounded-xl bg-surface-2 object-contain flex-shrink-0 shadow-elevation-1"
+        alt=""/>
+      <div class="min-w-0">
+        <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1 inline-flex items-center gap-1.5">{% icon "smartphone" size=12 %} Static · iOS</p>
+        <h1 class="text-h2 truncate">
+          {{ app_name }}
+          {% if app_version %}<span class="text-text-tertiary font-normal">v{{ app_version }}</span>{% endif %}
+        </h1>
+        {% if bundle_id %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ bundle_id }}</p>{% endif %}
+        <p class="text-tiny text-text-tertiary mt-0.5 font-mono truncate">{{ md5 }}</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 no-print" id="scan_options">
+      {% can 'admin.ai.view' %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endcan %}
+      <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="mi-pillbtn btn btn-md" role="button">
+        {% icon "shield-check" size=14 %} Scorecard
+      </a>
+      <a href="{% url 'static_analyzer_ios' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md" role="button">
+        {% icon "activity" size=14 %} Rescan
+      </a>
+      <button onclick="window.print()" class="btn btn-secondary btn-md">
+        {% icon "file-text" size=14 %} Print / PDF
+      </button>
+      <a id="supbtn" onclick="list_suppressions()" role="button" class="btn btn-secondary btn-md" @click="supOpen = true" href="#">
+        {% icon "sliders" size=14 %} Suppressions
+      </a>
+      <button type="button" class="btn btn-secondary btn-md" @click="plistOpen = true">
+        {% icon "eye" size=14 %} Info.plist
+      </button>
+      <button type="button" class="btn btn-secondary btn-md" @click="logsOpen = true">
+        {% icon "file-text" size=14 %} Scan logs
+      </button>
+      <a href="{% url "download_binary" checksum=md5 %}" class="btn btn-ghost btn-md">
+        {% icon "download" size=14 %} Download ZIP
+      </a>
     </div>
   </div>
-  <div class="flex flex-wrap items-center gap-2 no-print" id="scan_options">
-    {% can 'admin.ai.view' %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endcan %}
-    <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-primary btn-md" role="button">
-      {% icon "shield-check" size=14 %} Scorecard
-    </a>
-    <a href="{% url 'static_analyzer_ios' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md" role="button">
-      {% icon "activity" size=14 %} Rescan
-    </a>
-    <button onclick="window.print()" class="btn btn-secondary btn-md">
-      {% icon "file-text" size=14 %} Print / PDF
-    </button>
-    <a id="supbtn" onclick="list_suppressions()" role="button" class="btn btn-secondary btn-md" @click="supOpen = true" href="#">
-      {% icon "sliders" size=14 %} Suppressions
-    </a>
-    <button type="button" class="btn btn-secondary btn-md" @click="plistOpen = true">
-      {% icon "eye" size=14 %} Info.plist
-    </button>
-    <button type="button" class="btn btn-secondary btn-md" @click="logsOpen = true">
-      {% icon "file-text" size=14 %} Scan logs
-    </button>
-    <a href="{% url "download_binary" checksum=md5 %}" class="btn btn-ghost btn-md">
-      {% icon "download" size=14 %} Download ZIP
-    </a>
-  </div>
 </header>
+
+{# ─────────── Quick-jump nav (pure navigation aid over existing anchors) ─────────── #}
+<nav class="mi-quicknav sticky top-0 z-10 no-print" data-quicknav aria-label="Report sections">
+  <div class="mi-quicknav-scroll flex items-center gap-1 overflow-x-auto py-2 px-2 rounded-lg border border-border-subtle bg-surface-1/90 backdrop-blur shadow-elevation-1">
+    <a href="#information" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Info</a>
+    {% if not appstore_details.error %}<a href="#appstore" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">App Store</a>{% endif %}
+    <a href="#url_schemes" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">URL schemes</a>
+    <a href="#permissions" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Permissions</a>
+    <a href="#ios_api" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">API</a>
+    <a href="#transport_security" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">ATS</a>
+    <a href="#code_analysis" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Code</a>
+    <a href="#file_analysis" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">File checks</a>
+    <a href="#firebase" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Firebase</a>
+    <a href="#serverlocations" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Servers</a>
+    <a href="#malware_check" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Malware</a>
+    <a href="#urls" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">URLs</a>
+    <a href="#emails" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Emails</a>
+    <a href="#trackers" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Trackers</a>
+    <a href="#secrets" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Secrets</a>
+    <a href="#strings" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Strings</a>
+    <a href="#files" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">All files</a>
+  </div>
+</nav>
 
 {# ─────────── Score + File + App info ─────────── #}
 <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
   {# App scores #}
-  <div class="card lg:col-span-3" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "shield-check" size=16 %} App scores</h2></div>
-    <div class="card-body space-y-3 text-small">
-      {% if average_cvss %}
-      <div class="flex items-center justify-between">
-        <span class="text-text-tertiary">Average CVSS</span>
-        <span class="font-semibold tabular text-text-primary">{{ average_cvss }}</span>
-      </div>
-      {% endif %}
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-text-tertiary">Security score</span>
-        <span class="badge {% if appsec.security_score < 40 %}badge-critical{% elif appsec.security_score == 100 %}badge-passed{% else %}badge-medium{% endif %}">{{ appsec.security_score }}/100</span>
-      </div>
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-text-tertiary">Trackers</span>
-        {% if trackers.detected_trackers > 0 %}
-          <span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
-        {% else %}
-          <span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
+  <div class="card mi-glass card-hover lg:col-span-3" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "shield-check" size=14 %}</span> App scores</h2></div>
+    <div class="card-body">
+      <div class="flex flex-col sm:flex-row items-center gap-6">
+        {# Security score — the visual anchor, rendered as the shared arc gauge #}
+        {% if appsec.security_score is not None %}
+        <div class="flex-shrink-0 flex flex-col items-center gap-1.5">
+          {% include "components/gauge_arc.html" with value=appsec.security_score color=appsec.security_score|score_color sub_label="/ 100" size_class="w-32 h-32" animate=True %}
+          <span class="text-tiny uppercase text-text-tertiary">Security score</span>
+        </div>
         {% endif %}
+        {# Secondary scores #}
+        <div class="flex-1 min-w-0 w-full space-y-3 text-small">
+          {% if average_cvss %}
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "activity" size=14 %} Average CVSS</span>
+            <span class="font-semibold tabular text-text-primary">{{ average_cvss }}</span>
+          </div>
+          {% endif %}
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "eye" size=14 %} Trackers</span>
+            {% if trackers.detected_trackers > 0 %}
+              <span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
+            {% else %}
+              <span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
+            {% endif %}
+          </div>
+          <div class="pt-1">
+            <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-secondary btn-sm w-full justify-center">{% icon "shield" size=14 %} MobInspect Scorecard</a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   {# File information #}
-  <div class="card lg:col-span-4" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
+  <div class="card mi-glass card-hover lg:col-span-4" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "package" size=14 %}</span> File information</h2></div>
     <div class="card-body space-y-2 text-small">
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">File name</span><span class="font-mono text-mono text-text-primary truncate">{{ file_name }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">File name</span><span class="font-mono text-mono text-text-primary truncate" title="{{ file_name }}">{{ file_name }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">MD5</span><span class="font-mono text-mono text-text-secondary truncate">{{ md5 }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-20 flex-shrink-0">SHA1</span><span class="font-mono text-mono text-text-secondary truncate">{{ sha1 }}</span></div>
@@ -117,8 +196,8 @@
   </div>
 
   {# App information #}
-  <div class="card lg:col-span-5" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "info" size=16 %} App information</h2></div>
+  <div class="card mi-glass card-hover lg:col-span-5" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "info" size=14 %}</span> App information</h2></div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App type</span><span class="text-text-primary">{{ app_type }}</span></div>
@@ -135,9 +214,13 @@
 
 {# ─────────── App Store information ─────────── #}
 {% if not appstore_details.error %}
+<a id="appstore" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "smartphone" size=16 %} App Store information</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "smartphone" size=14 %}</span> App Store information</h2>
+      <a target="_blank" href="{{ appstore_details.itunes_url }}" rel="noopener noreferrer" class="btn btn-ghost btn-sm">{% icon "external-link" size=14 %} View listing</a>
+    </div>
     <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Title</span><span class="text-text-primary">{{ appstore_details.title }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Score</span><span class="text-text-primary">{{ appstore_details.score }}</span></div>
@@ -151,7 +234,7 @@
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Developer URL</span><span class="text-text-secondary truncate">{{ appstore_details.developer_url }}</span></div>
       <div class="flex items-baseline gap-2 md:col-span-2"><span class="text-text-tertiary w-32 flex-shrink-0">Supported devices</span><span class="text-text-secondary">{% for dev in appstore_details.supported_devices %}{{ dev }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
       <div class="md:col-span-2 mt-2">
-        <p class="text-text-tertiary mb-1">Description</p>
+        <p class="text-tiny uppercase text-text-tertiary mb-1">Description</p>
         <pre class="pre-finding text-text-secondary">{{ appstore_details.description }}</pre>
       </div>
     </div>
@@ -162,11 +245,13 @@
 {# ─────────── Custom URL schemes ─────────── #}
 <a id="url_schemes" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "external-link" size=18 %} Custom URL schemes</h2></div>
-    {% if bundle_url_types|length > 0 %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-small">
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "external-link" size=16 %}</span> Custom URL schemes</h2>
+      <span class="badge badge-neutral tabular">{{ bundle_url_types|length }}</span>
+    </div>
+    <div class="overflow-x-auto report-table">
+      <table id="table_url_schemes" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
             <th class="text-left px-5 py-2.5 font-medium">URL name</th>
@@ -190,24 +275,32 @@
               {% endif %}
             </td>
           </tr>
+          {% empty %}
+          <tr>
+            <td colspan="2" class="px-5 py-10 text-center">
+              <div class="flex flex-col items-center gap-2 text-text-tertiary">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "external-link" size=16 %}</span>
+                <p class="text-small">No URL schemes found.</p>
+              </div>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    {% else %}
-    <div class="card-body"><p class="text-small text-text-secondary">No URL Schemes found.</p></div>
-    {% endif %}
   </div>
 </section>
 
 {# ─────────── Application permissions ─────────── #}
 <a id="permissions" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield" size=18 %} Application permissions</h2></div>
-    {% if permissions %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-small">
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "shield" size=16 %}</span> Application permissions</h2>
+      <span class="badge badge-neutral tabular">{{ permissions|length }}</span>
+    </div>
+    <div class="overflow-x-auto report-table">
+      <table id="table_permissions" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
             <th class="text-left px-5 py-2.5 font-medium">Permissions</th>
@@ -230,23 +323,32 @@
             <td class="px-5 py-3 text-text-secondary">{{ desc.info}}</td>
             <td class="px-5 py-3 text-text-secondary">{{ desc.description }}</td>
           </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="px-5 py-10 text-center">
+              <div class="flex flex-col items-center gap-2 text-text-tertiary">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield" size=16 %}</span>
+                <p class="text-small">No permissions required.</p>
+              </div>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    {% else %}
-    <div class="card-body"><p class="text-small text-text-secondary">No Permissions required.</p></div>
-    {% endif %}
   </div>
 </section>
 
 {# ─────────── iOS API ─────────── #}
 <a id="ios_api" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} iOS API</h2></div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-small">
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "database" size=16 %}</span> iOS API</h2>
+      <span class="badge badge-neutral tabular">{{ ios_api|length }}</span>
+    </div>
+    <div class="overflow-x-auto report-table">
+      <table id="table_api" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
             <th class="text-left px-5 py-2.5 font-medium">API</th>
@@ -260,7 +362,7 @@
             <td class="px-5 py-3">
               <details class="group">
                 <summary class="cursor-pointer text-text-brand hover:underline select-none inline-flex items-center gap-1">
-                  {% icon "chevron-right" size=14 %} Show files
+                  {% icon "chevron-down" size=14 %} Show files
                 </summary>
                 <div class="mt-2 space-y-1">
                   {% for file_path, lines in details.files.items %}
@@ -268,6 +370,15 @@
                   {% endfor %}
                 </div>
               </details>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="2" class="px-5 py-10 text-center">
+              <div class="flex flex-col items-center gap-2 text-text-tertiary">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "database" size=16 %}</span>
+                <p class="text-small">No sensitive iOS API calls detected.</p>
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -280,30 +391,38 @@
 {# ─────────── App Transport Security (ATS) ─────────── #}
 <a id="transport_security" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "lock" size=18 %} App Transport Security (ATS)</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "lock" size=16 %}</span> App Transport Security (ATS)</h2></div>
     {% if ats_analysis and 'ats_summary' in ats_analysis and ats_analysis.ats_summary|length > 0 %}
     <div class="card-body grid grid-cols-2 md:grid-cols-4 gap-3">
-      <div class="flex items-center gap-3">
-        <span class="w-9 h-9 rounded-md bg-severity-high/10 text-severity-high dark:bg-severity-high-dark/15 dark:text-severity-high-dark flex items-center justify-center">{% icon "alert-triangle" size=18 %}</span>
-        <div><p class="text-tiny uppercase text-text-tertiary">High</p><p class="text-h3 tabular">{{ ats_analysis.ats_summary.high }}</p></div>
+      <div class="mi-stat rounded-lg border border-border-subtle bg-severity-high/10 px-4 py-3" x-data="counter({{ ats_analysis.ats_summary.high }})">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-md bg-severity-high/15 text-severity-high dark:bg-severity-high-dark/20 dark:text-severity-high-dark flex items-center justify-center flex-shrink-0">{% icon "alert-triangle" size=18 %}</span>
+          <div><p class="text-tiny uppercase text-text-tertiary">High</p><p class="mi-num text-h3 tabular" x-text="shown">0</p></div>
+        </div>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="w-9 h-9 rounded-md bg-severity-medium/10 text-severity-medium dark:bg-severity-medium-dark/15 dark:text-severity-medium-dark flex items-center justify-center">{% icon "alert-triangle" size=18 %}</span>
-        <div><p class="text-tiny uppercase text-text-tertiary">Warning</p><p class="text-h3 tabular">{{ ats_analysis.ats_summary.warning }}</p></div>
+      <div class="mi-stat rounded-lg border border-border-subtle bg-severity-medium/10 px-4 py-3" x-data="counter({{ ats_analysis.ats_summary.warning }})">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-md bg-severity-medium/15 text-severity-medium dark:bg-severity-medium-dark/20 dark:text-severity-medium-dark flex items-center justify-center flex-shrink-0">{% icon "alert-triangle" size=18 %}</span>
+          <div><p class="text-tiny uppercase text-text-tertiary">Warning</p><p class="mi-num text-h3 tabular" x-text="shown">0</p></div>
+        </div>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="w-9 h-9 rounded-md bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark flex items-center justify-center">{% icon "info" size=18 %}</span>
-        <div><p class="text-tiny uppercase text-text-tertiary">Info</p><p class="text-h3 tabular">{{ ats_analysis.ats_summary.info }}</p></div>
+      <div class="mi-stat rounded-lg border border-border-subtle bg-severity-low/10 px-4 py-3" x-data="counter({{ ats_analysis.ats_summary.info }})">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-md bg-severity-low/15 text-severity-low dark:bg-severity-low-dark/20 dark:text-severity-low-dark flex items-center justify-center flex-shrink-0">{% icon "info" size=18 %}</span>
+          <div><p class="text-tiny uppercase text-text-tertiary">Info</p><p class="mi-num text-h3 tabular" x-text="shown">0</p></div>
+        </div>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="w-9 h-9 rounded-md bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex items-center justify-center">{% icon "check" size=18 %}</span>
-        <div><p class="text-tiny uppercase text-text-tertiary">Secure</p><p class="text-h3 tabular">{{ ats_analysis.ats_summary.secure }}</p></div>
+      <div class="mi-stat rounded-lg border border-border-subtle bg-severity-passed/10 px-4 py-3" x-data="counter({{ ats_analysis.ats_summary.secure }})">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-md bg-severity-passed/15 text-severity-passed dark:bg-severity-passed-dark/20 dark:text-severity-passed-dark flex items-center justify-center flex-shrink-0">{% icon "check" size=18 %}</span>
+          <div><p class="text-tiny uppercase text-text-tertiary">Secure</p><p class="mi-num text-h3 tabular" x-text="shown">0</p></div>
+        </div>
       </div>
     </div>
     {% endif %}
-    <div class="overflow-x-auto border-t border-border-subtle">
-      <table class="w-full text-small">
+    <div class="overflow-x-auto report-table border-t border-border-subtle">
+      <table id="table_ats" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
             <th class="text-left px-5 py-2.5 font-medium">No</th>
@@ -331,6 +450,15 @@
               </td>
               <td class="px-5 py-3 text-text-secondary">{{findings.description}}</td>
             </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="px-5 py-10 text-center">
+                <div class="flex flex-col items-center gap-2 text-text-tertiary">
+                  <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield-check" size=16 %}</span>
+                  <p class="text-small">No ATS findings.</p>
+                </div>
+              </td>
+            </tr>
             {% endfor %}
           {% endif %}
         </tbody>
@@ -342,33 +470,43 @@
 {# ─────────── Code analysis ─────────── #}
 <a id="code_analysis" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Code analysis</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "bar-chart-3" size=16 %}</span> Code analysis</h2></div>
     {% if code_analysis and 'summary' in code_analysis and code_analysis.summary|length > 0 %}
     <div class="card-body grid grid-cols-2 md:grid-cols-5 gap-3">
-      <div class="flex items-center gap-3">
-        <span class="w-9 h-9 rounded-md bg-severity-high/10 text-severity-high dark:bg-severity-high-dark/15 dark:text-severity-high-dark flex items-center justify-center">{% icon "alert-triangle" size=18 %}</span>
-        <div><p class="text-tiny uppercase text-text-tertiary">High</p><p class="text-h3 tabular">{{ code_analysis.summary.high }}</p></div>
+      <div class="mi-stat rounded-lg border border-border-subtle bg-severity-high/10 px-4 py-3" x-data="counter({{ code_analysis.summary.high }})">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-md bg-severity-high/15 text-severity-high dark:bg-severity-high-dark/20 dark:text-severity-high-dark flex items-center justify-center flex-shrink-0">{% icon "alert-triangle" size=18 %}</span>
+          <div><p class="text-tiny uppercase text-text-tertiary">High</p><p class="mi-num text-h3 tabular" x-text="shown">0</p></div>
+        </div>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="w-9 h-9 rounded-md bg-severity-medium/10 text-severity-medium dark:bg-severity-medium-dark/15 dark:text-severity-medium-dark flex items-center justify-center">{% icon "alert-triangle" size=18 %}</span>
-        <div><p class="text-tiny uppercase text-text-tertiary">Warning</p><p class="text-h3 tabular">{{ code_analysis.summary.warning }}</p></div>
+      <div class="mi-stat rounded-lg border border-border-subtle bg-severity-medium/10 px-4 py-3" x-data="counter({{ code_analysis.summary.warning }})">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-md bg-severity-medium/15 text-severity-medium dark:bg-severity-medium-dark/20 dark:text-severity-medium-dark flex items-center justify-center flex-shrink-0">{% icon "alert-triangle" size=18 %}</span>
+          <div><p class="text-tiny uppercase text-text-tertiary">Warning</p><p class="mi-num text-h3 tabular" x-text="shown">0</p></div>
+        </div>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="w-9 h-9 rounded-md bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark flex items-center justify-center">{% icon "info" size=18 %}</span>
-        <div><p class="text-tiny uppercase text-text-tertiary">Info</p><p class="text-h3 tabular">{{ code_analysis.summary.info }}</p></div>
+      <div class="mi-stat rounded-lg border border-border-subtle bg-severity-low/10 px-4 py-3" x-data="counter({{ code_analysis.summary.info }})">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-md bg-severity-low/15 text-severity-low dark:bg-severity-low-dark/20 dark:text-severity-low-dark flex items-center justify-center flex-shrink-0">{% icon "info" size=18 %}</span>
+          <div><p class="text-tiny uppercase text-text-tertiary">Info</p><p class="mi-num text-h3 tabular" x-text="shown">0</p></div>
+        </div>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="w-9 h-9 rounded-md bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex items-center justify-center">{% icon "check" size=18 %}</span>
-        <div><p class="text-tiny uppercase text-text-tertiary">Secure</p><p class="text-h3 tabular">{{ code_analysis.summary.secure }}</p></div>
+      <div class="mi-stat rounded-lg border border-border-subtle bg-severity-passed/10 px-4 py-3" x-data="counter({{ code_analysis.summary.secure }})">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-md bg-severity-passed/15 text-severity-passed dark:bg-severity-passed-dark/20 dark:text-severity-passed-dark flex items-center justify-center flex-shrink-0">{% icon "check" size=18 %}</span>
+          <div><p class="text-tiny uppercase text-text-tertiary">Secure</p><p class="mi-num text-h3 tabular" x-text="shown">0</p></div>
+        </div>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="w-9 h-9 rounded-md bg-severity-unknown/15 text-severity-unknown dark:bg-severity-unknown-dark/15 dark:text-severity-unknown-dark flex items-center justify-center">{% icon "eye-off" size=18 %}</span>
-        <div><p class="text-tiny uppercase text-text-tertiary">Suppressed</p><p class="text-h3 tabular">{{ code_analysis.summary.suppressed }}</p></div>
+      <div class="mi-stat rounded-lg border border-border-subtle bg-surface-2 px-4 py-3" x-data="counter({{ code_analysis.summary.suppressed }})">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-md bg-severity-unknown/15 text-severity-unknown dark:bg-severity-unknown-dark/15 dark:text-severity-unknown-dark flex items-center justify-center flex-shrink-0">{% icon "eye-off" size=18 %}</span>
+          <div><p class="text-tiny uppercase text-text-tertiary">Suppressed</p><p class="mi-num text-h3 tabular" x-text="shown">0</p></div>
+        </div>
       </div>
     </div>
     {% endif %}
-    <div class="overflow-x-auto border-t border-border-subtle">
+    <div class="overflow-x-auto report-table border-t border-border-subtle">
       <table id="table_code" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
@@ -430,7 +568,7 @@
               {% else %}
                 <details class="group">
                   <summary class="cursor-pointer text-text-brand hover:underline select-none inline-flex items-center gap-1">
-                    {% icon "chevron-right" size=14 %} Show files
+                    {% icon "chevron-down" size=14 %} Show files
                   </summary>
                   <div class="mt-2 space-y-1">
                     {% for file_path, lines in details.files.items %}
@@ -452,6 +590,15 @@
               </div>
             </td>
           </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="px-5 py-10 text-center">
+              <div class="flex flex-col items-center gap-2 text-text-tertiary">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "shield-check" size=16 %}</span>
+                <p class="text-small">No code analysis findings.</p>
+              </div>
+            </td>
+          </tr>
           {% endfor %}
           {% endif %}
         </tbody>
@@ -463,10 +610,13 @@
 {# ─────────── File analysis ─────────── #}
 <a id="file_analysis" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} File analysis</h2></div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-small">
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "file-text" size=16 %}</span> File analysis</h2>
+      <span class="badge badge-neutral tabular">{{ file_analysis|length }}</span>
+    </div>
+    <div class="overflow-x-auto report-table">
+      <table id="table_file_analysis" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
             <th class="text-left px-5 py-2.5 font-medium">No</th>
@@ -489,6 +639,15 @@
               {% endfor %}
             </td>
           </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="px-5 py-10 text-center">
+              <div class="flex flex-col items-center gap-2 text-text-tertiary">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "file-text" size=16 %}</span>
+                <p class="text-small">No file-level findings.</p>
+              </div>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
@@ -499,9 +658,12 @@
 {# ─────────── Firebase database analysis ─────────── #}
 <a id="firebase" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "database" size=18 %} Firebase database analysis</h2></div>
-    <div class="overflow-x-auto">
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "database" size=16 %}</span> Firebase database analysis</h2>
+      <span class="badge badge-neutral tabular">{{ firebase_urls|length }}</span>
+    </div>
+    <div class="overflow-x-auto report-table">
       <table id="table_firebase" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
@@ -527,6 +689,15 @@
             </td>
             <td class="px-5 py-3 text-text-secondary">{{ find.description }}</td>
           </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="px-5 py-10 text-center">
+              <div class="flex flex-col items-center gap-2 text-text-tertiary">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-surface-2">{% icon "database" size=16 %}</span>
+                <p class="text-small">No Firebase database URLs found.</p>
+              </div>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
@@ -537,8 +708,8 @@
 {# ─────────── Server locations ─────────── #}
 <a id="serverlocations" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "activity" size=18 %} Server locations</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "activity" size=16 %}</span> Server locations</h2></div>
     <div class="card-body">
       <div id="chartdiv"></div>
     </div>
@@ -546,7 +717,7 @@
     <div class="px-5 pb-3">
       <p class="text-small text-text-secondary">This app may communicate with the following OFAC sanctioned list of countries.</p>
     </div>
-    <div class="overflow-x-auto border-t border-border-subtle">
+    <div class="overflow-x-auto report-table border-t border-border-subtle">
       <table id="table_ofac" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
@@ -578,10 +749,10 @@
 {# ─────────── Domain malware check ─────────── #}
 <a id="malware_check" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "search" size=18 %} Domain malware check</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "shield-alert" size=16 %}</span> Domain malware check</h2></div>
     {% if domains %}
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto report-table">
       <table id="table_malware" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
@@ -629,10 +800,13 @@
 {# ─────────── URLs ─────────── #}
 <a id="urls" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "external-link" size=18 %} URLs</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "external-link" size=16 %}</span> URLs</h2>
+      {% if urls %}<span class="badge badge-neutral tabular">{{ urls|length }}</span>{% endif %}
+    </div>
     {% if urls %}
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto report-table">
       <table id="table_urls" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
@@ -663,10 +837,13 @@
 {# ─────────── Emails ─────────── #}
 <a id="emails" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Emails</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "file-text" size=16 %}</span> Emails</h2>
+      {% if emails %}<span class="badge badge-neutral tabular">{{ emails|length }}</span>{% endif %}
+    </div>
     {% if emails %}
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto report-table">
       <table id="table_emails" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
@@ -697,10 +874,10 @@
 {# ─────────── Trackers ─────────── #}
 <a id="trackers" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "eye" size=18 %} Trackers</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "eye-off" size=16 %}</span> Trackers</h2></div>
     {% if trackers %}
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto report-table">
       <table id="table_trackers" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
@@ -727,8 +904,11 @@
 {# ─────────── Possible hardcoded secrets ─────────── #}
 <a id="secrets" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "key" size=18 %} Possible hardcoded secrets</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header">
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "key" size=16 %}</span> Possible hardcoded secrets</h2>
+      <span class="badge badge-neutral tabular">{{ secrets|length }}</span>
+    </div>
     <div class="card-body">
       <div class="space-y-1 font-mono text-mono text-text-secondary break-all">
         {% for val in secrets %}
@@ -742,9 +922,9 @@
 {# ─────────── Strings ─────────── #}
 <a id="strings" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Strings</h2></div>
-    <div class="card-body">
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "file-text" size=16 %}</span> Strings</h2></div>
+    <div class="card-body text-small text-text-secondary">
       {% include 'base/list.html' with list=strings type="strings"  limit=100 %}
     </div>
   </div>
@@ -753,9 +933,9 @@
 {# ─────────── Files ─────────── #}
 <a id="files" class="anchor"></a>
 <section>
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "copy" size=18 %} Files</h2></div>
-    <div class="card-body">
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "copy" size=16 %}</span> Files</h2></div>
+    <div class="card-body text-small text-text-secondary">
       {% include 'base/list.html' with list=files type="files"  limit=200 %}
     </div>
   </div>
@@ -763,10 +943,10 @@
 
 {# ─────────── Info.plist modal ─────────── #}
 <div x-show="plistOpen" x-cloak @keydown.escape.window="plistOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-  <div class="absolute inset-0 bg-black/50" @click="plistOpen = false"></div>
-  <div class="relative card w-full max-w-4xl max-h-[85vh] flex flex-col" @click.outside="plistOpen = false">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="plistOpen = false"></div>
+  <div class="relative card mi-glass w-full max-w-4xl max-h-[85vh] flex flex-col shadow-elevation-4" @click.outside="plistOpen = false">
     <div class="card-header flex items-center justify-between">
-      <h2 class="text-h3">Info.plist</h2>
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "eye" size=16 %}</span> Info.plist</h2>
       <button type="button" class="btn btn-ghost btn-sm" @click="plistOpen = false" aria-label="Close">{% icon "x" size=16 %}</button>
     </div>
     <div class="card-body overflow-auto">
@@ -777,13 +957,13 @@
 
 {# ─────────── Suppression rules modal ─────────── #}
 <div x-show="supOpen" x-cloak @keydown.escape.window="supOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-  <div class="absolute inset-0 bg-black/50" @click="supOpen = false"></div>
-  <div class="relative card w-full max-w-4xl max-h-[85vh] flex flex-col" @click.outside="supOpen = false">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="supOpen = false"></div>
+  <div class="relative card mi-glass w-full max-w-4xl max-h-[85vh] flex flex-col shadow-elevation-4" @click.outside="supOpen = false">
     <div class="card-header flex items-center justify-between">
-      <h2 class="text-h3">Suppression rules</h2>
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "sliders" size=16 %}</span> Suppression rules</h2>
       <button type="button" class="btn btn-ghost btn-sm" @click="supOpen = false" aria-label="Close">{% icon "x" size=16 %}</button>
     </div>
-    <div class="overflow-auto">
+    <div class="overflow-auto report-table">
       <table id="sup_table" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
@@ -801,13 +981,13 @@
 
 {# ─────────── Scan logs modal ─────────── #}
 <div x-show="logsOpen" x-cloak @keydown.escape.window="logsOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-  <div class="absolute inset-0 bg-black/50" @click="logsOpen = false"></div>
-  <div class="relative card w-full max-w-4xl max-h-[85vh] flex flex-col" @click.outside="logsOpen = false">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="logsOpen = false"></div>
+  <div class="relative card mi-glass w-full max-w-4xl max-h-[85vh] flex flex-col shadow-elevation-4" @click.outside="logsOpen = false">
     <div class="card-header flex items-center justify-between">
-      <h2 class="text-h3">Scan logs</h2>
+      <h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-chart-violet/15 text-chart-violet">{% icon "file-text" size=16 %}</span> Scan logs</h2>
       <button type="button" class="btn btn-ghost btn-sm" @click="logsOpen = false" aria-label="Close">{% icon "x" size=16 %}</button>
     </div>
-    <div class="overflow-auto">
+    <div class="overflow-auto report-table">
       <table id="scan_logs" class="w-full text-small">
         <thead>
           <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
@@ -961,4 +1141,52 @@
   {% endif %}
   ];
   </script>
+<script>
+  // Animated count-up for stat tiles (additive; presentation only).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+
+  // Quick-jump nav scroll-spy — highlights the section link that matches
+  // the anchor currently in view (additive; presentation only).
+  (function () {
+    var nav = document.querySelector('[data-quicknav]');
+    if (!nav) return;
+    var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#"]'));
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var targets = Object.keys(map)
+      .map(function (id) { return document.getElementById(id); })
+      .filter(Boolean);
+    if (!targets.length || !('IntersectionObserver' in window)) return;
+    var current = null;
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          if (current) current.classList.remove('is-active');
+          current = map[entry.target.id];
+          if (current) current.classList.add('is-active');
+        }
+      });
+    }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+    targets.forEach(function (t) { obs.observe(t); });
+  })();
+</script>
 {% endblock %}

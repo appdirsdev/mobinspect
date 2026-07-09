@@ -5,48 +5,184 @@
 
 {% block extra_head %}
 <style>
+  [x-cloak] { display: none !important; }
+
   @media print {
     @page { size: landscape; }
-    aside, header.h-topbar, footer, .btn, #scan_options { display: none !important; }
+    aside, header.h-topbar, footer { display: none !important; }
+    .btn, [data-no-print] { display: none !important; }
+  }
+
+  /* ── Ambient report header: floating brand-blobs + faint grid ──
+     Toned-down variant of the dashboard hero (general/home.html), for a
+     dense report page. Theme-aware, reduced-motion safe. */
+  .mi-hero { background: var(--surface-1); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(60px); opacity: .4;
+  }
+  .mi-hero-glow::before {
+    width: 260px; height: 260px; top: -110px; right: -60px;
+    background: radial-gradient(circle at center, rgba(254,74,35,.5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 200px; height: 200px; bottom: -110px; left: 15%;
+    background: radial-gradient(circle at center, rgba(141,92,252,.35), transparent 70%);
+    animation: mi-float 21s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .4;
+    -webkit-mask-image: radial-gradient(ellipse 70% 100% at 85% 0%, #000 10%, transparent 70%);
+            mask-image: radial-gradient(ellipse 70% 100% at 85% 0%, #000 10%, transparent 70%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .3; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .24; }
+
+  /* ── Uniform icon chip for section headers ── */
+  .mi-icon-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+    background: rgba(254,74,35,.1); color: #FE4A23;
+  }
+  :root[data-theme="dark"] .mi-icon-chip { background: rgba(254,74,35,.18); color: #FE4A23; }
+
+  /* ── Larger variant for the page hero ── */
+  .mi-icon-chip-lg {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
+    background: rgba(254,74,35,.12); color: #FE4A23;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06);
+  }
+  :root[data-theme="dark"] .mi-icon-chip-lg { background: rgba(254,74,35,.2); color: #FE4A23; }
+
+  /* ── Metric tiles: accent bar + hover lift + count-up ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Gradient hover tiles (malware lookup) ── */
+  .mi-action { position: relative; overflow: hidden;
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+  .mi-action:hover { transform: translateY(-2px);
+    box-shadow: 0 12px 28px -16px rgba(0,0,0,.4); border-color: var(--mi-accent, #FE4A23); }
+  .mi-action::before { content: ''; position: absolute; inset: 0; opacity: 0;
+    background: radial-gradient(120% 120% at 100% 0%, var(--mi-accent, #FE4A23), transparent 55%);
+    transition: opacity .2s ease; }
+  .mi-action:hover::before { opacity: .1; }
+
+  /* ── Pulsing ring on the "Insecure" filter chip — reflects a real finding count, not decoration ── */
+  .mi-alert-pulse { position: relative; }
+  .mi-alert-pulse::before {
+    content: ''; position: absolute; inset: -3px; border-radius: 9999px;
+    border: 1.5px solid #DC2626; opacity: .55;
+    animation: mi-pulse-ring 2s ease-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after,
+    .mi-alert-pulse::before { animation: none; }
+    .mi-stat, .mi-action { transition: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-18px,0); }
+  }
+  @keyframes mi-pulse-ring {
+    0%   { transform: scale(.92); opacity: .55; }
+    100% { transform: scale(1.35); opacity: 0; }
   }
 </style>
 {% endblock %}
 
 {% block content %}
 
-{# ─── Page header ─── #}
-<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
-  <div class="flex items-center gap-4 min-w-0">
-    <span class="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark flex-shrink-0">
-      {% icon "package" size=28 %}
-    </span>
-    <div class="min-w-0">
-      <p class="text-tiny uppercase text-text-tertiary">Static · Windows</p>
-      <h1 class="text-h2 truncate">{{ app_name|default:file_name }} {% if app_version %}<span class="text-text-tertiary">v{{ app_version }}</span>{% endif %}</h1>
-      <p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ md5 }}</p>
+{# ─── Page header (ambient hero) ─── #}
+<header class="mi-hero relative overflow-hidden rounded-xl border border-border-subtle mb-6 p-5 md:p-7" data-reveal>
+  <div class="mi-hero-grid" aria-hidden="true"></div>
+  <div class="mi-hero-glow" aria-hidden="true"></div>
+  <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="flex items-center gap-4 min-w-0">
+      <span class="mi-icon-chip-lg">
+        {% icon "package" size=26 %}
+      </span>
+      <div class="min-w-0">
+        <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold inline-flex items-center gap-1.5">
+          {% icon "shield-check" size=12 %} Static · Windows
+        </p>
+        <h1 class="text-h2 truncate mt-0.5">{{ app_name|default:file_name }} {% if app_version %}<span class="text-text-tertiary font-normal">v{{ app_version }}</span>{% endif %}</h1>
+        <p class="text-small text-text-secondary mt-0.5 font-mono truncate inline-flex items-center gap-1.5" x-data="{ copied: false }">
+          <span class="truncate">{{ md5 }}</span>
+          <button type="button"
+                  @click="navigator.clipboard.writeText('{{ md5|escapejs }}').then(() => { copied = true; setTimeout(() => copied = false, 1200); })"
+                  :title="copied ? 'Copied!' : 'Copy MD5'"
+                  class="text-text-tertiary hover:text-text-brand flex-shrink-0">
+            <span x-show="!copied">{% icon "copy" size=12 %}</span>
+            <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=12 %}</span>
+          </button>
+        </p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2" data-no-print>
+      <a href="{% url 'static_analyzer_windows' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md">
+        {% icon "activity" size=14 %} Rescan
+      </a>
+      <a href="{% url 'download_binary' checksum=md5 %}" class="btn btn-secondary btn-md">
+        {% icon "download" size=14 %} APPX
+      </a>
+      <button type="button" class="btn btn-ghost btn-md" onclick="document.getElementById('mi-strings').showModal()">
+        {% icon "file-text" size=14 %} Strings
+      </button>
+      <button type="button" class="btn btn-ghost btn-md" onclick="document.getElementById('mi-logs').showModal()">
+        {% icon "file-text" size=14 %} Logs
+      </button>
     </div>
   </div>
-  <div class="flex flex-wrap items-center gap-2">
-    <a href="{% url 'static_analyzer_windows' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md">
-      {% icon "activity" size=14 %} Rescan
-    </a>
-    <a href="{% url 'download_binary' checksum=md5 %}" class="btn btn-secondary btn-md">
-      {% icon "download" size=14 %} APPX
-    </a>
-    <button type="button" class="btn btn-ghost btn-md" onclick="document.getElementById('mi-strings').showModal()">
-      {% icon "file-text" size=14 %} Strings
-    </button>
-    <button type="button" class="btn btn-ghost btn-md" onclick="document.getElementById('mi-logs').showModal()">
-      {% icon "file-text" size=14 %} Logs
-    </button>
-  </div>
 </header>
+
+{# ─── Live metric tiles (animated, real counts from context) ─── #}
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" data-reveal>
+  <div class="mi-stat card mi-glass card-body" x-data="counter({{ binary_analysis|length }})">
+    <span class="w-10 h-10 rounded-lg bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">
+      {% icon "bar-chart-3" size=18 %}
+    </span>
+    <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+    <p class="text-small text-text-secondary">Rules checked</p>
+  </div>
+  <div class="mi-stat card mi-glass card-body" x-data="counter({{ binary_warnings|length }})">
+    <span class="w-10 h-10 rounded-lg bg-severity-medium/15 text-severity-medium inline-flex items-center justify-center flex-shrink-0">
+      {% icon "alert-triangle" size=18 %}
+    </span>
+    <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+    <p class="text-small text-text-secondary">Warnings</p>
+  </div>
+  <div class="mi-stat card mi-glass card-body" x-data="counter({{ files|length }})">
+    <span class="w-10 h-10 rounded-lg bg-text-secondary/15 text-text-secondary inline-flex items-center justify-center flex-shrink-0">
+      {% icon "layers" size=18 %}
+    </span>
+    <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+    <p class="text-small text-text-secondary">Files extracted</p>
+  </div>
+  <div class="mi-stat card mi-glass card-body" x-data="counter({{ strings|length }})">
+    <span class="w-10 h-10 rounded-lg bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">
+      {% icon "database" size=18 %}
+    </span>
+    <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+    <p class="text-small text-text-secondary">Strings captured</p>
+  </div>
+</section>
 
 {# ─── Information cards ─── #}
 <section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
 
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "info" size=16 %} App information</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-3"><span class="mi-icon-chip">{% icon "info" size=16 %}</span> App information</h2></div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Publisher</span><span class="text-text-primary truncate">{{ publisher_name }}</span></div>
@@ -65,8 +201,20 @@
     </div>
   </div>
 
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "package" size=16 %} File information</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header flex items-center justify-between gap-2">
+      <h2 class="text-h4 flex items-center gap-3"><span class="mi-icon-chip">{% icon "package" size=16 %}</span> File information</h2>
+      <button type="button"
+              x-data="{ copied: false }"
+              data-copy="File: {{ file_name }}&#10;Size: {{ size }}&#10;MD5: {{ md5 }}&#10;SHA1: {{ sha1 }}&#10;SHA256: {{ sha256 }}"
+              @click="navigator.clipboard.writeText($el.dataset.copy).then(() => { copied = true; setTimeout(() => copied = false, 1500); });"
+              :title="copied ? 'Copied!' : 'Copy all file information'"
+              class="btn btn-ghost btn-sm flex-shrink-0">
+        <span x-show="!copied">{% icon "copy" size=14 %}</span>
+        <span x-show="copied" x-cloak class="text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=14 %}</span>
+        <span class="text-tiny" x-text="copied ? 'Copied' : 'Copy'"></span>
+      </button>
+    </div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">File name</span><span class="font-mono text-mono text-text-primary truncate">{{ file_name }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Size</span><span class="text-text-primary">{{ size }}</span></div>
@@ -76,8 +224,8 @@
     </div>
   </div>
 
-  <div class="card" data-reveal>
-    <div class="card-header"><h2 class="text-h4 flex items-center gap-2">{% icon "file-text" size=16 %} XML manifest</h2></div>
+  <div class="card mi-glass card-hover" data-reveal>
+    <div class="card-header"><h2 class="text-h4 flex items-center gap-3"><span class="mi-icon-chip">{% icon "file-text" size=16 %}</span> XML manifest</h2></div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Compiler</span><span class="text-text-primary">{{ compiler_version }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">VS version</span><span class="text-text-primary">{{ visual_studio_version }}</span></div>
@@ -93,10 +241,25 @@
 </section>
 
 {# ─── Binary analysis findings ─── #}
-<section class="card mb-6" data-reveal>
-  <div class="card-header">
-    <h2 class="text-h3 flex items-center gap-2">{% icon "shield-alert" size=18 %} APPX binary analysis</h2>
-    <span class="text-tiny text-text-tertiary">{{ binary_analysis|length|add:binary_warnings|length }} finding{{ binary_analysis|length|pluralize }}</span>
+{% with all_findings=binary_analysis|add:binary_warnings %}
+{% regroup all_findings|dictsort:"status" by status as status_groups %}
+<section class="card mi-glass card-hover mb-6" data-reveal x-data="{ filter: 'all' }">
+  <div class="card-header flex-wrap gap-3">
+    <h2 class="text-h3 flex items-center gap-3"><span class="mi-icon-chip">{% icon "shield-alert" size=16 %}</span> APPX binary analysis</h2>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" @click="filter = 'all'"
+              class="badge badge-neutral border-0 cursor-pointer transition-shadow duration-fast"
+              :class="filter === 'all' ? 'ring-2 ring-chart-amber' : ''">
+        All · {{ all_findings|length }}
+      </button>
+      {% for group in status_groups %}
+        <button type="button" @click="filter = '{{ group.grouper }}'"
+                class="badge border-0 cursor-pointer transition-shadow duration-fast {% if group.grouper == 'Insecure' %}badge-critical mi-alert-pulse{% elif group.grouper == 'Secure' %}badge-passed{% else %}badge-low{% endif %}"
+                :class="filter === '{{ group.grouper }}' ? 'ring-2 ring-chart-amber' : ''">
+          {{ group.grouper }} · {{ group.list|length }}
+        </button>
+      {% endfor %}
+    </div>
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-small">
@@ -110,7 +273,7 @@
       </thead>
       <tbody>
         {% for r in binary_analysis %}
-          <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+          <tr x-show="filter === 'all' || filter === '{{ r.status }}'" class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
             <td class="px-5 py-2.5 font-mono text-mono text-text-primary">{{ r.rule_id }}</td>
             <td class="px-5 py-2.5">
               {% if r.status == "Insecure" %}<span class="badge badge-critical">Insecure</span>
@@ -122,7 +285,7 @@
           </tr>
         {% endfor %}
         {% for w in binary_warnings %}
-          <tr class="border-b border-border-subtle hover:bg-surface-2/40">
+          <tr x-show="filter === 'all' || filter === '{{ w.status }}'" class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
             <td class="px-5 py-2.5 font-mono text-mono text-text-primary">{{ w.rule_id }}</td>
             <td class="px-5 py-2.5"><span class="badge badge-low">{{ w.status }}</span></td>
             <td class="px-5 py-2.5 text-text-secondary">{{ w.desc }}</td>
@@ -131,44 +294,70 @@
         {% empty %}
         {% endfor %}
         {% if not binary_analysis and not binary_warnings %}
-          <tr><td colspan="4" class="px-5 py-8 text-center text-text-tertiary">No findings.</td></tr>
+          <tr><td colspan="4" class="px-5 py-10 text-center text-text-tertiary">
+            <span class="inline-flex flex-col items-center gap-2">
+              {% icon "shield-check" size=26 %}
+              No findings.
+            </span>
+          </td></tr>
         {% endif %}
       </tbody>
     </table>
   </div>
 </section>
+{% endwith %}
 
 {# ─── Malware lookup links ─── #}
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "search" size=18 %} Malware lookup</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-3"><span class="mi-icon-chip">{% icon "search" size=16 %}</span> Malware lookup</h2></div>
   <div class="card-body grid grid-cols-2 md:grid-cols-4 gap-3">
     <a href="https://www.virustotal.com/gui/file/{{ sha256 }}" target="_blank" rel="noopener"
-       class="card-hover p-3 rounded-md border border-border-subtle hover:border-mobinspect-500 text-small">
-      <p class="text-text-primary font-medium">VirusTotal</p>
-      <p class="text-tiny text-text-tertiary mt-1">{% icon "external-link" size=10 %} Open report</p>
+       class="mi-action rounded-lg border border-border-subtle p-3.5" style="--mi-accent:#8D5CFC">
+      <div class="relative z-10 flex items-center gap-2.5">
+        <span class="mi-icon-chip">{% icon "shield-check" size=15 %}</span>
+        <div class="min-w-0">
+          <p class="text-text-primary font-medium text-small truncate">VirusTotal</p>
+          <p class="text-tiny text-text-tertiary mt-0.5 inline-flex items-center gap-1">Open report {% icon "external-link" size=10 %}</p>
+        </div>
+      </div>
     </a>
     <a href="https://tria.ge/s?q={{ sha256 }}" target="_blank" rel="noopener"
-       class="card-hover p-3 rounded-md border border-border-subtle hover:border-mobinspect-500 text-small">
-      <p class="text-text-primary font-medium">Triage</p>
-      <p class="text-tiny text-text-tertiary mt-1">{% icon "external-link" size=10 %} Open report</p>
+       class="mi-action rounded-lg border border-border-subtle p-3.5" style="--mi-accent:#16A34A">
+      <div class="relative z-10 flex items-center gap-2.5">
+        <span class="mi-icon-chip">{% icon "search" size=15 %}</span>
+        <div class="min-w-0">
+          <p class="text-text-primary font-medium text-small truncate">Triage</p>
+          <p class="text-tiny text-text-tertiary mt-0.5 inline-flex items-center gap-1">Open report {% icon "external-link" size=10 %}</p>
+        </div>
+      </div>
     </a>
     <a href="https://metadefender.com/results/hash/{{ sha256 }}" target="_blank" rel="noopener"
-       class="card-hover p-3 rounded-md border border-border-subtle hover:border-mobinspect-500 text-small">
-      <p class="text-text-primary font-medium">MetaDefender</p>
-      <p class="text-tiny text-text-tertiary mt-1">{% icon "external-link" size=10 %} Open report</p>
+       class="mi-action rounded-lg border border-border-subtle p-3.5" style="--mi-accent:#D97706">
+      <div class="relative z-10 flex items-center gap-2.5">
+        <span class="mi-icon-chip">{% icon "database" size=15 %}</span>
+        <div class="min-w-0">
+          <p class="text-text-primary font-medium text-small truncate">MetaDefender</p>
+          <p class="text-tiny text-text-tertiary mt-0.5 inline-flex items-center gap-1">Open report {% icon "external-link" size=10 %}</p>
+        </div>
+      </div>
     </a>
     <a href="https://www.hybrid-analysis.com/search?query={{ sha256 }}" target="_blank" rel="noopener"
-       class="card-hover p-3 rounded-md border border-border-subtle hover:border-mobinspect-500 text-small">
-      <p class="text-text-primary font-medium">Hybrid Analysis</p>
-      <p class="text-tiny text-text-tertiary mt-1">{% icon "external-link" size=10 %} Open report</p>
+       class="mi-action rounded-lg border border-border-subtle p-3.5" style="--mi-accent:#FE4A23">
+      <div class="relative z-10 flex items-center gap-2.5">
+        <span class="mi-icon-chip">{% icon "zap" size=15 %}</span>
+        <div class="min-w-0">
+          <p class="text-text-primary font-medium text-small truncate">Hybrid Analysis</p>
+          <p class="text-tiny text-text-tertiary mt-0.5 inline-flex items-center gap-1">Open report {% icon "external-link" size=10 %}</p>
+        </div>
+      </div>
     </a>
   </div>
 </section>
 
 {# ─── VirusTotal results inline ─── #}
 {% if virus_total %}
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "shield" size=18 %} VirusTotal scan</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-3"><span class="mi-icon-chip">{% icon "shield-check" size=16 %}</span> VirusTotal scan</h2></div>
   <div class="card-body">
     {% if virus_total.items|length < 9 %}
       <p class="text-text-secondary">{{ virus_total.verbose_msg }}</p>
@@ -190,7 +379,7 @@
             <tbody>
               {% for av_name, av_result in virus_total.scans.items %}
                 {% if av_result.detected %}
-                  <tr class="border-b border-border-subtle">
+                  <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
                     <td class="px-4 py-2 text-text-primary">{{ av_name }}</td>
                     <td class="px-4 py-2"><span class="badge badge-critical">{{ av_result.result }}</span></td>
                   </tr>
@@ -206,11 +395,22 @@
 {% endif %}
 
 {# ─── Files ─── #}
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "file-text" size=18 %} Files</h2></div>
+<section class="card mi-glass card-hover mb-6" data-reveal x-data="{ q: '' }">
+  <div class="card-header flex-wrap gap-3">
+    <h2 class="text-h3 flex items-center gap-3"><span class="mi-icon-chip">{% icon "layers" size=16 %}</span> Files</h2>
+    <div class="flex items-center gap-2">
+      <span class="text-tiny text-text-tertiary">{{ files|length }} file{{ files|length|pluralize }}</span>
+      {% if files %}
+      <div class="relative">
+        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{% icon "search" size=13 %}</span>
+        <input type="text" x-model="q" placeholder="Filter files…" class="input h-8 pl-8 text-tiny w-40 sm:w-56" />
+      </div>
+      {% endif %}
+    </div>
+  </div>
   <div class="card-body">
     <ul class="font-mono text-mono text-text-secondary space-y-0.5 max-h-96 overflow-y-auto">
-      {% for file in files %}<li class="truncate" title="{{ file }}">{{ file }}</li>{% empty %}
+      {% for file in files %}<li class="truncate rounded px-1.5 py-0.5 -mx-1.5 hover:bg-surface-2/60 hover:text-text-primary transition-colors duration-fast" title="{{ file }}" x-show="!q || $el.textContent.toLowerCase().includes(q.toLowerCase())">{{ file }}</li>{% empty %}
         <li class="text-text-tertiary italic">No files extracted.</li>
       {% endfor %}
     </ul>
@@ -219,23 +419,39 @@
 
 {# ─── Strings dialog ─── #}
 <dialog id="mi-strings" class="rounded-xl backdrop:bg-black/40 max-w-3xl w-full p-0 bg-surface-1 text-text-primary border border-border">
-  <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
-    <h3 class="text-h3">Strings</h3>
-    <button onclick="this.closest('dialog').close()" class="text-text-tertiary hover:text-text-primary">{% icon "x" size=18 %}</button>
+  <div x-data="{ q: '' }">
+    <div class="flex items-center justify-between gap-3 px-5 py-3 border-b border-border-subtle">
+      <div class="flex items-center gap-3 min-w-0">
+        <h3 class="text-h3">Strings</h3>
+        <span class="badge badge-neutral flex-shrink-0">{{ strings|length }}</span>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <div class="relative">
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">{% icon "search" size=13 %}</span>
+          <input type="text" x-model="q" placeholder="Filter…" class="input h-8 pl-8 text-tiny w-32 sm:w-52" />
+        </div>
+        <button onclick="this.closest('dialog').close()" class="text-text-tertiary hover:text-text-primary">{% icon "x" size=18 %}</button>
+      </div>
+    </div>
+    <div class="px-5 py-4 max-h-[70vh] overflow-auto font-mono text-mono whitespace-pre-wrap space-y-0.5">
+      {% for s in strings %}<div class="rounded px-1 -mx-1 hover:bg-surface-2/50" x-show="!q || $el.textContent.toLowerCase().includes(q.toLowerCase())">{{ s }}</div>{% endfor %}
+      {% if not strings %}<p class="text-text-tertiary italic">No strings extracted.</p>{% endif %}
+    </div>
   </div>
-  <pre class="px-5 py-4 max-h-[70vh] overflow-auto m-0 font-mono text-mono whitespace-pre-wrap">{% for s in strings %}{{ s }}
-{% endfor %}</pre>
 </dialog>
 
 {# ─── Scan logs dialog ─── #}
 <dialog id="mi-logs" class="rounded-xl backdrop:bg-black/40 max-w-4xl w-full p-0 bg-surface-1 text-text-primary border border-border">
   <div class="flex items-center justify-between gap-4 px-5 py-3 border-b border-border-subtle">
-    <h3 class="text-h3">Scan logs</h3>
+    <div class="flex items-center gap-3">
+      <h3 class="text-h3">Scan logs</h3>
+      <span class="badge badge-neutral">{{ logs|length }}</span>
+    </div>
     <button onclick="this.closest('dialog').close()" class="text-text-tertiary hover:text-text-primary">{% icon "x" size=18 %}</button>
   </div>
   <div class="overflow-x-auto max-h-[70vh]">
     <table class="w-full text-small">
-      <thead>
+      <thead class="sticky top-0 z-10 bg-surface-1">
         <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
           <th class="text-left px-4 py-2 font-medium">Timestamp</th>
           <th class="text-left px-4 py-2 font-medium">Event</th>
@@ -244,7 +460,7 @@
       </thead>
       <tbody>
         {% for log in logs %}
-          <tr class="border-b border-border-subtle">
+          <tr class="border-b border-border-subtle hover:bg-surface-2/40 transition-colors duration-fast">
             <td class="px-4 py-2 font-mono text-mono text-text-secondary tabular whitespace-nowrap">{{ log.timestamp }}</td>
             <td class="px-4 py-2 text-text-primary">{{ log.status }}</td>
             <td class="px-4 py-2">
@@ -260,6 +476,32 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Presentational-only Alpine helper for the redesign (additive; does not
+     touch any scan/report logic). Mirrors the count-up helper already used
+     on the dashboard (general/home.html) and the iOS/Android report pages. -->
+<script>
+  // Animated count-up for the metric tiles.
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 800, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+</script>
 <script>
   // Drop ?rescan=1 from the URL after a successful render
   if (window.location.search.indexOf('rescan=') !== -1) {

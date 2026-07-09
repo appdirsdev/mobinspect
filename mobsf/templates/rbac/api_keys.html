@@ -1,113 +1,420 @@
 {% extends "base/app.html" %}
 {% load mi_icons %}
 
+{% block page_title %}API keys{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── API keys — ambient header, glowing one-time reveal, animated stat tiles ──
+     Theme-aware (data-theme on <html>), reduced-motion safe. Scoped to this page. */
+  .mi-keys-hero { background: rgb(var(--surface-1)); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(56px); opacity: .5;
+    width: 260px; height: 260px; top: -100px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 17s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(60px); opacity: .3;
+    width: 220px; height: 220px; bottom: -110px; left: -50px;
+    background: radial-gradient(circle at center, rgba(59,130,246,.4), transparent 70%);
+    animation: mi-float 21s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 70% 70% at 85% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 70% at 85% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .3; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .2; }
+
+  .mi-icon-chip {
+    background: linear-gradient(135deg, rgba(37,99,235,.18), rgba(37,99,235,.06));
+    box-shadow: inset 0 0 0 1px rgba(37,99,235,.18);
+  }
+
+  /* KPI tiles: accent bar + hover lift + count-up */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: rgb(var(--border-default)); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* One-time secret reveal — success-tinted glow, pulsing icon */
+  .mi-reveal { box-shadow: 0 20px 46px -24px rgba(22,163,74,.4); }
+  .mi-reveal-ico { position: relative; }
+  .mi-reveal-ico::before {
+    content: ''; position: absolute; inset: 0; border-radius: 9999px;
+    background: currentColor; opacity: .45;
+    animation: mi-pulse 2.4s ease-out infinite;
+  }
+  .mi-copy-field { transition: box-shadow .18s ease, border-color .18s ease; }
+  .mi-copy-field:focus { box-shadow: 0 0 0 4px rgba(22,163,74,.16); }
+  .mi-copy-btn { transition: transform .15s ease, color .15s ease, border-color .15s ease; }
+  .mi-copy-btn:hover { transform: translateY(-1px); }
+  .mi-copy-btn.is-copied { color: #16A34A !important; border-color: #16A34A !important; }
+
+  /* Create-key card: brand top accent */
+  .mi-create-card { position: relative; overflow: hidden; }
+  .mi-create-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #2563EB, transparent 85%);
+  }
+
+  /* Table rows + inline row actions */
+  .mi-row { transition: background-color .15s ease; }
+  .mi-row-copy { transition: transform .15s ease, color .15s ease; }
+  .mi-row-copy:hover { transform: translateY(-1px); }
+  .mi-row-copy.is-copied { color: #16A34A; }
+
+  .mi-status-dot { position: relative; }
+  .mi-status-dot.is-active::before {
+    content: ''; position: absolute; inset: 0; border-radius: 9999px;
+    background: currentColor; opacity: .55;
+    animation: mi-pulse 2.2s ease-out infinite;
+  }
+
+  @keyframes mi-float { 0%, 100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-20px,0); } }
+  @keyframes mi-pulse { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(2.3); opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-stat, .mi-copy-field, .mi-copy-btn, .mi-row, .mi-row-copy { transition: none; }
+    .mi-reveal-ico::before, .mi-status-dot.is-active::before { animation: none; opacity: 0; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<header class="mb-6">
-  <h1 class="text-h1">API keys</h1>
-  <p class="text-text-secondary mt-1">
-    Per-user keys for programmatic access. Each key inherits your role permissions.
-  </p>
-</header>
+<div class="space-y-6">
 
-{% if just_created and plaintext %}
-  <div class="card mb-6 border-severity-passed dark:border-severity-passed-dark" data-reveal>
-    <div class="card-body">
-      <div class="flex items-center gap-2 mb-2 text-severity-passed dark:text-severity-passed-dark">
-        {% icon "circle-check" size=18 %}
-        <strong>Key "{{ just_created.name }}" created.</strong>
-      </div>
-      <p class="text-small text-text-secondary">
-        Copy the key now — it will not be shown again.
-      </p>
-      <div class="mt-3 flex items-center gap-2">
-        <input
-          readonly
-          value="{{ plaintext }}"
-          class="input font-mono text-mono select-all"
-          onclick="this.select(); document.execCommand('copy');"
-        />
+  {# ══════════════════ Ambient header ══════════════════ #}
+  <header class="mi-keys-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-6 md:px-8 md:py-7">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="mi-icon-chip w-11 h-11 rounded-xl text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+          {% icon "key" size=20 %}
+        </span>
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold inline-flex items-center gap-1.5">
+            {% icon "shield-check" size=12 %} Access control
+          </p>
+          <h1 class="text-h1 truncate mt-0.5">API keys</h1>
+          <p class="text-small text-text-secondary mt-1 max-w-xl">
+            Per-user keys for programmatic access. Each key inherits your role permissions.
+          </p>
+        </div>
       </div>
     </div>
-  </div>
-{% endif %}
+  </header>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-  {# ─── create form ─── #}
-  <div class="lg:col-span-1">
-    <div class="card">
-      <div class="card-header"><h2 class="text-h3">Create new key</h2></div>
-      <form method="post" class="card-body space-y-4">
-        {% csrf_token %}
-        <div>
-          <label class="label" for="id_name">Name</label>
-          {{ form.name }}
-          {% for e in form.name.errors %}<p class="text-tiny text-system-error mt-1">{{ e }}</p>{% endfor %}
+  {# ─── one-time plaintext reveal ─── #}
+  {% if just_created and plaintext %}
+    <div class="mi-reveal card border-severity-passed dark:border-severity-passed-dark" data-reveal>
+      <div class="card-body">
+        <div class="flex items-start gap-3">
+          <span class="mi-reveal-ico w-9 h-9 rounded-md bg-severity-passed/15 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark inline-flex items-center justify-center flex-shrink-0">
+            {% icon "circle-check" size=18 %}
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="text-h4 text-text-primary">Key &ldquo;{{ just_created.name }}&rdquo; created</p>
+            <p class="text-small text-text-secondary mt-0.5">
+              Copy the key now — it will not be shown again.
+            </p>
+            <div class="mt-3 flex items-center gap-2">
+              <input
+                id="plaintextKeyInput"
+                readonly
+                value="{{ plaintext }}"
+                aria-label="Generated API key — copy this now, it will not be shown again"
+                class="mi-copy-field input font-mono text-mono select-all flex-1"
+                onclick="this.select(); document.execCommand('copy');"
+              />
+              <button type="button" id="copyPlaintextBtn" class="mi-copy-btn btn btn-secondary btn-md flex-shrink-0">
+                {% icon "copy" size=14 %} <span class="mi-copy-label">Copy</span>
+              </button>
+            </div>
+          </div>
         </div>
-        <div>
-          <label class="label" for="id_expires_in_days">Expires in (days)</label>
-          {{ form.expires_in_days }}
-          <p class="text-tiny text-text-tertiary mt-1">Leave blank for no expiry.</p>
-        </div>
-        <button type="submit" class="btn btn-primary btn-md w-full">
-          {% icon "key" size=14 %} Generate
-        </button>
-      </form>
+      </div>
     </div>
-  </div>
+  {% endif %}
 
-  {# ─── list ─── #}
-  <div class="lg:col-span-2">
-    <div class="card">
-      <div class="card-header"><h2 class="text-h3">Your keys</h2></div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-small">
-          <thead>
-            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
-              <th class="text-left px-5 py-2.5 font-medium">Name</th>
-              <th class="text-left px-5 py-2.5 font-medium">Prefix</th>
-              <th class="text-left px-5 py-2.5 font-medium">Last used</th>
-              <th class="text-left px-5 py-2.5 font-medium">Status</th>
-              <th class="px-5 py-2.5"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for k in keys %}
-              <tr class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
-                <td class="px-5 py-3 text-text-primary">{{ k.name }}</td>
-                <td class="px-5 py-3"><code class="font-mono text-mono text-text-secondary">mi_{{ k.prefix }}…</code></td>
-                <td class="px-5 py-3 text-text-secondary">
-                  {% if k.last_used_at %}{{ k.last_used_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
-                </td>
-                <td class="px-5 py-3">
-                  {% if k.revoked_at %}
-                    <span class="badge badge-unknown">Revoked</span>
-                  {% elif not k.is_active %}
-                    <span class="badge badge-medium">Expired</span>
-                  {% else %}
-                    <span class="badge badge-passed">Active</span>
-                  {% endif %}
-                </td>
-                <td class="px-5 py-3 text-right">
-                  {% if k.is_active %}
-                    <form method="post" action="{% url 'rbac:api_key_revoke' k.id %}"
-                          onsubmit="return confirm('Revoke this key? Cannot be undone.');"
-                          class="inline">
-                      {% csrf_token %}
-                      <button type="submit" class="btn btn-ghost btn-sm text-system-error">
-                        {% icon "x" size=14 %} Revoke
-                      </button>
-                    </form>
-                  {% endif %}
-                </td>
+  {# ─── KPI — real counts, derived from the rows rendered below ─── #}
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-4" data-reveal>
+    <div class="mi-stat card card-body" x-data="counter({{ keys|length }})">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+          {% icon "layers" size=20 %}
+        </span>
+      </div>
+      <p class="mi-num text-display font-bold mt-3" x-text="shown">0</p>
+      <p class="text-small text-text-secondary">Total keys</p>
+    </div>
+    <div class="mi-stat card card-body">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-severity-passed/15 text-severity-passed inline-flex items-center justify-center flex-shrink-0">
+          {% icon "check" size=20 %}
+        </span>
+      </div>
+      <p class="mi-num text-display font-bold mt-3" id="kpiActiveCount">0</p>
+      <p class="text-small text-text-secondary">Active</p>
+    </div>
+    <div class="mi-stat card card-body">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-severity-medium/15 text-severity-medium inline-flex items-center justify-center flex-shrink-0">
+          {% icon "info" size=20 %}
+        </span>
+      </div>
+      <p class="mi-num text-display font-bold mt-3" id="kpiExpiredCount">0</p>
+      <p class="text-small text-text-secondary">Expired</p>
+    </div>
+    <div class="mi-stat card card-body">
+      <div class="flex items-start justify-between gap-2">
+        <span class="w-10 h-10 rounded-lg bg-text-secondary/15 text-text-secondary inline-flex items-center justify-center flex-shrink-0">
+          {% icon "x" size=20 %}
+        </span>
+      </div>
+      <p class="mi-num text-display font-bold mt-3" id="kpiRevokedCount">0</p>
+      <p class="text-small text-text-secondary">Revoked</p>
+    </div>
+  </section>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    {# ─── create form ─── #}
+    <div class="lg:col-span-1">
+      <div class="mi-create-card card" data-reveal>
+        <div class="card-header flex items-center gap-2">
+          <span class="w-9 h-9 rounded-md bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+            {% icon "plus" size=18 %}
+          </span>
+          <h2 class="text-h3">Create new key</h2>
+        </div>
+        <form method="post" class="card-body space-y-4">
+          {% csrf_token %}
+          <div>
+            <label class="label" for="id_name">Name</label>
+            {{ form.name }}
+            {% for e in form.name.errors %}<p class="text-tiny text-system-error mt-1">{{ e }}</p>{% endfor %}
+          </div>
+          <div>
+            <label class="label" for="id_expires_in_days">Expires in (days)</label>
+            {{ form.expires_in_days }}
+            <p class="text-tiny text-text-tertiary mt-1">Leave blank for no expiry.</p>
+          </div>
+          <button type="submit" class="btn btn-primary btn-md w-full">
+            {% icon "key" size=14 %} Generate
+          </button>
+          <p class="text-tiny text-text-tertiary inline-flex items-start gap-1.5">
+            {% icon "info" size=12 %} The full key is shown once, immediately after creation.
+          </p>
+        </form>
+      </div>
+    </div>
+
+    {# ─── list ─── #}
+    <div class="lg:col-span-2">
+      <div class="card" data-reveal>
+        <div class="card-header flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="w-9 h-9 rounded-md bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
+              {% icon "layers" size=18 %}
+            </span>
+            <h2 class="text-h3">Your keys</h2>
+          </div>
+          {% if keys|length %}
+            <span class="text-small text-text-tertiary tabular">{{ keys|length }} key{{ keys|length|pluralize }}</span>
+          {% endif %}
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-small">
+            <thead>
+              <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+                <th class="text-left px-5 py-2.5 font-medium">Name</th>
+                <th class="text-left px-5 py-2.5 font-medium">Prefix</th>
+                <th class="text-left px-5 py-2.5 font-medium">Last used</th>
+                <th class="text-left px-5 py-2.5 font-medium">Status</th>
+                <th class="px-5 py-2.5"></th>
               </tr>
-            {% empty %}
-              <tr><td colspan="5" class="px-5 py-8 text-center text-text-tertiary">No API keys yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+            </thead>
+            <tbody id="apiKeysBody">
+              {% for k in keys %}
+                <tr class="mi-row border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast"
+                    data-status="{% if k.revoked_at %}revoked{% elif not k.is_active %}expired{% else %}active{% endif %}">
+                  <td class="px-5 py-3 text-text-primary">{{ k.name }}</td>
+                  <td class="px-5 py-3">
+                    <div class="flex items-center gap-2">
+                      <code class="font-mono text-mono text-text-secondary">mi_{{ k.prefix }}…</code>
+                      <button type="button" class="mi-row-copy text-text-tertiary hover:text-mobinspect-500 flex-shrink-0"
+                              title="Copy prefix" data-copy-value="mi_{{ k.prefix }}">
+                        {% icon "copy" size=12 %}
+                      </button>
+                    </div>
+                  </td>
+                  <td class="px-5 py-3 text-text-secondary tabular">
+                    {% if k.last_used_at %}{{ k.last_used_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+                  </td>
+                  <td class="px-5 py-3">
+                    {% if k.revoked_at %}
+                      <span class="badge badge-unknown gap-1.5">{% icon "x" size=10 %} Revoked</span>
+                    {% elif not k.is_active %}
+                      <span class="badge badge-medium gap-1.5">{% icon "info" size=10 %} Expired</span>
+                    {% else %}
+                      <span class="badge badge-passed gap-1.5">
+                        <span class="mi-status-dot is-active w-1.5 h-1.5 rounded-full bg-current inline-block"></span>
+                        Active
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td class="px-5 py-3 text-right whitespace-nowrap">
+                    {% if k.is_active %}
+                      <form method="post" action="{% url 'rbac:api_key_revoke' k.id %}"
+                            onsubmit="return confirm('Revoke this key? Cannot be undone.');"
+                            class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost btn-sm text-system-error">
+                          {% icon "x" size=14 %} Revoke
+                        </button>
+                      </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="5" class="px-5 py-12">
+                    <div class="flex flex-col items-center text-center gap-3">
+                      <span class="w-12 h-12 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center">
+                        {% icon "key" size=22 %}
+                      </span>
+                      <p class="text-h3 text-text-primary">No API keys yet</p>
+                      <p class="text-small text-text-secondary">Generate your first key to start using the API.</p>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+  // Presentational-only, additive. No existing behavior is modified.
+  document.addEventListener('DOMContentLoaded', function () {
+
+    function copyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) { /* no-op */ }
+      document.body.removeChild(ta);
+      return Promise.resolve();
+    }
+
+    function flashCopied(btn, labelSelector) {
+      var label = labelSelector ? btn.querySelector(labelSelector) : null;
+      var original = label ? label.textContent : null;
+      btn.classList.add('is-copied');
+      if (label) { label.textContent = 'Copied!'; }
+      setTimeout(function () {
+        btn.classList.remove('is-copied');
+        if (label && original !== null) { label.textContent = original; }
+      }, 1600);
+    }
+
+    // Auto-select the freshly generated key so it's ready to copy.
+    var plaintextInput = document.getElementById('plaintextKeyInput');
+    if (plaintextInput) {
+      plaintextInput.focus();
+      plaintextInput.select();
+    }
+
+    var copyPlaintextBtn = document.getElementById('copyPlaintextBtn');
+    if (copyPlaintextBtn && plaintextInput) {
+      copyPlaintextBtn.addEventListener('click', function () {
+        copyText(plaintextInput.value).then(function () {
+          flashCopied(copyPlaintextBtn, '.mi-copy-label');
+        });
+      });
+    }
+
+    // Per-row "copy prefix" quick action (prefix only — never the secret).
+    document.querySelectorAll('.mi-row-copy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var value = btn.getAttribute('data-copy-value') || '';
+        copyText(value).then(function () { flashCopied(btn, null); });
+      });
+    });
+
+    // Derive Active / Expired / Revoked counts from the real rows already
+    // rendered from the `keys` queryset, and animate the KPI tiles.
+    var rows = document.querySelectorAll('#apiKeysBody tr[data-status]');
+    var counts = { active: 0, expired: 0, revoked: 0 };
+    rows.forEach(function (row) {
+      var status = row.getAttribute('data-status');
+      if (Object.prototype.hasOwnProperty.call(counts, status)) { counts[status] += 1; }
+    });
+
+    var reduceMotion = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function animateCount(el, target) {
+      if (!el) return;
+      if (reduceMotion || target <= 0) { el.textContent = target; return; }
+      var dur = 700, start = performance.now();
+      function tick(t) {
+        var p = Math.min((t - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(eased * target);
+        if (p < 1) { requestAnimationFrame(tick); }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    animateCount(document.getElementById('kpiActiveCount'), counts.active);
+    animateCount(document.getElementById('kpiExpiredCount'), counts.expired);
+    animateCount(document.getElementById('kpiRevokedCount'), counts.revoked);
+  });
+
+  // Animated count-up for the "Total keys" tile (Alpine; same helper used
+  // across other MobInspect pages — presentation only).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 700, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+    };
+  }
+</script>
 {% endblock %}

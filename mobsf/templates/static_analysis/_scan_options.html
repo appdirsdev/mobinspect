@@ -1,18 +1,95 @@
 {% load mi_icons %}
 {% comment %}
-  Reusable scan-options card. Each link is conditional on its url variable being passed.
-  Vars: appsec_url, rescan_url, manifest_url, source_url, suppressions_url, view_pdf_url, etc.
+  Reusable scan-options toolbar card. Every action is conditional on its url
+  variable being passed in — omit a var and its button simply doesn't render.
+  Vars: appsec_url, rescan_url, manifest_url, source_url, suppressions_url,
+        pdf_url, json_url, download_url.
+  Note: this is an included FRAGMENT (no {% extends %}) — the scoped <style>
+  below travels with it wherever it's included and only touches mi-scanopt-*
+  classes, so it can't collide with the host page's own styles.
 {% endcomment %}
-<section class="card mb-6" data-reveal>
-  <div class="card-header"><h2 class="text-h3 flex items-center gap-2">{% icon "sliders" size=18 %} Scan options</h2></div>
-  <div class="card-body flex flex-wrap items-center gap-2">
-    {% if rescan_url %}<a href="{{ rescan_url }}" class="btn btn-secondary btn-sm">{% icon "activity" size=14 %} Rescan</a>{% endif %}
-    {% if appsec_url %}<a href="{{ appsec_url }}" class="btn btn-secondary btn-sm">{% icon "shield-check" size=14 %} Scorecard</a>{% endif %}
-    {% if manifest_url %}<a href="{{ manifest_url }}" class="btn btn-secondary btn-sm">{% icon "file-text" size=14 %} Manifest</a>{% endif %}
-    {% if source_url %}<a href="{{ source_url }}" class="btn btn-secondary btn-sm">{% icon "layers" size=14 %} Source tree</a>{% endif %}
-    {% if suppressions_url %}<button onclick="document.getElementById('mi-suppressions') && document.getElementById('mi-suppressions').showModal()" class="btn btn-ghost btn-sm">{% icon "eye-off" size=14 %} Suppressions</button>{% endif %}
-    {% if pdf_url %}<a href="{{ pdf_url }}" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} PDF</a>{% endif %}
-    {% if json_url %}<a href="{{ json_url }}" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} JSON</a>{% endif %}
-    {% if download_url %}<a href="{{ download_url }}" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} Binary</a>{% endif %}
+<style>
+  /* ── Scan-options card: top accent bar + grouped-action micro-interactions ── */
+  .mi-scanopt { position: relative; overflow: hidden; }
+  .mi-scanopt::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #2563EB, #3B82F6 45%, transparent 92%);
+  }
+  .mi-scanopt-group { position: relative; }
+  @media (min-width: 1024px) {
+    .mi-scanopt-group + .mi-scanopt-group {
+      border-left: 1px solid var(--border-subtle);
+      padding-left: 1.25rem;
+    }
+  }
+  .mi-scanopt-btn { transition: transform .16s ease, box-shadow .16s ease; }
+  .mi-scanopt-btn:hover { transform: translateY(-2px); }
+  .mi-scanopt-ico { display: inline-flex; transition: transform .22s cubic-bezier(.34,1.56,.64,1); }
+  .mi-scanopt-btn:hover .mi-scanopt-ico { transform: scale(1.15); }
+  @media (prefers-reduced-motion: reduce) {
+    .mi-scanopt-btn, .mi-scanopt-ico { transition: none; }
+    .mi-scanopt-btn:hover { transform: none; }
+    .mi-scanopt-btn:hover .mi-scanopt-ico { transform: none; }
+  }
+</style>
+
+<section class="card card-hover mi-scanopt mb-6" data-reveal>
+  <div class="card-header">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
+        {% icon "sliders" size=17 %}
+      </span>
+      <div class="min-w-0">
+        <h2 class="text-h3 leading-tight">Scan options</h2>
+        <p class="text-tiny text-text-secondary">Quick actions for this scan</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body">
+    {% if rescan_url or appsec_url or manifest_url or source_url or suppressions_url or pdf_url or json_url or download_url %}
+    <div class="flex flex-wrap items-start gap-x-6 gap-y-4">
+
+      {% if rescan_url or appsec_url %}
+      <div class="mi-scanopt-group flex flex-col gap-2">
+        <span class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold">Actions</span>
+        <div class="flex flex-wrap gap-2">
+          {% if rescan_url %}<a href="{{ rescan_url }}" class="mi-scanopt-btn btn btn-secondary btn-sm"><span class="mi-scanopt-ico">{% icon "activity" size=14 %}</span> Rescan</a>{% endif %}
+          {% if appsec_url %}<a href="{{ appsec_url }}" class="mi-scanopt-btn btn btn-secondary btn-sm"><span class="mi-scanopt-ico">{% icon "shield-check" size=14 %}</span> Scorecard</a>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if manifest_url or source_url or suppressions_url %}
+      <div class="mi-scanopt-group flex flex-col gap-2">
+        <span class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold">Inspect</span>
+        <div class="flex flex-wrap gap-2">
+          {% if manifest_url %}<a href="{{ manifest_url }}" class="mi-scanopt-btn btn btn-secondary btn-sm"><span class="mi-scanopt-ico">{% icon "file-text" size=14 %}</span> Manifest</a>{% endif %}
+          {% if source_url %}<a href="{{ source_url }}" class="mi-scanopt-btn btn btn-secondary btn-sm"><span class="mi-scanopt-ico">{% icon "layers" size=14 %}</span> Source tree</a>{% endif %}
+          {% if suppressions_url %}<button type="button" onclick="document.getElementById('mi-suppressions') && document.getElementById('mi-suppressions').showModal()" class="mi-scanopt-btn btn btn-ghost btn-sm"><span class="mi-scanopt-ico">{% icon "eye-off" size=14 %}</span> Suppressions</button>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if pdf_url or json_url or download_url %}
+      <div class="mi-scanopt-group flex flex-col gap-2 lg:ml-auto">
+        <span class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold">Export</span>
+        <div class="flex flex-wrap gap-2">
+          {% if pdf_url %}<a href="{{ pdf_url }}" class="mi-scanopt-btn btn btn-ghost btn-sm"><span class="mi-scanopt-ico">{% icon "download" size=14 %}</span> PDF</a>{% endif %}
+          {% if json_url %}<a href="{{ json_url }}" class="mi-scanopt-btn btn btn-ghost btn-sm"><span class="mi-scanopt-ico">{% icon "download" size=14 %}</span> JSON</a>{% endif %}
+          {% if download_url %}<a href="{{ download_url }}" class="mi-scanopt-btn btn btn-ghost btn-sm"><span class="mi-scanopt-ico">{% icon "download" size=14 %}</span> Binary</a>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center justify-center text-center py-6 gap-2">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-surface-2 text-text-tertiary">
+        {% icon "info" size=18 %}
+      </span>
+      <p class="text-small text-text-secondary">No scan actions are available for this report.</p>
+    </div>
+    {% endif %}
   </div>
 </section>

@@ -1,28 +1,239 @@
 {% extends "base/legacy_app.html" %}
+{% load mi_icons %}
+
+{% block page_title %}Zipped Source Instructions{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero { background: var(--surface-1); }
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .55;
+  }
+  .mi-hero-glow::before {
+    width: 360px; height: 360px; top: -130px; right: -70px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.55), transparent 70%);
+    animation: mi-float 15s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 300px; height: 300px; bottom: -150px; left: -50px;
+    background: radial-gradient(circle at center, rgba(59,130,246,.42), transparent 70%);
+    animation: mi-float 20s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .5;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .42; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .34; }
+
+  /* ── Requirement cards: accent top-bar + hover lift ── */
+  .mi-card-accent { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-card-accent:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .mi-card-accent::after { content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: linear-gradient(90deg, var(--mi-accent, #2563EB), transparent 85%); }
+
+  /* ── File-tree snippet box ── */
+  .mi-tree { transition: border-color .18s ease, background .18s ease; }
+  .mi-card-accent:hover .mi-tree { border-color: var(--border-default); }
+  .mi-copy-btn { transition: transform .15s ease, background-color .15s ease; }
+  .mi-copy-btn:hover { transform: scale(1.08); }
+  .mi-copy-btn:active { transform: scale(.96); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-card-accent, .mi-tree, .mi-copy-btn { transition: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-26px,0); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="content-wrapper">
-  <div class="content-header">
-  </div>
-   <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-12">
-            <div class="card">
-              <div class="card-body">
-                  <h1>Zipped Source Code Instruction</h1>
-                      <p class="lead">MobInspect supports iOS and Android (eclipse and Android Studio) project files.</p>  
-                      <p>
-                        <strong>Eclipse Project:</strong> The file AndroidManifest.xml and the directory 'src' must exist in the root directory of ZIPPED Source files for eclipse projects.
-                      </p>
-                      <p>
-                        <strong> Android Studio Project:</strong> AndroidManifest.xml must be located at 'app/src/main/AndroidManifest.xml' and the directory 'app/src/main/java/' must exist for Android Studio projects. 
-                      </p>
-                      <p>
-                        <strong>iOS Project:</strong> For iOS projects, the .xcodeproj file must exist in the root directory of the ZIPPED Source files.
-                      </p>
+<div class="space-y-6">
+
+  {# ══════════════════ Ambient hero ══════════════════ #}
+  <section class="mi-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-8 md:px-10 md:py-10">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "package" size=13 %} MobInspect · Source Upload Guide
+          </p>
+          <h1 class="text-display font-bold leading-tight">Zipped Source Code Instructions</h1>
+          <p class="text-body text-text-secondary mt-2 max-w-2xl">
+            MobInspect can statically analyze Android and iOS projects straight from a ZIP archive of your
+            source tree — no build step required. Match your archive to one of the layouts below, then head
+            back to the dropzone.
+          </p>
+          <div class="flex flex-wrap items-center gap-2 mt-4">
+            <span class="badge badge-low gap-1.5">{% icon "package" size=12 %} Eclipse</span>
+            <span class="badge badge-passed gap-1.5">{% icon "layers" size=12 %} Android Studio</span>
+            <span class="badge badge-unknown gap-1.5">{% icon "smartphone" size=12 %} iOS / Xcode</span>
           </div>
         </div>
-       </div>
-     </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <a href="{% url 'home' %}" class="btn btn-primary btn-md">
+            {% icon "upload-cloud" size=14 %} Back to upload
+          </a>
+        </div>
+      </div>
     </div>
+  </section>
+
+  {# ══════════════════ Project-type requirement cards ══════════════════ #}
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-4" data-reveal>
+
+    {# Eclipse #}
+    <article class="mi-card-accent card" style="--mi-accent:#2563EB" x-data="copyable('AndroidManifest.xml\nsrc/')">
+      <div class="card-header">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
+            {% icon "package" size=20 %}
+          </span>
+          <div class="min-w-0">
+            <h2 class="text-h4">Eclipse Project</h2>
+            <p class="text-tiny text-text-secondary">Legacy ADT-style layout</p>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-small text-text-secondary mb-4">
+          <span class="code">AndroidManifest.xml</span> and the <span class="code">src</span> directory
+          must both exist in the <strong class="text-text-primary">root</strong> of the ZIPPED source files.
+        </p>
+        <div class="mi-tree relative bg-surface-2 border border-border-subtle rounded-lg px-4 py-3 font-mono text-tiny leading-relaxed">
+          <button type="button" @click="copy()"
+                  class="mi-copy-btn absolute top-2 right-2 inline-flex items-center justify-center w-7 h-7 rounded-md text-text-tertiary hover:bg-surface-3 hover:text-text-primary"
+                  aria-label="Copy required paths">
+            <span x-show="!copied">{% icon "copy" size=13 %}</span>
+            <span x-show="copied" x-cloak class="text-severity-passed">{% icon "check" size=13 %}</span>
+          </button>
+          <div class="text-text-secondary">project.zip</div>
+          <div class="pl-4 flex items-center gap-1.5 mt-1">
+            {% icon "check" size=12 class="text-severity-passed flex-shrink-0" %} AndroidManifest.xml
+          </div>
+          <div class="pl-4 flex items-center gap-1.5 mt-1">
+            {% icon "check" size=12 class="text-severity-passed flex-shrink-0" %} src/
+          </div>
+        </div>
+      </div>
+    </article>
+
+    {# Android Studio #}
+    <article class="mi-card-accent card" style="--mi-accent:#16A34A" x-data="copyable('app/src/main/AndroidManifest.xml\napp/src/main/java/')">
+      <div class="card-header">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-severity-passed/15 text-severity-passed flex-shrink-0">
+            {% icon "layers" size=20 %}
+          </span>
+          <div class="min-w-0">
+            <h2 class="text-h4">Android Studio Project</h2>
+            <p class="text-tiny text-text-secondary">Gradle module layout</p>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-small text-text-secondary mb-4">
+          <span class="code">AndroidManifest.xml</span> must be located at
+          <span class="code">app/src/main/AndroidManifest.xml</span> and the directory
+          <span class="code">app/src/main/java/</span> must exist.
+        </p>
+        <div class="mi-tree relative bg-surface-2 border border-border-subtle rounded-lg px-4 py-3 font-mono text-tiny leading-relaxed">
+          <button type="button" @click="copy()"
+                  class="mi-copy-btn absolute top-2 right-2 inline-flex items-center justify-center w-7 h-7 rounded-md text-text-tertiary hover:bg-surface-3 hover:text-text-primary"
+                  aria-label="Copy required paths">
+            <span x-show="!copied">{% icon "copy" size=13 %}</span>
+            <span x-show="copied" x-cloak class="text-severity-passed">{% icon "check" size=13 %}</span>
+          </button>
+          <div class="text-text-secondary">project.zip</div>
+          <div class="pl-4 text-text-secondary mt-1">app/</div>
+          <div class="pl-8 text-text-secondary">src/</div>
+          <div class="pl-12 flex items-center gap-1.5 mt-1">
+            {% icon "check" size=12 class="text-severity-passed flex-shrink-0" %} main/AndroidManifest.xml
+          </div>
+          <div class="pl-12 flex items-center gap-1.5 mt-1">
+            {% icon "check" size=12 class="text-severity-passed flex-shrink-0" %} main/java/
+          </div>
+        </div>
+      </div>
+    </article>
+
+    {# iOS #}
+    <article class="mi-card-accent card" style="--mi-accent:#64748B" x-data="copyable('YourApp.xcodeproj')">
+      <div class="card-header">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-text-secondary/15 text-text-secondary flex-shrink-0">
+            {% icon "smartphone" size=20 %}
+          </span>
+          <div class="min-w-0">
+            <h2 class="text-h4">iOS Project</h2>
+            <p class="text-tiny text-text-secondary">Xcode project layout</p>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-small text-text-secondary mb-4">
+          The <span class="code">.xcodeproj</span> file must exist in the
+          <strong class="text-text-primary">root</strong> of the ZIPPED source files.
+        </p>
+        <div class="mi-tree relative bg-surface-2 border border-border-subtle rounded-lg px-4 py-3 font-mono text-tiny leading-relaxed">
+          <button type="button" @click="copy()"
+                  class="mi-copy-btn absolute top-2 right-2 inline-flex items-center justify-center w-7 h-7 rounded-md text-text-tertiary hover:bg-surface-3 hover:text-text-primary"
+                  aria-label="Copy required paths">
+            <span x-show="!copied">{% icon "copy" size=13 %}</span>
+            <span x-show="copied" x-cloak class="text-severity-passed">{% icon "check" size=13 %}</span>
+          </button>
+          <div class="text-text-secondary">project.zip</div>
+          <div class="pl-4 flex items-center gap-1.5 mt-1">
+            {% icon "check" size=12 class="text-severity-passed flex-shrink-0" %} YourApp.xcodeproj
+          </div>
+        </div>
+      </div>
+    </article>
+
+  </section>
+
+  {# ══════════════════ Tip callout ══════════════════ #}
+  <section class="card card-body flex items-start gap-3" data-reveal>
+    <span class="inline-flex items-center justify-center w-9 h-9 rounded-md bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">
+      {% icon "info" size=18 %}
+    </span>
+    <p class="text-small text-text-secondary">
+      MobInspect reads the manifest and source tree directly from the ZIP — no build step required. Keep the
+      archive limited to the project source shown above for the fastest, cleanest scan.
+    </p>
+  </section>
+
 </div>
+
+<script>
+  // Copy-to-clipboard helper for the required-path snippets (presentational only).
+  function copyable(text) {
+    return {
+      copied: false,
+      copy() {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            this.copied = true;
+            setTimeout(() => { this.copied = false; }, 1500);
+          });
+        }
+      },
+    };
+  }
+</script>
 {% endblock %}

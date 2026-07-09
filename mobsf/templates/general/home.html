@@ -1,128 +1,387 @@
 {% extends "base/app.html" %}
-{% load static %}{% load mi_icons %}{% load rbac %}
+{% load static %}{% load mi_icons %}{% load rbac %}{% load mi_score %}
 
-{% block page_title %}Home{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px;
+    filter: blur(64px); opacity: .55;
+  }
+  .mi-hero-glow::before {
+    width: 360px; height: 360px; top: -130px; right: -70px;
+    background: radial-gradient(circle at center, rgba(254,74,35,.5), transparent 70%);
+    animation: mi-float 15s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 300px; height: 300px; bottom: -150px; left: -50px;
+    background: radial-gradient(circle at center, rgba(141,92,252,.38), transparent 70%);
+    animation: mi-float 20s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .5;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 80% 80% at 75% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .5; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .4; }
+
+  /* ── Dropzone: glow ring on drag ── */
+  .mi-drop { transition: border-color .2s ease, background .2s ease, box-shadow .2s ease; }
+  .mi-drop.is-drag {
+    border-color: #FE4A23;
+    background: rgba(254,74,35,.06);
+    box-shadow: 0 0 0 4px rgba(254,74,35,.18), 0 12px 40px -12px rgba(254,74,35,.5);
+  }
+  .mi-drop.is-drag .mi-drop-ico { transform: scale(1.12) translateY(-2px); }
+  .mi-drop-ico { transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+
+  /* ── Metric tiles: accent bar + hover lift + count-up ── */
+  .mi-stat { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .mi-stat:hover { transform: translateY(-3px);
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: var(--border-default); }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  /* ── Gradient action tiles ── */
+  .mi-action { position: relative; overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease; }
+  .mi-action:hover { transform: translateY(-3px);
+    box-shadow: 0 16px 36px -18px rgba(0,0,0,.45); }
+  .mi-action::before { content: ''; position: absolute; inset: 0; opacity: 0;
+    background: radial-gradient(120% 120% at 100% 0%, var(--mi-accent, #FE4A23), transparent 55%);
+    transition: opacity .22s ease; }
+  .mi-action:hover::before { opacity: .10; }
+
+  /* .mi-pillbtn (dark grain-pill CTA) is now global — see base/app.html #mi-chrome. */
+
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+    .mi-stat, .mi-action, .mi-drop, .mi-drop-ico { transition: none; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-26px,0); }
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="space-y-8" data-reveal>
+<div class="space-y-6">
 
-  <header>
-    <h1 class="text-h1">Welcome back{% if request.user.is_authenticated %}, {{ request.user.username }}{% endif %}.</h1>
-    <p class="text-text-secondary mt-1">Drag a binary onto the upload zone, or pick a file to start.</p>
-  </header>
-
-  {# ─────────── Upload zone ─────────── #}
+  {# ══════════════════ Ambient hero + upload ══════════════════ #}
   <section
+    class="mi-hero card relative overflow-hidden p-0"
     x-data="upload()"
     @dragover.prevent="dragging = true"
     @dragleave.prevent="dragging = false"
     @drop.prevent="onDrop($event)"
+    data-reveal
   >
-    <form
-      id="upload_form"
-      method="post"
-      enctype="multipart/form-data"
-      class="card p-0"
-      :class="dragging ? 'border-mobinspect-500 ring-2 ring-mobinspect-500/30' : ''"
-    >
-      {% csrf_token %}
-      <label
-        for="uploadFile"
-        class="flex flex-col items-center justify-center text-center px-6 py-16 cursor-pointer rounded-lg transition-colors duration-fast"
-      >
-        <span class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-mobinspect-500/10 text-mobinspect-500 mb-4 transition-transform duration-fast" :class="dragging ? 'scale-110' : ''">
-          {% icon "upload-cloud" size=28 %}
-        </span>
-        <span class="text-h3" x-text="dragging ? 'Drop to upload' : 'Drag &amp; drop or click to upload'"></span>
-        <span class="text-small text-text-secondary mt-2">
-          APK · AAB · XAPK · IPA · APPX · ZIP source
-        </span>
-        <input type="file" id="uploadFile" name="file" class="sr-only" accept="{{ upload_accept }}" multiple
-               @change="onPick($event)" />
-        <span class="mt-6 inline-flex">
-          <span class="btn btn-primary btn-md" :class="uploading ? 'opacity-50 pointer-events-none' : ''">
-            <span x-show="!uploading">{% icon "upload" size=14 %} Choose file</span>
-            <span x-show="uploading" x-cloak>Uploading…</span>
-          </span>
-        </span>
-      </label>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
 
-      <div x-show="status" x-cloak class="px-6 pb-6">
-        <div class="flex items-center gap-3 text-small">
-          <span class="w-full bg-surface-2 rounded-full h-1.5 overflow-hidden">
-            <span class="block h-full bg-mobinspect-500 transition-[width] duration-fast" :style="`width: ${progress}%`"></span>
-          </span>
-          <span class="text-text-secondary tabular" x-text="`${progress}%`"></span>
+    <div class="relative z-10 px-6 py-8 md:px-10 md:py-10">
+      {# greeting row #}
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "shield-check" size=13 %} MobInspect · Security Dashboard
+          </p>
+          <h1 class="text-display font-bold leading-tight">
+            Welcome back{% if request.user.is_authenticated %},
+            <span class="text-text-brand">{{ request.user.username }}</span>{% endif %}.
+          </h1>
+          <p class="text-body text-text-secondary mt-2 max-w-xl">
+            Drop a mobile binary below to launch a full static analysis — or pick
+            up where you left off.
+          </p>
+          {# live inline chips (real counts) #}
+          <div class="flex flex-wrap items-center gap-2 mt-4">
+            <span class="badge badge-neutral gap-1.5">{% icon "layers" size=12 %} {{ stats.total }} total scan{{ stats.total|pluralize }}</span>
+            <span class="badge badge-neutral gap-1.5">{% icon "activity" size=12 %} {{ stats.week }} this week</span>
+            <span class="badge badge-neutral gap-1.5">{% icon "smartphone" size=12 %} {{ stats.android }} Android</span>
+            {% if stats.ios %}<span class="badge badge-neutral gap-1.5">{% icon "smartphone" size=12 %} {{ stats.ios }} iOS</span>{% endif %}
+          </div>
         </div>
-        <p class="text-small text-text-secondary mt-2" x-text="status"></p>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <a href="{% url 'recent' %}" class="mi-pillbtn btn btn-md">
+            {% icon "layers" size=14 %} Recent scans
+          </a>
+          {% can 'settings.view' %}
+          <a href="{% url 'rbac:adb_connections' %}" class="mi-pillbtn btn btn-md">
+            {% icon "sliders" size=14 %} Integrations
+          </a>
+          {% endcan %}
+        </div>
       </div>
-    </form>
+
+      {# dropzone — upload() logic preserved verbatim #}
+      <form
+        id="upload_form"
+        method="post"
+        enctype="multipart/form-data"
+        class="mi-drop card mi-glass border-2 border-dashed p-0"
+        :class="dragging ? 'is-drag' : ''"
+      >
+        {% csrf_token %}
+        <label
+          for="uploadFile"
+          class="flex flex-col items-center justify-center text-center px-6 py-12 md:py-14 cursor-pointer rounded-lg"
+        >
+          <span class="mi-drop-ico inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-chart-amber/15 text-chart-amber mb-4 shadow-elevation-1">
+            {% icon "upload-cloud" size=30 %}
+          </span>
+          <span class="text-h2" x-text="dragging ? 'Release to upload' : 'Drag &amp; drop, or click to upload'"></span>
+          <span class="text-small text-text-secondary mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+            <span class="font-mono">APK</span><span class="text-text-tertiary">·</span>
+            <span class="font-mono">AAB</span><span class="text-text-tertiary">·</span>
+            <span class="font-mono">XAPK</span><span class="text-text-tertiary">·</span>
+            <span class="font-mono">IPA</span><span class="text-text-tertiary">·</span>
+            <span class="font-mono">APPX</span><span class="text-text-tertiary">·</span>
+            <span class="font-mono">ZIP source</span>
+          </span>
+          <input type="file" id="uploadFile" name="file" class="sr-only" accept="{{ upload_accept }}" multiple
+                 @change="onPick($event)" />
+          <span class="mt-6 inline-flex">
+            <span class="mi-pillbtn btn btn-lg" :class="uploading ? 'opacity-50 pointer-events-none' : ''">
+              <span x-show="!uploading">{% icon "upload" size=16 %} Choose file</span>
+              <span x-show="uploading" x-cloak>Uploading…</span>
+            </span>
+          </span>
+        </label>
+
+        <div x-show="status" x-cloak class="px-6 pb-6">
+          <div class="flex items-center gap-3 text-small">
+            <span class="w-full bg-surface-2 rounded-full h-2 overflow-hidden">
+              <span class="block h-full bg-chart-amber transition-[width] duration-fast" :style="`width: ${progress}%`"></span>
+            </span>
+            <span class="text-text-secondary tabular" x-text="`${progress}%`"></span>
+          </div>
+          <p class="text-small text-text-secondary mt-2" x-text="status"></p>
+        </div>
+      </form>
+    </div>
   </section>
 
-  {# ─────────── Quick actions ─────────── #}
-  <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <a href="{% url 'recent' %}" class="card card-hover">
-      <div class="card-body flex items-start gap-3">
-        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-mobinspect-500/10 text-mobinspect-500 flex-shrink-0">
+  {# ══════════════════ Live metric tiles — icon+label / number+pill anatomy, matching the reference exactly ══════════════════ #}
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-4" data-reveal>
+    {# total #}
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ stats.total }})">
+      <p class="text-small text-text-secondary flex items-center gap-2">
+        <span class="text-text-tertiary">{% icon "layers" size=16 %}</span> Total scans
+      </p>
+      <div class="flex items-baseline gap-2 mt-2">
+        <span class="mi-num text-display font-bold" x-text="shown">0</span>
+      </div>
+    </div>
+    {# android #}
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ stats.android }})">
+      <p class="text-small text-text-secondary flex items-center gap-2">
+        <span class="text-text-tertiary">{% icon "smartphone" size=16 %}</span> Android apps
+      </p>
+      <div class="flex items-baseline gap-2 mt-2">
+        <span class="mi-num text-display font-bold" x-text="shown">0</span>
+      </div>
+    </div>
+    {# ios #}
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ stats.ios }})">
+      <p class="text-small text-text-secondary flex items-center gap-2">
+        <span class="text-text-tertiary">{% icon "smartphone" size=16 %}</span> iOS apps
+      </p>
+      <div class="flex items-baseline gap-2 mt-2">
+        <span class="mi-num text-display font-bold" x-text="shown">0</span>
+      </div>
+    </div>
+    {# this week — the one tile with a REAL week-over-week delta pill #}
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ stats.week }})">
+      <p class="text-small text-text-secondary flex items-center gap-2">
+        <span class="text-text-tertiary">{% icon "activity" size=16 %}</span> Scanned this week
+      </p>
+      <div class="flex items-baseline gap-2 mt-2">
+        <span class="mi-num text-display font-bold" x-text="shown">0</span>
+        {% if stats.week_delta_pct is not None %}
+          <span class="mi-pill-delta {% if stats.week_delta_pct >= 0 %}up{% else %}down{% endif %}">
+            {% if stats.week_delta_pct >= 0 %}{% icon "arrow-up" size=10 %}{% else %}{% icon "arrow-down" size=10 %}{% endif %}
+            {{ stats.week_delta_pct }}%
+          </span>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  {# ══════════════════ Chart trio (real data; each card owns its own empty state) ══════════════════ #}
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-4" data-reveal>
+
+    {# Latest scan score — arc gauge #}
+    <div class="card mi-glass">
+      <div class="card-header">
+        <h3 class="text-h4 flex items-center gap-2">
+          <span class="w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">{% icon "gauge" size=14 %}</span>
+          Latest scan score
+        </h3>
+      </div>
+      <div class="card-body flex flex-col items-center justify-center min-h-[220px]">
+        {% if latest_score is not None %}
+          {% include "components/gauge_arc.html" with value=latest_score color=latest_score|score_color sub_label="/ 100" size_class="w-28 h-28" %}
+          <a href="/{{ recent.0.ANALYZER }}/{{ recent.0.MD5 }}/" class="text-tiny text-text-brand hover:underline mt-3 truncate max-w-full">
+            {{ recent.0.APP_NAME|default:recent.0.FILE_NAME|default:"View report" }}
+          </a>
+        {% else %}
+          <span class="w-12 h-12 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center mb-3">{% icon "gauge" size=22 %}</span>
+          <p class="text-small text-text-tertiary text-center">Scan an app to see its security score here.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {# 14-day scan trend — dot matrix #}
+    <div class="card mi-glass">
+      <div class="card-header">
+        <h3 class="text-h4 flex items-center gap-2">
+          <span class="w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">{% icon "activity" size=14 %}</span>
+          Scans · last 14 days
+        </h3>
+      </div>
+      <div class="card-body flex items-center min-h-[220px]">
+        {% include "components/dot_matrix.html" with pairs=trend_pairs max_value=trend_max unit="scan" %}
+      </div>
+    </div>
+
+    {# Platform mix — real counts, proportional bars #}
+    <div class="card mi-glass">
+      <div class="card-header">
+        <h3 class="text-h4 flex items-center gap-2">
+          <span class="w-7 h-7 rounded-md bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">{% icon "smartphone" size=14 %}</span>
+          Platform mix
+        </h3>
+      </div>
+      <div class="card-body min-h-[220px] flex flex-col justify-center">
+        {% if stats.total %}
+          <div class="space-y-4">
+            <div>
+              <div class="flex items-center justify-between text-small mb-1.5">
+                <span class="text-text-secondary">Android</span>
+                <span class="text-text-primary font-medium tabular">{{ stats.android }}</span>
+              </div>
+              <div class="h-2 rounded-full bg-surface-2 overflow-hidden">
+                <span class="block h-full rounded-full bg-chart-amber" style="width:{% widthratio stats.android stats.total 100 %}%"></span>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between text-small mb-1.5">
+                <span class="text-text-secondary">iOS</span>
+                <span class="text-text-primary font-medium tabular">{{ stats.ios }}</span>
+              </div>
+              <div class="h-2 rounded-full bg-surface-2 overflow-hidden">
+                <span class="block h-full rounded-full bg-chart-violet" style="width:{% widthratio stats.ios stats.total 100 %}%"></span>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between text-small mb-1.5">
+                <span class="text-text-secondary">Windows</span>
+                <span class="text-text-primary font-medium tabular">{{ stats.windows }}</span>
+              </div>
+              <div class="h-2 rounded-full bg-surface-2 overflow-hidden">
+                <span class="block h-full rounded-full bg-text-tertiary" style="width:{% widthratio stats.windows stats.total 100 %}%"></span>
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <p class="text-small text-text-tertiary text-center">No scans yet — platform mix will show up here.</p>
+        {% endif %}
+      </div>
+    </div>
+
+  </section>
+
+  {# ══════════════════ Quick actions ══════════════════ #}
+  <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" data-reveal>
+    <a href="{% url 'recent' %}" class="mi-action card mi-glass card-body group" style="--mi-accent:#FE4A23">
+      <div class="relative z-10 flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-chart-amber/15 text-chart-amber flex-shrink-0">
           {% icon "layers" size=20 %}
         </span>
-        <div class="min-w-0">
-          <h3 class="text-h4">Recent scans</h3>
-          <p class="text-small text-text-secondary mt-1">Browse your scan history.</p>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-h4 flex items-center gap-1">Recent scans {% icon "chevron-right" size=14 class="text-text-tertiary transition-transform duration-fast group-hover:translate-x-1" %}</h3>
+          <p class="text-small text-text-secondary mt-1">Browse and re-open your scan history.</p>
         </div>
       </div>
     </a>
-    <a href="{% url 'dynamic' %}" class="card card-hover">
-      <div class="card-body flex items-start gap-3">
-        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-severity-low/10 text-severity-low dark:bg-severity-low-dark/15 dark:text-severity-low-dark flex-shrink-0">
+    <a href="{% url 'dynamic' %}" class="mi-action card mi-glass card-body group" style="--mi-accent:#8D5CFC">
+      <div class="relative z-10 flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-chart-violet/15 text-chart-violet flex-shrink-0">
           {% icon "smartphone" size=20 %}
         </span>
-        <div class="min-w-0">
-          <h3 class="text-h4">Dynamic analyzer</h3>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-h4 flex items-center gap-1">Dynamic analyzer {% icon "chevron-right" size=14 class="text-text-tertiary transition-transform duration-fast group-hover:translate-x-1" %}</h3>
           <p class="text-small text-text-secondary mt-1">Run a runtime scan on a connected device.</p>
         </div>
       </div>
     </a>
-    <a href="{% url 'api_docs' %}" class="card card-hover">
-      <div class="card-body flex items-start gap-3">
-        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-severity-passed/10 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark flex-shrink-0">
+    <a href="{% url 'api_docs' %}" class="mi-action card mi-glass card-body group" style="--mi-accent:#FE4A23">
+      <div class="relative z-10 flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-md bg-chart-amber/15 text-chart-amber flex-shrink-0">
           {% icon "file-text" size=20 %}
         </span>
-        <div class="min-w-0">
-          <h3 class="text-h4">REST API</h3>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-h4 flex items-center gap-1">REST API {% icon "chevron-right" size=14 class="text-text-tertiary transition-transform duration-fast group-hover:translate-x-1" %}</h3>
           <p class="text-small text-text-secondary mt-1">Reference for CI/CD integrations.</p>
         </div>
       </div>
     </a>
   </section>
 
-  {# ─────────── Recent activity (real RecentScansDB rows; omitted when empty) ─────────── #}
+  {# ══════════════════ Recent activity (real rows; omitted when empty) ══════════════════ #}
   {% if recent %}
-  <section class="card" data-reveal>
+  <section class="card mi-glass" data-reveal>
     <div class="card-header">
       <h2 class="text-h3">Recent activity</h2>
       <a href="{% url 'recent' %}" class="text-small text-text-brand hover:underline inline-flex items-center gap-1">View all {% icon "arrow-up-right" size=14 %}</a>
     </div>
-    <ul class="divide-y divide-border-subtle">
-      {% for r in recent %}
-        <li>
-          <a href="/{{ r.ANALYZER }}/{{ r.MD5 }}/"
-             class="px-5 py-3 flex items-center gap-3 hover:bg-surface-2/40 transition-colors duration-fast">
-            <span class="w-8 h-8 rounded-md bg-surface-2 flex items-center justify-center text-text-tertiary flex-shrink-0">
-              {% icon "package" size=14 %}
-            </span>
-            <div class="min-w-0 flex-1">
-              <p class="text-small font-medium text-text-primary truncate">{{ r.APP_NAME|default:r.FILE_NAME|default:"Unnamed scan" }}</p>
-              <p class="text-tiny text-text-tertiary truncate font-mono">{% if r.PACKAGE_NAME %}{{ r.PACKAGE_NAME }} · {% endif %}{{ r.MD5|slice:":12" }}…</p>
-            </div>
-            {% if r.SCAN_TYPE %}
-              <span class="badge badge-unknown flex-shrink-0">{{ r.SCAN_TYPE }}</span>
-            {% endif %}
-            <span class="text-tiny text-text-tertiary tabular whitespace-nowrap flex-shrink-0">{{ r.TIMESTAMP|timesince }} ago</span>
-          </a>
-        </li>
-      {% endfor %}
-    </ul>
+    <div class="overflow-x-auto">
+      <table class="w-full text-small">
+        <thead>
+          <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <th class="text-left font-medium px-5 py-3">Application</th>
+            <th class="text-left font-medium px-5 py-3">Identifier</th>
+            <th class="text-left font-medium px-5 py-3">Type</th>
+            <th class="text-right font-medium px-5 py-3 whitespace-nowrap">Scanned</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recent %}
+          <tr class="border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
+              onclick="window.location.href='/{{ r.ANALYZER }}/{{ r.MD5 }}/'">
+            <td class="px-5 py-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="w-8 h-8 rounded-md {% if r.ANALYZER == 'static_analyzer_ios' %}bg-text-secondary/15 text-text-secondary{% else %}bg-severity-passed/15 text-severity-passed{% endif %} flex items-center justify-center flex-shrink-0">
+                  {% icon "smartphone" size=14 %}
+                </span>
+                <a href="/{{ r.ANALYZER }}/{{ r.MD5 }}/" class="font-medium text-text-primary truncate hover:text-text-brand">{{ r.APP_NAME|default:r.FILE_NAME|default:"Unnamed scan" }}</a>
+              </div>
+            </td>
+            <td class="px-5 py-3">
+              <span class="text-tiny text-text-tertiary font-mono">{% if r.PACKAGE_NAME %}{{ r.PACKAGE_NAME }} · {% endif %}{{ r.MD5|slice:":12" }}…</span>
+            </td>
+            <td class="px-5 py-3">
+              {% if r.SCAN_TYPE %}
+                <span class="badge badge-neutral uppercase">{{ r.SCAN_TYPE }}</span>
+              {% else %}
+                <span class="text-text-tertiary">—</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-right text-tiny text-text-tertiary tabular whitespace-nowrap">{{ r.TIMESTAMP|timesince }} ago</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
   {% endif %}
 
@@ -182,6 +441,28 @@
         xhr.open('POST', '{% url "upload" %}', true);
         xhr.setRequestHeader('X-CSRFToken', csrf);
         xhr.send(fd);
+      },
+    };
+  }
+
+  // Animated count-up for the metric tiles (additive; presentation only).
+  function counter(target) {
+    return {
+      shown: 0,
+      init() {
+        const end = Number(target) || 0;
+        if (end <= 0) { this.shown = 0; return; }
+        const reduce = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { this.shown = end; return; }
+        const dur = 900, start = performance.now();
+        const tick = (t) => {
+          const p = Math.min((t - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          this.shown = Math.round(eased * end);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
       },
     };
   }
