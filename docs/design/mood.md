@@ -4,92 +4,56 @@ A short north-star document for visual decisions. When in doubt, this is the tie
 
 ## One-line vibe
 
-**"A pro's tool, not a dashboard demo."** Quietly confident, dense with information, animated only when it helps you understand what changed.
+**"An instrument panel for a SOC analyst."** Dark-first, dense, built to be stared at for hours during a shift — not glanced at once for a demo screenshot.
 
-## Reference points (what we like)
+## Where this comes from
 
-- **Linear** — restrained, fast, every pixel earned, dark mode that's actually dark
-- **Sentry** — severity is the visual hierarchy, not nav decoration
-- **Datadog (recent)** — chart density without clutter
-- **Vercel dashboard** — surface depth used to imply hierarchy
-- **Tailscale admin** — calm, trusty, never flashy
+The visual direction isn't open-ended taste — it's modeled on a Behance case study, *"Cyber Security UI/UX Design"* (fictional product **CyberGuard**). The palette hex codes and the Albert Sans display typeface came straight off that reference's own style-guide slides. This was a client-material-pinned brief, not a "go find something cool on Dribbble" exercise, and that changes how we treat it: deviations from the reference need a reason, not a preference.
 
-## Anti-references (what we avoid)
+One thing was **not** inherited from CyberGuard: the brand blue used for navigation, the logo, and every interactive control. That's MobInspect's own identity, decided independently, and it's layered on top of the CyberGuard mirror rather than replacing it. See the policy below — this is the detail most likely to look like an unfinished sweep if you don't know the reasoning, so it's written down twice.
 
-- Glassmorphism (security users hate translucent UI on important data — readability comes first)
-- Neon gradients (signals "crypto", not "professional")
-- Emoji-laden empty states (the audience is grown-ups)
-- Animated-on-every-hover dashboards (performative, not functional)
-- "AI assistant" sidebars (unless we ship one and it earns its space)
+## The three-tier color policy
 
-## Surfaces
+Every color decision in the product answers to one of these three tiers. Nothing freelances.
 
-Five surface depths. Most pages use only 2 (canvas + card). Modals jump to surface 4. **Never** stack more than 3 surface levels in a single visible region — it becomes a depth-perception puzzle.
+1. **Brand blue — "operate the tool."** Sidebar, topbar, logo, nav active-state, the global focus ring, primary buttons, input focus states. This is chrome, not data. It was a deliberate identity call, made separately from the CyberGuard mirror — the "M" monogram predates this rebrand.
+2. **Amber/violet duotone — dashboard data only.** Gauge fill, chart series, stat-tile accent bars and glows, non-semantic icon chips. Sourced directly from the reference. It never touches a button, a nav item, or body text — the moment amber shows up on something clickable, it starts competing with brand blue for "what do I click," and the panel stops reading as calm instrumentation.
+3. **The dark grain-pill CTA — one hero action per screen.** `.mi-pillbtn`, near-black in both themes (`#17181C` dark / `#1A1A1A` light). CyberGuard's own screens never show two primary CTAs competing for attention on one dashboard, and neither do ours.
 
-In dark mode we lean on **borders**, not just shadows, to convey hierarchy — shadows become visually weak on dark backgrounds.
+Severity color sits outside this tier system entirely, on its own rule: **semantic only, never decoration.** A red badge means a real critical finding, a real failed check, a real risk category — never "this row is exciting." We found this rule being broken in the wild this session (see below), which is exactly why it's written down here in black and white.
 
-## Color discipline
+## Why the gauge is the signature piece
 
-- The **only** colors that should ever convey meaning are the severity tokens. A button that's blue because it's a CTA is fine; a "low severity" finding being green-because-it's-fine is **not** — green means "this passed", not "this is low".
-- Brand blue is for navigation, CTAs, links. It must never be confused with the "low severity" blue. Severity blue is `severity.low`, brand blue is `mobinspect.500`. They are deliberately different shades.
-- Backgrounds in dark mode trend toward `#0B0F1A` not pure black. Pure black creates harsh borders and reads as "OLED phone", not "pro tool".
+The 270° radial score meter isn't a chart-library widget dropped in for polish — it's a genuine small engineering choice. No JS charting dependency, no backend trig per value: the pointer's angle comes from composing two CSS `rotate()` transforms, driven by a single Django `{% widthratio %}` tag, and the arc track itself is an SVG `pathLength="100"` + `stroke-dasharray` trick. It's the kind of component that looks simple and isn't, which is the right amount of cleverness for the one element every scan report leads with.
 
-## Typography rules
+It also carries a rule the rest of the system leans on: color always comes in as `score_color` (a theme-aware CSS variable), never a bare hex. Skip that and the gauge now falls back to gray, not blue — on purpose. It used to silently default to brand blue when no color was passed, which read as a false "everything's fine, this is just chrome" signal on a component whose entire job is telling you severity. Gray-for-unknown is honest; blue-for-unknown was a bug.
 
-- One typeface for everything except code (Inter)
-- One mono for code (JetBrains Mono)
-- Numbers use **tabular figures** in tables (`font-feature-settings: 'tnum'`) — alignment matters
-- Hashes / file paths use `text-mono` and a subtle background tint so they look "click-to-copy"
+## Backgrounds and depth
 
-## Density
+Dark is the *default* theme app-wide now, not a media-query afterthought — CyberGuard has no light variant, and a SOC dashboard that people live in for a shift should open in the mode it was actually designed for. Light mode still exists and is fully supported, it's just not what greets you.
 
-- Default table row height: **40px** (information-dense, scannable)
-- Compact mode for long tables: **32px** (toggle in user prefs)
-- Card padding: **16px** vertical, **20px** horizontal
-- Form field height: **36px**
+Surfaces are CSS custom properties (`--surface-0` through `--surface-4`), theme-toggled off `data-theme` on `<html>`, not hardcoded per-component. In dark mode we lean on borders over shadows to convey hierarchy — shadows go visually weak once the background itself is already dark.
 
-## Motion philosophy
+Glass is opt-in, not ambient. `.mi-glass` (backdrop blur + saturate) dresses up dashboard-style cards deliberately; it is **not** forced onto the base `.card` class everywhere. Dense tables and forms stay flatly opaque on purpose — translucency under a data table is a readability tax nobody asked to pay.
 
-> If the user can't articulate what an animation taught them, the animation shouldn't exist.
+## Typography
 
-Three motions earn their place:
+- **Display / headings** — Albert Sans, self-hosted, pulled straight from the reference's type specimen. Tailwind v3's fontSize shorthand config has no `fontFamily` key (confirmed the hard way — it silently drops from the compiled CSS), so this is wired in as an explicit override in `app.css` rather than through `tailwind.config.js` alone.
+- **Body / UI** — Inter, unchanged. Kept deliberately over Albert Sans at small sizes: a display face with personality is the wrong choice for a dense data table you're reading at 13px for an hour.
+- **Mono / data** — JetBrains Mono, unchanged. Hashes, code, tabular figures.
 
-1. **Reveal**: cards fade-up with 50ms stagger when a page loads. Communicates "the page is ready".
-2. **State change**: status pills cross-fade colors over 200ms when a finding is suppressed. Communicates "your action took effect".
-3. **Chart entry**: lines/bars draw in over 320ms. Communicates "this is data, not a static image — interact with it".
+## Severity is not a decoration budget
 
-Everything else is instant or 120ms.
+Before this session, severity badge classes (`badge-critical`, `badge-passed`, etc.) had leaked into upwards of fifteen templates as a free color palette for things with zero severity meaning — item counts like "75 endpoints," version tags, feature labels. A green `badge-passed` pill next to an unrelated label reads as "this passed a security check" whether or not that's true. `badge-neutral` now exists as the boring, correct default for any count, tag, or label that isn't a real finding or status. If it doesn't have a severity, it doesn't get a severity color.
 
-`prefers-reduced-motion` collapses everything to instant + opacity-only fade.
+The score-tier scale itself had the same disease in a different shape: the same red/amber/blue/green ternary was hand-copied into six templates, and a seventh — Analytics — quietly ran a different three-tier scale with no blue/"low" step at all. The same numeric score could render a different color depending which page you were standing on. There's now exactly one threshold scale (`mi_score.py`: <30 critical, <40 medium, <60 low, ≥60 passed), exposed as both CSS variables and template filters. Nobody hand-writes the ternary again.
 
-## Iconography
+## Small honesties
 
-Lucide, stroke 1.5. **One icon per nav item** maximum. Inline severity labels never use icons — color carries the load (with `aria-label` for screen readers).
+- The sidebar persists its expand/collapse state to `localStorage`, because this is a full-page-reload Django app, not an SPA — without persistence, an expanded sidebar would silently re-collapse on every single navigation. That's not a nice-to-have, it's a bug fix.
+- Both theme toggles (topbar and sidebar) now share one event (`mi:theme-change`) instead of drifting out of sync with each other.
+- Icons are restrained: one per nav item, and inline severity labels lean on color plus an `aria-label`, not an icon doing the same job twice.
 
-## Empty states
+## What we didn't build
 
-Always: **icon · title · one-sentence body · optional CTA**. Never just "No data."
-
-Example for an empty Scans table:
-
-```
-┌─────────────────────────────────────┐
-│           [upload-cloud icon]       │
-│        No scans yet                 │
-│   Upload an APK, IPA, or AAB to     │
-│   get started.                      │
-│            [ New Scan → ]           │
-└─────────────────────────────────────┘
-```
-
-## Loading states
-
-- Skeleton rows for tables (never spinners on full pages)
-- Spinner on inline buttons during submit (`aria-busy="true"`)
-- Top-of-page progress bar for HTMX boosted nav (~150ms threshold before showing)
-
-## Errors
-
-- Inline beside the field that caused them (form validation)
-- Toast for transient failures
-- Full page only for 403/404/500 — and those pages are styled, not stack traces (unless `MOBSF_DEBUG=1`)
+No candlestick/OHLC chart, no flow/ribbon chart, no compliance-percentage rows, no "Approve / Reject AI action" buttons. Every one of those would either fabricate data MobInspect doesn't have or imply a live-remediation capability that doesn't exist. A good-looking dashboard that lies about what the product can do is worse than a plainer one that doesn't — so we left the gaps visible instead of papering over them with fake polish.
