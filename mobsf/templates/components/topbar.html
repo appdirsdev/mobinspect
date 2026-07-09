@@ -1,38 +1,45 @@
 {% load mi_icons %}
-{# Topbar — search · notifications · theme toggle · user menu #}
+{# Topbar — page context · theme toggle · notifications · user menu #}
 <div class="flex items-center gap-3 w-full px-4 lg:px-6">
 
   {# Mobile sidebar toggle #}
   <button
     type="button"
-    class="md:hidden p-2 rounded-md text-text-secondary hover:bg-surface-2"
+    class="mi-iconbtn md:hidden p-2 rounded-lg text-text-secondary hover:bg-surface-2"
     aria-label="Open menu"
   >
     {% icon "menu" size=20 %}
   </button>
+
+  {# Page context #}
+  <div class="min-w-0 hidden sm:block">
+    <p class="mi-page-eyebrow leading-none mb-0.5">MobInspect</p>
+    <p class="text-small font-semibold text-text-primary truncate leading-none">{{ title|default:"Dashboard" }}</p>
+  </div>
 
   <div class="ml-auto flex items-center gap-1">
 
     {# Theme toggle — cycles light → dark → system #}
     <button
       type="button"
-      class="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
+      class="mi-iconbtn p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
       aria-label="Toggle theme"
       x-data="{
-        pref: (window.MI && window.MI.theme) ? window.MI.theme.get() : 'system'
+        pref: (window.MI && window.MI.theme) ? window.MI.theme.get() : 'dark'
       }"
       @click="pref = window.MI.theme.cycle()"
+      @mi:theme-change.window="pref = $event.detail.value"
       :title="'Theme: ' + pref"
     >
-      <span x-show="pref === 'light'">{% icon "sun" size=18 %}</span>
-      <span x-show="pref === 'dark'" x-cloak>{% icon "moon" size=18 %}</span>
-      <span x-show="pref === 'system'" x-cloak>{% icon "monitor" size=18 %}</span>
+      <span class="mi-theme-ico" x-show="pref === 'light'">{% icon "sun" size=18 %}</span>
+      <span class="mi-theme-ico" x-show="pref === 'dark'" x-cloak>{% icon "moon" size=18 %}</span>
+      <span class="mi-theme-ico" x-show="pref === 'system'" x-cloak>{% icon "monitor" size=18 %}</span>
     </button>
 
     {# Notifications #}
     <button
       type="button"
-      class="relative p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
+      class="mi-iconbtn relative p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
       aria-label="Notifications"
     >
       {% icon "bell" size=18 %}
@@ -44,12 +51,14 @@
       <div x-data="{ open: false }" class="relative">
         <button
           type="button"
-          class="flex items-center gap-2 pl-1.5 pr-2 h-9 rounded-md hover:bg-surface-2 transition-colors duration-fast"
+          class="mi-iconbtn flex items-center gap-2 pl-1.5 pr-2 h-9 rounded-lg hover:bg-surface-2 transition-colors duration-fast"
           @click="open = !open"
           @click.outside="open = false"
         >
-          <span class="w-7 h-7 rounded-full bg-mobinspect-500/15 text-mobinspect-500 flex items-center justify-center font-medium text-small">
-            {{ request.user.username|slice:":1"|upper }}
+          <span class="mi-avatar-ring w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+            <span class="w-full h-full rounded-full bg-surface-1 text-mobinspect-500 flex items-center justify-center font-semibold text-small">
+              {{ request.user.username|slice:":1"|upper }}
+            </span>
           </span>
           <span class="hidden lg:inline text-small text-text-primary max-w-[120px] truncate">{{ request.user.username }}</span>
           {% icon "chevron-down" size=14 %}
@@ -59,8 +68,8 @@
           x-show="open"
           x-cloak
           x-transition:enter="transition ease-out duration-base"
-          x-transition:enter-start="opacity-0 scale-95"
-          x-transition:enter-end="opacity-100 scale-100"
+          x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+          x-transition:enter-end="opacity-100 scale-100 translate-y-0"
           class="absolute right-0 mt-2 w-56 card shadow-elevation-3 origin-top-right py-1.5 z-30"
           role="menu"
         >

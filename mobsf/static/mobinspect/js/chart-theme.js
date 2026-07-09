@@ -29,8 +29,10 @@
     Chart.defaults.plugins.tooltip.bodyColor       = readVar('--text-secondary') || '#475569';
     Chart.defaults.plugins.tooltip.borderColor     = readVar('--border-default') || '#CBD5E1';
     Chart.defaults.plugins.tooltip.borderWidth     = 1;
-    Chart.defaults.plugins.tooltip.padding         = 10;
-    Chart.defaults.plugins.tooltip.cornerRadius    = 6;
+    Chart.defaults.plugins.tooltip.padding         = 12;
+    Chart.defaults.plugins.tooltip.cornerRadius    = 10;
+    Chart.defaults.plugins.tooltip.titleFont       = { weight: '600' };
+    Chart.defaults.plugins.tooltip.bodySpacing     = 4;
     Chart.defaults.plugins.legend.labels.usePointStyle = true;
     Chart.defaults.plugins.legend.labels.boxHeight = 6;
 

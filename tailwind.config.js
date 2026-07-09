@@ -47,6 +47,14 @@ module.exports = {
           950: '#172554',
         },
 
+        // Chart duotone — reserved for data-visualization series only (never
+        // buttons/nav/text/UI chrome, which stay on the `mobinspect` brand
+        // ramp + logo). Sourced from the approved dashboard-design reference.
+        chart: {
+          amber:  '#FE4A23', // primary series (bars, line strokes, deltas)
+          violet: '#8D5CFC', // secondary series (alternating bars, contrast line)
+        },
+
         // Severity — semantic only. Never use for non-severity UI.
         // Two stops per severity: base (light theme) + 'on-dark' variant.
         severity: {
@@ -119,6 +127,11 @@ module.exports = {
       },
       fontSize: {
         // [size, { lineHeight, letterSpacing, fontWeight }]
+        // NOTE: Tailwind's fontSize array shorthand does NOT support a
+        // fontFamily key (verified empirically — silently dropped from the
+        // compiled utility). display/h1-h4 get the Albert Sans display face
+        // via an explicit override in app.css instead (search "Albert Sans"
+        // there); this array stays limited to size/lineHeight/weight.
         display: ['48px', { lineHeight: '1.1',  fontWeight: '700' }],
         h1:      ['30px', { lineHeight: '1.2',  fontWeight: '600' }],
         h2:      ['24px', { lineHeight: '1.25', fontWeight: '600' }],

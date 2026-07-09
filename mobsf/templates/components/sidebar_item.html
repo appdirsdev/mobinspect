@@ -1,9 +1,11 @@
 {% load mi_icons %}{% load static %}
 <a
   href="{% url url %}"
-  class="group flex items-center gap-3 px-2.5 h-9 rounded-md text-small text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast {% if active %}bg-mobinspect-500/10 text-mobinspect-500 hover:text-mobinspect-500 hover:bg-mobinspect-500/15{% endif %}"
+  class="mi-nav-item group flex items-center gap-3 px-2.5 h-10 rounded-lg text-small font-medium text-text-secondary hover:text-text-primary {% if active %}is-active{% endif %}"
+  :class="sidebarCollapsed ? 'justify-center !px-0' : ''"
   aria-current="{% if active %}page{% else %}false{% endif %}"
+  title="{{ label }}"
 >
-  <span class="flex-shrink-0">{% icon icon size=18 %}</span>
+  <span class="mi-nav-ico flex-shrink-0">{% icon icon size=18 %}</span>
   <span x-show="!sidebarCollapsed" x-transition.opacity class="truncate">{{ label }}</span>
 </a>

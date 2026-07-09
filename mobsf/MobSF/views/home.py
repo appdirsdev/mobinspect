@@ -10,9 +10,13 @@ from pathlib import Path
 from datetime import timedelta
 from wsgiref.util import FileWrapper
 
+from collections import OrderedDict
+
 from django.conf import settings
 from django.utils.timezone import now
 from django.core.paginator import Paginator
+from django.db.models import Count
+from django.db.models.functions import TruncDate
 from django.http import HttpResponse, HttpResponseRedirect
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
@@ -50,6 +54,10 @@ from mobsf.StaticAnalyzer.models import (
 from mobsf.StaticAnalyzer.views.common.suppression import (
     get_package,
 )
+# get_android_dashboard/get_ios_dashboard are imported lazily inside index()
+# below (not here at module scope): appsec.py -> db_interaction.py imports
+# update_scan_timestamp from this module, so a top-level import here would
+# be a circular import at Django app-loading time.
 from mobsf.DynamicAnalyzer.views.common.shared import (
     invalid_params,
     send_response,
@@ -91,10 +99,88 @@ def index(request):
         .order_by('-TIMESTAMP')[:8]
         .values('MD5', 'APP_NAME', 'PACKAGE_NAME', 'FILE_NAME',
                 'TIMESTAMP', 'SCAN_TYPE', 'ANALYZER'))
+    # Live dashboard metrics — real counts from RecentScansDB, no fabrication.
+    # Platform split follows the ANALYZER route key (same one used for report
+    # links); "week" counts scans in the trailing 7 days.
+    scans = RecentScansDB.objects
+    week_ago = now() - timedelta(days=7)
+    prev_week_ago = now() - timedelta(days=14)
+    week_count = scans.filter(TIMESTAMP__gte=week_ago).count()
+    prev_week_count = scans.filter(
+        TIMESTAMP__gte=prev_week_ago, TIMESTAMP__lt=week_ago).count()
+    # Real week-over-week delta (mirrors Analytics' scans_prev_week pattern)
+    # for the "this week" tile's pill — None when there's nothing to compare
+    # against yet, never a fabricated percentage.
+    week_delta_pct = (
+        round(((week_count - prev_week_count) / prev_week_count) * 100)
+        if prev_week_count else None
+    )
+    stats = {
+        'total': scans.count(),
+        'android': scans.filter(ANALYZER='static_analyzer').count(),
+        'ios': scans.filter(ANALYZER='static_analyzer_ios').count(),
+        'windows': scans.filter(ANALYZER='static_analyzer_windows').count(),
+        'week': week_count,
+        'week_delta_pct': week_delta_pct,
+    }
+    # Latest-scan security score for the dashboard's arc gauge — deliberately
+    # scores only the single most recent app (cheap, one dashboard
+    # computation) rather than rolling up every recent scan the way
+    # Analytics does (bounded but still O(100) dashboard computations,
+    # too costly to repeat on every home-page load). Fails closed: any
+    # error here must never break the home page.
+    latest_score = None
+    if recent:
+        try:
+            from mobsf.StaticAnalyzer.views.common.appsec import (
+                get_android_dashboard,
+                get_ios_dashboard,
+            )
+            latest = recent[0]
+            if latest['ANALYZER'] == 'static_analyzer':
+                row = StaticAnalyzerAndroid.objects.filter(
+                    MD5=latest['MD5']).first()
+                if row:
+                    latest_score = get_android_dashboard(
+                        [row]).get('security_score')
+            elif latest['ANALYZER'] == 'static_analyzer_ios':
+                row = StaticAnalyzerIOS.objects.filter(
+                    MD5=latest['MD5']).first()
+                if row:
+                    latest_score = get_ios_dashboard(
+                        [row]).get('security_score')
+        except Exception:
+            logger.exception('Dashboard: latest-scan score lookup failed')
+            latest_score = None
+
+    # 14-day daily scan-count trend for the dot-matrix widget (cheap grouped
+    # count, same pattern as Analytics — see components/dot_matrix.html).
+    trend_start = (now() - timedelta(days=13)).date()
+    daily = (
+        scans.filter(TIMESTAMP__date__gte=trend_start)
+        .annotate(day=TruncDate('TIMESTAMP'))
+        .values('day')
+        .annotate(c=Count('MD5'))
+        .order_by('day')
+    )
+    daily_map = OrderedDict()
+    for i in range(13, -1, -1):
+        d = (now() - timedelta(days=i)).date()
+        daily_map[d.isoformat()] = 0
+    for row in daily:
+        if row['day']:
+            daily_map[row['day'].isoformat()] = row['c']
+    trend_pairs = list(daily_map.items())
+    trend_max = max(daily_map.values()) if daily_map else 0
+
     context = {
         'version': settings.MOBSF_VER,
         'mimes': mimes,
         'exts': '|'.join(exts),
+        'stats': stats,
+        'latest_score': latest_score,
+        'trend_pairs': trend_pairs,
+        'trend_max': trend_max,
         # Valid HTML file-input accept attribute: comma-separated, each
         # extension dotted (".apk,.xapk,..."). The template must NOT derive
         # this by stripping the '|' from `exts` — that yields one invalid

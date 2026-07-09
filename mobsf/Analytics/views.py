@@ -143,6 +143,15 @@ def dashboard(request):
             daily_map[row['day'].isoformat()] = row['c']
     trend_labels = list(daily_map.keys())
     trend_values = list(daily_map.values())
+    # Last-14-days window for the dot-matrix widget (components/dot_matrix.html):
+    # a real subset of the same daily counts above, zipped into (label, value)
+    # pairs so the template can iterate with tuple unpacking (Django template
+    # dot-lookup can't index a list by a loop variable), plus the window's
+    # own max so each column scales honestly against what actually happened.
+    trend_recent_labels = trend_labels[-14:]
+    trend_recent_values = trend_values[-14:]
+    trend_recent_pairs = list(zip(trend_recent_labels, trend_recent_values))
+    trend_recent_max = max(trend_recent_values) if trend_recent_values else 0
 
     # Platform breakdown (from RecentScansDB SCAN_TYPE)
     platform_rows = (
@@ -221,6 +230,8 @@ def dashboard(request):
         },
         'trend_labels':  trend_labels,
         'trend_values':  trend_values,
+        'trend_recent_pairs': trend_recent_pairs,
+        'trend_recent_max':   trend_recent_max,
         'platform':      platform,
         'severity':      severity_counts,
         'severity_total': severity_total,

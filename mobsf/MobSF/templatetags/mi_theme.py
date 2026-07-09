@@ -25,14 +25,17 @@ _BOOTSTRAP_JS = """
 (function(){
   try {
     var KEY = 'mi-theme';
-    var pref = localStorage.getItem(KEY) || 'system';
+    // Default (no stored choice yet) is 'dark' — MobInspect's dashboard
+    // design is dark-first; the sun/moon toggle still lets anyone switch
+    // to light or follow their OS ('system') once they express a choice.
+    var pref = localStorage.getItem(KEY) || 'dark';
     var dark = pref === 'dark' ||
       (pref === 'system' &&
        window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme-pref', pref);
   } catch (e) {
-    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.setAttribute('data-theme', 'dark');
   }
 })();
 """.strip()

@@ -1,4 +1,4 @@
-{% load static %}{% load mi_icons %}{% load mi_theme %}<!doctype html>
+{% load static %}{% load mi_icons %}{% load mi_theme %}{% load mi_static %}<!doctype html>
 <html lang="en" class="h-full">
 <head>
   {# Theme bootstrap MUST run before any paint to avoid flash #}
@@ -14,7 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="{% static 'mobinspect/img/favicon.svg' %}" />
   <link rel="alternate icon" href="{% static 'img/favicon.ico' %}" />
 
-  <link rel="stylesheet" href="{% static 'mobinspect/css/dist/app.css' %}" />
+  <link rel="stylesheet" href="{% static 'mobinspect/css/dist/app.css' %}?v={% asset_version 'mobinspect/css/dist/app.css' %}" />
 
   <style id="mi-widget-dark-theme">
     /* Dark-mode overrides for third-party widgets (CodeMirror, highlight.js,
@@ -68,20 +68,199 @@
     [data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button { color: rgb(var(--text-primary)) !important; }
   </style>
 
+  <style id="mi-chrome">
+    /* ═══════════════ App chrome: sidebar · topbar · footer ═══════════════
+       Purely presentational polish + micro-animations for the global shell.
+       Uses design tokens so it tracks the palette; reduced-motion safe. */
+
+    /* ---------- Glassmorphic ambient-glow cards (home/appsec/analytics hero
+       headers) — frosted surface over the glow blobs behind it, matching the
+       CyberGuard reference's dashboard header treatment. Deliberately scoped
+       to .mi-hero (NOT the base .card class): applying backdrop-filter to
+       every card app-wide would hurt legibility on dense tables/forms rather
+       than help it. Loads after app.css in the head, so this same-specificity
+       override wins the cascade without needing !important. */
+    .mi-hero {
+      background: rgb(var(--surface-1) / 0.68);
+      backdrop-filter: blur(20px) saturate(150%);
+      -webkit-backdrop-filter: blur(20px) saturate(150%);
+      border-color: rgb(var(--border-subtle) / 0.5);
+    }
+    .mi-hero::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+      border-radius: inherit; padding: 1px;
+      background: linear-gradient(180deg, rgb(255 255 255 / .10), transparent 40%);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; }
+
+    /* General-purpose glass surface — opt-in per card via class="card mi-glass"
+       (added alongside .card, not replacing it). Same recipe as .mi-hero but
+       reusable anywhere a page wants the frosted-panel look; unlike .mi-hero
+       this is NOT auto-applied to every .card, so dense tables/forms stay
+       fully opaque unless a page explicitly asks for it. */
+    .mi-glass {
+      background: rgb(var(--surface-1) / 0.6) !important;
+      backdrop-filter: blur(16px) saturate(150%);
+      -webkit-backdrop-filter: blur(16px) saturate(150%);
+      border-color: rgb(var(--border-subtle) / 0.5) !important;
+      position: relative;
+    }
+    .mi-glass::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+      border-radius: inherit; padding: 1px;
+      background: linear-gradient(180deg, rgb(255 255 255 / .08), transparent 50%);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .mi-glass { background: rgb(var(--surface-1) / 0.94) !important; }
+    }
+
+    /* Dark grain-pill CTAs — CyberGuard's exact "Check Alerts" button
+       treatment (neutral near-black pill + subtle noise, not brand-colored).
+       Global (promoted from home.html) so any page can opt in via
+       class="btn ... mi-pillbtn" alongside the normal .btn sizing classes;
+       app-wide .btn-primary/.btn-secondary stay on-brand blue by default. */
+    .mi-pillbtn {
+      position: relative; overflow: hidden; isolation: isolate;
+      background: #17181C; color: #fff; border: 1px solid rgb(255 255 255 / .08);
+      border-radius: 9999px; transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .mi-pillbtn:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -10px rgb(0 0 0 / .6); }
+    .mi-pillbtn:active { transform: translateY(0); }
+    .mi-pillbtn::before {
+      content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .07;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .mi-pillbtn > * { position: relative; z-index: 1; }
+    :root[data-theme="light"] .mi-pillbtn { background: #1A1A1A; }
+    @media (prefers-reduced-motion: reduce) { .mi-pillbtn { transition: none; } }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .mi-hero { background: rgb(var(--surface-1) / 0.94); }
+    }
+
+    /* ---------- Sidebar ---------- */
+    .mi-aside { position: relative; }
+    .mi-aside::after { content: ''; position: absolute; top: 0; right: -1px; width: 1px;
+      height: 100%; pointer-events: none; opacity: .6;
+      background: linear-gradient(180deg, transparent, rgba(37,99,235,.35), transparent); }
+
+    .mi-brand .mi-brand-badge { position: relative; }
+    .mi-brand .mi-brand-badge::before { content: ''; position: absolute; inset: -5px; z-index: -1;
+      border-radius: 14px; filter: blur(9px); opacity: 0; transition: opacity .25s ease;
+      background: radial-gradient(circle at 50% 40%, rgba(37,99,235,.5), transparent 70%); }
+    .mi-brand:hover .mi-brand-badge::before { opacity: 1; }
+
+    .mi-navlabel { font-size: 10px; font-weight: 600; letter-spacing: .14em;
+      text-transform: uppercase; color: rgb(var(--text-tertiary)); }
+
+    .mi-nav-item { position: relative; overflow: hidden;
+      transition: color .18s ease, background-color .18s ease, transform .16s ease; }
+    .mi-nav-item::before { content: ''; position: absolute; left: 0; top: 50%;
+      transform: translateY(-50%); width: 3px; height: 0; border-radius: 0 4px 4px 0;
+      background: linear-gradient(180deg, #3B82F6, #2563EB);
+      transition: height .28s cubic-bezier(.34,1.56,.64,1); }
+    .mi-nav-item:hover { background-color: rgb(var(--surface-2)); transform: translateX(2px); }
+    .mi-nav-item:hover::before { height: 38%; }
+    /* Active-state chip — CyberGuard reference (Dashboard.png, pixel-sampled)
+       uses a neutral dark charcoal chip, not a brand-colored one; reuses the
+       same warm dark-neutral material as .mi-pillbtn (#17181C/#1A1A1A) for
+       consistency, rather than the app's cooler --surface-3 token or blue. */
+    .mi-nav-item.is-active { color: #fff;
+      background: #17181C; border-radius: 10px; }
+    .mi-nav-item.is-active::before { height: 0; }
+    :root[data-theme="light"] .mi-nav-item.is-active { background: #1A1A1A; }
+    .mi-nav-ico { transition: transform .22s cubic-bezier(.34,1.56,.64,1); }
+    .mi-nav-item:hover .mi-nav-ico { transform: scale(1.14) rotate(-3deg); }
+    .mi-nav-item.is-active .mi-nav-ico { color: #fff; }
+
+    /* Gradient ring via a 2px padded conic border — robust on any surface
+       (avoids z-index/stacking issues behind the sidebar background). */
+    .mi-avatar-ring { padding: 2px; border-radius: 9999px;
+      background: conic-gradient(from 140deg, #2563EB, #3B82F6, #60A5FA, #2563EB); }
+
+    /* ---------- Topbar ---------- */
+    .mi-topbar { position: relative; }
+    .mi-topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+      height: 1px; opacity: .55;
+      background: linear-gradient(90deg, transparent, rgba(37,99,235,.4), transparent); }
+    .mi-iconbtn { transition: color .16s ease, background-color .16s ease, transform .16s ease; }
+    .mi-iconbtn:hover { transform: translateY(-1px); }
+    .mi-iconbtn:active { transform: translateY(0); }
+    .mi-theme-ico { display: inline-flex; transition: transform .3s cubic-bezier(.34,1.56,.64,1); }
+    .mi-iconbtn:hover .mi-theme-ico { transform: rotate(25deg) scale(1.08); }
+    .mi-page-eyebrow { font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+      color: rgb(var(--text-tertiary)); }
+
+    /* ---------- Footer ---------- */
+    .mi-footer { position: relative; }
+    .mi-footer::before { content: ''; position: absolute; top: -1px; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(37,99,235,.35), transparent); }
+    .mi-status-dot { width: 7px; height: 7px; border-radius: 9999px; background: #16A34A; position: relative; }
+    .mi-status-dot::after { content: ''; position: absolute; inset: 0; border-radius: 9999px;
+      background: #16A34A; animation: mi-pulse 2.4s ease-out infinite; }
+    @keyframes mi-pulse { 0% { transform: scale(1); opacity: .7; }
+      70% { transform: scale(2.6); opacity: 0; } 100% { opacity: 0; } }
+
+    /* ---------- v3: shared data-viz + surface primitives ----------
+       Reusable across any page: arc gauges, delta pills, a subtle grain
+       texture for primary CTAs. Colors are passed in via inline style
+       (currentColor / custom props) so these stay on-brand per severity. */
+
+    /* Arc gauge (see components/gauge_arc.html): the two nested frames
+       rotate the pointer dot to the value's position on a 270° arc via
+       pure CSS transform composition — no per-value trig in templates. */
+    .mi-gauge-pointer-frame { position: absolute; inset: 0; transform: rotate(225deg); }
+    .mi-gauge-pointer-inner { position: absolute; inset: 0; }
+    .mi-gauge-dot { position: absolute; top: 50%; left: 50%; width: 11px; height: 11px;
+      margin: -5.5px 0 0 -5.5px; border-radius: 9999px; background: currentColor;
+      transform: translateY(-58px);
+      box-shadow: 0 0 0 5px rgb(var(--surface-1)), 0 0 14px 2px currentColor; }
+    .mi-gauge-tick { stroke: rgb(var(--border-default)); stroke-width: 2; stroke-linecap: round; }
+    .mi-gauge-ring { animation: mi-gauge-draw 1.2s .15s cubic-bezier(.16,1,.3,1) both; }
+    @keyframes mi-gauge-draw { from { stroke-dashoffset: var(--mi-gauge-len); } to { stroke-dashoffset: 0; } }
+
+    /* Delta / trend pill — compact rounded badge for +N% style metrics.
+       CyberGuard reference (Dashboard.png) renders every delta pill in the
+       same neutral gray regardless of up/down direction — no red/green
+       semantic coloring. The up/down arrow icon still conveys direction. */
+    .mi-pill-delta { display: inline-flex; align-items: center; gap: 3px; font-weight: 600;
+      font-size: 11px; padding: 2px 8px 2px 7px; border-radius: 9999px; line-height: 1.5;
+      color: rgb(var(--text-secondary)); background: rgb(var(--surface-2)); }
+
+    /* Subtle grain texture for primary CTAs — a faint fractal-noise overlay
+       that reads as tactile/premium rather than flat-fill. Opacity kept low
+       so it never affects text contrast (WCAG unaffected: overlay ≈2%). */
+    .btn-primary { position: relative; overflow: hidden; isolation: isolate; }
+    .btn-primary::before {
+      content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      opacity: .05; mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .btn-primary > * { position: relative; z-index: 1; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mi-gauge-ring { animation: none !important; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mi-nav-item, .mi-nav-item::before, .mi-nav-ico, .mi-iconbtn, .mi-theme-ico,
+      .mi-status-dot::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+
   {% block extra_head %}{% endblock %}
 </head>
 
 <body
   class="h-full antialiased bg-surface-0 text-text-primary"
   hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-  x-data="{ sidebarCollapsed: false }"
+  x-data="{ sidebarCollapsed: (localStorage.getItem('mi-sidebar') ?? 'collapsed') !== 'expanded' }"
 >
   <div class="flex h-full">
 
     {# ─────────── Sidebar ─────────── #}
     <aside
       :class="sidebarCollapsed ? 'w-sidebar-collapsed' : 'w-sidebar'"
-      class="hidden md:flex flex-col border-r border-border-subtle bg-surface-1 transition-[width] duration-base ease-out"
+      class="mi-aside hidden md:flex flex-col border-r border-border-subtle bg-surface-1 transition-[width] duration-base ease-out"
     >
       {% include "components/sidebar.html" %}
     </aside>
@@ -90,7 +269,7 @@
     <div class="flex flex-col flex-1 min-w-0">
 
       {# Topbar #}
-      <header class="flex items-center h-topbar border-b border-border-subtle bg-surface-1/80 backdrop-blur sticky top-0 z-20">
+      <header class="mi-topbar flex items-center h-topbar border-b border-border-subtle bg-surface-1/80 backdrop-blur sticky top-0 z-20">
         {% include "components/topbar.html" %}
       </header>
 
@@ -102,10 +281,23 @@
         </div>
       </main>
 
-      {# Footer (intentionally tiny) #}
-      <footer class="px-6 py-3 border-t border-border-subtle text-tiny text-text-tertiary flex items-center justify-between">
-        <span>© {% now "Y" %} Appdirs · MobInspect</span>
-        <span>v{{ version|default:"" }}</span>
+      {# Footer #}
+      <footer class="mi-footer px-4 lg:px-6 py-3 border-t border-border-subtle flex flex-col sm:flex-row items-center justify-between gap-2 text-tiny text-text-tertiary">
+        <div class="flex items-center gap-2.5">
+          <span class="inline-flex w-5 h-5 rounded-md shadow-elevation-1">
+            {% include "components/logo_mark.html" %}
+          </span>
+          <span>© {% now "Y" %} <span class="font-medium text-text-secondary">Appdirs</span> · MobInspect</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="inline-flex items-center gap-1.5" title="Runs fully offline / air-gap ready">
+            <span class="mi-status-dot" aria-hidden="true"></span>
+            <span class="uppercase tracking-wide text-[10px] font-semibold text-text-secondary">Local · Offline-ready</span>
+          </span>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2 text-text-secondary font-mono tabular">
+            v{{ version|default:"" }}
+          </span>
+        </div>
       </footer>
     </div>
   </div>

@@ -2,29 +2,35 @@
 {% comment %}
   Sidebar — role-aware navigation. Items are wrapped in the can tag so users
   only see links to pages they can actually use. The backend enforces
-  permissions independently via @require_permission decorators.
+  permissions independently via @require_permission decorators. Visual polish
+  + micro-animations live in the #mi-chrome stylesheet (base/app.html); all
+  functional wiring (urls, can-gates, active state, collapse) is unchanged.
 {% endcomment %}
 <div class="flex items-center gap-2 px-4 h-topbar border-b border-border-subtle">
-  <a href="{% url 'home' %}" class="flex items-center gap-2 min-w-0 group">
-    <span class="inline-flex w-8 h-8 rounded-lg shadow-elevation-1 transition-transform duration-fast group-hover:scale-105">
+  <a href="{% url 'home' %}" class="mi-brand flex items-center gap-2.5 min-w-0 group">
+    <span class="mi-brand-badge inline-flex w-8 h-8 rounded-lg shadow-elevation-1 transition-transform duration-fast group-hover:scale-105">
       {% include "components/logo_mark.html" %}
     </span>
     <span x-show="!sidebarCollapsed" x-transition.opacity class="font-semibold tracking-tight text-text-primary truncate">
-      MobInspect
+      Mob<span class="text-text-brand">Inspect</span>
     </span>
   </a>
   <button
     type="button"
     class="ml-auto p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
     aria-label="Toggle sidebar"
-    @click="sidebarCollapsed = !sidebarCollapsed"
+    @click="sidebarCollapsed = !sidebarCollapsed; localStorage.setItem('mi-sidebar', sidebarCollapsed ? 'collapsed' : 'expanded')"
   >
-    {% icon "chevron-left" size=16 %}
+    <span class="inline-flex transition-transform duration-base" :class="sidebarCollapsed ? 'rotate-180' : ''">{% icon "chevron-left" size=16 %}</span>
   </button>
 </div>
 
 <nav class="flex-1 overflow-y-auto px-2 py-4 space-y-0.5">
   {% with cur=request.resolver_match.url_name %}
+
+    {% can_any 'scan.create' 'scan.view' 'scan.view_own' 'analytics.view' 'dynamic.android.run' 'dynamic.ios.run' %}
+      <p x-show="!sidebarCollapsed" x-transition.opacity class="mi-navlabel px-3 pb-1.5">Workspace</p>
+    {% endcan_any %}
 
     {% can 'scan.create' %}
       {% if cur == 'home' %}
@@ -60,6 +66,7 @@
 
     {% can_any 'admin.user.view' 'rbac.role.view' 'api.key.create' 'audit.view' 'settings.view' %}
       <div class="my-3 border-t border-border-subtle"></div>
+      <p x-show="!sidebarCollapsed" x-transition.opacity class="mi-navlabel px-3 pb-1.5">Administration</p>
     {% endcan_any %}
 
     {% can 'admin.user.view' %}
@@ -100,10 +107,45 @@
   {% endwith %}
 </nav>
 
+{# ── Bottom utility group: theme + sign out (mirrors CyberGuard's settings/logout/theme cluster; only real, working actions — no dummy "Settings" icon since Integrations above already serves that role) ── #}
+<div class="border-t border-border-subtle p-2 space-y-0.5">
+  <button
+    type="button"
+    class="mi-nav-item group flex items-center gap-3 px-2.5 h-9 rounded-lg text-small font-medium text-text-secondary hover:text-text-primary w-full"
+    :class="sidebarCollapsed ? 'justify-center !px-0' : ''"
+    aria-label="Toggle theme"
+    x-data="{ pref: (window.MI && window.MI.theme) ? window.MI.theme.get() : 'dark' }"
+    @click="pref = window.MI.theme.cycle()"
+    @mi:theme-change.window="pref = $event.detail.value"
+    :title="'Theme: ' + pref"
+  >
+    <span class="mi-nav-ico flex-shrink-0">
+      <span x-show="pref === 'light'">{% icon "sun" size=18 %}</span>
+      <span x-show="pref === 'dark'" x-cloak>{% icon "moon" size=18 %}</span>
+      <span x-show="pref === 'system'" x-cloak>{% icon "monitor" size=18 %}</span>
+    </span>
+    <span x-show="!sidebarCollapsed" x-transition.opacity class="truncate">Theme</span>
+  </button>
+  <form method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button
+      type="submit"
+      class="mi-nav-item group flex items-center gap-3 px-2.5 h-9 rounded-lg text-small font-medium text-text-secondary hover:text-text-primary w-full"
+      :class="sidebarCollapsed ? 'justify-center !px-0' : ''"
+      title="Sign out"
+    >
+      <span class="mi-nav-ico flex-shrink-0">{% icon "log-out" size=18 %}</span>
+      <span x-show="!sidebarCollapsed" x-transition.opacity class="truncate">Sign out</span>
+    </button>
+  </form>
+</div>
+
 <div class="border-t border-border-subtle p-3">
   <div class="flex items-center gap-2.5 min-w-0">
-    <div class="w-8 h-8 rounded-full bg-mobinspect-500/15 text-mobinspect-500 flex items-center justify-center font-medium text-small flex-shrink-0">
-      {% if request.user.is_authenticated %}{{ request.user.username|slice:":1"|upper }}{% else %}?{% endif %}
+    <div class="mi-avatar-ring w-8 h-8 flex-shrink-0">
+      <div class="w-full h-full rounded-full bg-surface-1 text-mobinspect-500 flex items-center justify-center font-semibold text-small">
+        {% if request.user.is_authenticated %}{{ request.user.username|slice:":1"|upper }}{% else %}?{% endif %}
+      </div>
     </div>
     <div x-show="!sidebarCollapsed" x-transition.opacity class="min-w-0 flex-1">
       <p class="text-small font-medium text-text-primary truncate">

@@ -1,0 +1,44 @@
+{% comment %}
+  Reusable dot-matrix bar chart — a grid of small dots forming a "skyline"
+  silhouette per column, each scaled to the window's real max. Pure Django
+  template arithmetic (no JS charting library): {% widthratio %} computes
+  each column's filled-dot count against the caller-supplied max_value.
+
+  Params:
+    pairs      — list of (label, value) tuples, one per column. Build this
+                 in the view via zip(labels, values) — Django template dot
+                 lookup can't index a list by a loop variable, so passing
+                 pre-zipped pairs (unpacked below via `for label, value in`)
+                 is the correct pattern, not two parallel lists.
+    max_value  — int, the real max across the values in `pairs` (caller-
+                 computed, since Django templates have no "max of list" filter)
+    unit       — singular unit noun for the title tooltip, e.g. "scan"
+
+  Usage:
+    {% include "components/dot_matrix.html" with pairs=trend_recent_pairs max_value=trend_recent_max unit="scan" %}
+{% endcomment %}
+{% if max_value %}
+<div class="flex items-end gap-1.5 sm:gap-2 overflow-x-auto pb-1" role="img" aria-label="Daily {{ unit }} count, last {{ pairs|length }} days">
+  {% for label, value in pairs %}
+    {% widthratio value max_value 6 as filled %}
+    <div class="flex flex-col items-center gap-1.5 flex-shrink-0" title="{{ label }}: {{ value }} {{ unit }}{{ value|pluralize }}">
+      <div class="flex flex-col-reverse gap-1">
+        {% for n in "123456" %}
+          {# widthratio yields a string; |add:0 forces a real int so this
+             comparison against the int forloop.counter isn't a silent
+             type-mismatch no-op (verified: without the coercion every dot
+             renders empty regardless of the real value). #}
+          {% if forloop.counter <= filled|add:0 %}
+            <span class="w-2 h-2 rounded-full bg-chart-amber"></span>
+          {% else %}
+            <span class="w-2 h-2 rounded-full bg-surface-3"></span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <span class="text-[9px] font-mono text-text-tertiary tabular">{{ label|slice:"-2:" }}</span>
+    </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-small text-text-tertiary py-6 text-center">No scans in this window yet.</p>
+{% endif %}

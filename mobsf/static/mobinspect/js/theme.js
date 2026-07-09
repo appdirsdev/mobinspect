@@ -37,7 +37,9 @@
 
   function get() {
     const v = localStorage.getItem(STORAGE_KEY);
-    return VALID.includes(v) ? v : 'system';
+    // Default (no stored choice yet) is 'dark' — matches the inline
+    // no-flicker bootstrap in mi_theme.py; must stay in sync with it.
+    return VALID.includes(v) ? v : 'dark';
   }
 
   function set(value) {

@@ -36,6 +36,20 @@
     --text-tertiary: 148 163 184;
     --text-inverse:  248 250 252;
     --text-brand:    29  78 216;
+
+    /* Security-score tiers — theme-aware, same hex family as the severity
+     * tokens above (severity-critical/medium/low/passed/unknown), exposed
+     * as CSS vars so the score gauge's inline style="color:" can resolve
+     * the correct light/dark shade without needing Tailwind's dark: class
+     * mechanism (which only works on class attributes, not raw style=).
+     * ONE shared threshold set lives in
+     * mobsf/MobSF/templatetags/mi_score.py (score_tier/score_color); never
+     * duplicate the </30/<40/<60/else logic inline again. */
+    --score-critical: 220 38 38;   /* severity-critical  #DC2626 */
+    --score-medium:   217 119 6;   /* severity-medium    #D97706 */
+    --score-low:      37 99 235;   /* severity-low       #2563EB */
+    --score-passed:   22 163 74;   /* severity-passed    #16A34A */
+    --score-unknown:  100 116 139; /* severity-unknown   #64748B */
   }
 
   [data-theme='dark'] {
@@ -54,6 +68,12 @@
     --text-tertiary:  100 116 139;
     --text-inverse:    15  23  42;
     --text-brand:      59 130 246;
+
+    --score-critical: 248 113 113;  /* severity-critical-dark  #F87171 */
+    --score-medium:   251 191 36;   /* severity-medium-dark    #FBBF24 */
+    --score-low:       96 165 250;  /* severity-low-dark       #60A5FA */
+    --score-passed:    74 222 128;  /* severity-passed-dark    #4ADE80 */
+    --score-unknown:  148 163 184;  /* severity-unknown-dark   #94A3B8 */
   }
 
   /* Resets */
@@ -118,6 +138,17 @@
     font-weight: 100 800;
     font-display: swap;
     src: url('../../fonts/JetBrainsMono-Variable.woff2') format('woff2-variations');
+  }
+  /* Display face — rounded-geometric, used for headings/large numerals only
+   * (see tailwind.config.js fontFamily.display). Inter remains the body
+   * face; Albert Sans is a display personality choice, not a UI-legibility
+   * one at small sizes. */
+  @font-face {
+    font-family: 'Albert Sans';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('../../fonts/AlbertSans-Variable.woff2') format('woff2-variations');
   }
 }
 
@@ -212,6 +243,13 @@
            dark:bg-severity-unknown-dark/15 dark:text-severity-unknown-dark;
   }
 
+  /* Non-severity pill — decorative labels (version tags, feature/platform
+   * chips) that must never borrow a severity-* color, since that would
+   * read as a finding state that isn't there. */
+  .badge-neutral {
+    @apply bg-surface-2 text-text-secondary;
+  }
+
   /* Code block + inline kbd */
   .code {
     @apply font-mono text-mono bg-surface-2 rounded px-1.5 py-0.5;
@@ -231,6 +269,14 @@
 
 /* ───────────────────────────────────────────────────── @layer utilities */
 @layer utilities {
+  /* Display face override — Tailwind's fontSize array shorthand can't carry
+   * a fontFamily key (verified empirically), so the heading/display
+   * utilities' font-family is set explicitly here instead. Body/small/tiny
+   * text intentionally stays on the sans (Inter) stack. */
+  .text-display, .text-h1, .text-h2, .text-h3, .text-h4 {
+    font-family: 'Albert Sans', theme('fontFamily.sans');
+  }
+
   /* Dot separator: <span>1</span><span class="dot-sep"></span><span>2</span> */
   .dot-sep::before {
     content: '·';
