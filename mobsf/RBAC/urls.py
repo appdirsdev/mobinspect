@@ -24,6 +24,11 @@ urlpatterns = [
     # Integrations · ADB connections
     path('integrations/adb/',
          views.adb_connections_list, name='adb_connections'),
+    # Fixed-box save/test (Android + iOS device cards)
+    path('integrations/device/<slug:platform>/save/',
+         views.device_save, name='device_save'),
+    path('integrations/device/<slug:platform>/test/',
+         views.device_test_key, name='device_test'),
     path('integrations/adb/add/',
          views.adb_connection_add, name='adb_connection_add'),
     path('integrations/adb/<int:conn_id>/remove/',
@@ -32,4 +37,22 @@ urlpatterns = [
          views.adb_connection_set_active, name='adb_connection_set_active'),
     path('integrations/adb/<int:conn_id>/test/',
          views.adb_connection_test, name='adb_connection_test'),
+
+    # Integrations · AI model endpoints
+    # Legacy by-id routes FIRST so integer ids bind to the <int> converter
+    # (the <slug:role> routes below also match pure-digit segments, which would
+    # otherwise shadow these and make them unreachable via the URL router).
+    path('integrations/model/add/',
+         views.model_integration_add, name='model_integration_add'),
+    path('integrations/model/<int:integ_id>/remove/',
+         views.model_integration_remove, name='model_integration_remove'),
+    path('integrations/model/<int:integ_id>/set-active/',
+         views.model_integration_set_active, name='model_integration_set_active'),
+    path('integrations/model/<int:integ_id>/test/',
+         views.model_integration_test, name='model_integration_test'),
+    # Fixed-box save/test (Generation + Classification model cards)
+    path('integrations/model/<slug:role>/save/',
+         views.model_save, name='model_save'),
+    path('integrations/model/<slug:role>/test/',
+         views.model_test_key, name='model_test'),
 ]

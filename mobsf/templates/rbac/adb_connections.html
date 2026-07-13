@@ -3,6 +3,41 @@
 
 {% block page_title %}Integrations{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* ── Ambient hero: brand-blue bloom + faint grid (the admin/config zone
+     signature, shared with Roles / API keys / Audit log) ── */
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px; filter: blur(64px); opacity: .5;
+  }
+  .mi-hero-glow::before {
+    width: 320px; height: 320px; top: -120px; right: -60px;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 15s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 260px; height: 260px; bottom: -130px; left: -40px;
+    background: radial-gradient(circle at center, rgba(59,130,246,.36), transparent 70%);
+    animation: mi-float 20s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .5;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 80% 0%, #000 10%, transparent 75%);
+            mask-image: radial-gradient(ellipse 80% 80% at 80% 0%, #000 10%, transparent 75%);
+  }
+  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .4; }
+  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .32; }
+  @media (prefers-reduced-motion: reduce) {
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
+  }
+  @keyframes mi-float { 0%,100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-24px,0); } }
+</style>
+{% endblock %}
+
 {% comment %}
   Integrations — four fixed, self-contained cards:
     • Android device   (adb host:port)     → rbac:device_save 'android'
@@ -18,29 +53,35 @@
 {% endcomment %}
 
 {% block content %}
-<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-8">
-  <div class="flex items-start gap-3 min-w-0">
-    <span class="w-10 h-10 rounded-lg bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0">
-      {% icon "sliders" size=20 %}
-    </span>
-    <div class="min-w-0">
-      <p class="text-tiny uppercase tracking-wide text-text-tertiary">Configuration</p>
-      <h1 class="text-h1">Integrations</h1>
-      <p class="text-small text-text-secondary mt-0.5 max-w-2xl">
-        Point MobInspect at the external systems it drives — dynamic-analysis
-        devices and local AI model endpoints. Enter each system's address,
-        then test connectivity. Values are stored in the database; environment
-        variables act as headless fallbacks.
-      </p>
-    </div>
-  </div>
-  {% if not 'settings.manage'|can:request %}
-  <span class="badge badge-unknown self-start">{% icon "shield-check" size=12 %} Read-only</span>
-  {% endif %}
-</header>
+<div class="space-y-6">
 
-{# ═══════════════════════ four fixed integration cards ═══════════════════════ #}
-<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+  {# ══════════════════ Ambient hero ══════════════════ #}
+  <section class="mi-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+    <div class="relative z-10 px-6 py-7 md:px-9 md:py-8">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.18em] text-text-brand font-semibold mb-2 inline-flex items-center gap-1.5">
+            {% icon "sliders" size=13 %} Configuration
+          </p>
+          <h1 class="text-display font-bold leading-tight">Integrations</h1>
+          <p class="text-body text-text-secondary mt-2 max-w-2xl">
+            Point MobInspect at the external systems it drives — dynamic-analysis
+            devices and local AI model endpoints. Set each address, then test
+            connectivity. Values persist in the database; environment variables
+            act as headless fallbacks.
+          </p>
+        </div>
+        {% if not 'settings.manage'|can:request %}
+          <span class="badge badge-unknown self-start flex-shrink-0">{% icon "shield-check" size=12 %} Read-only</span>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  {# ═══════════════════════ four fixed integration cards ═══════════════════════ #}
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
   {# ─────────────── 1 · Android device ─────────────── #}
   <div class="card" data-reveal id="card-android">
@@ -243,6 +284,7 @@
     </form>
   </div>
 
+  </div>
 </div>
 {% endblock %}
 
@@ -293,6 +335,18 @@
         if (label) { label.textContent = 'Testing…'; }
         btn.disabled = true;
 
+        // Send the values CURRENTLY in the card's fields so Test probes what
+        // the operator sees (incl. unsaved edits) — matching Save & Test —
+        // instead of the last-saved config. Server re-validates every value.
+        var body = new FormData();
+        var baseUrlEl = card ? card.querySelector('input[name="base_url"]') : null;
+        var hostPortEl = card ? card.querySelector('input[name="host_port"]') : null;
+        var modelEl = card ? card.querySelector('input[name="model_name"]') : null;
+        if (baseUrlEl) { body.append('base_url', baseUrlEl.value); }
+        if (hostPortEl) { body.append('host_port', hostPortEl.value); }
+        if (modelEl) { body.append('model_name', modelEl.value); }
+        body.append('csrfmiddlewaretoken', getCsrf());
+
         fetch(url, {
           method: 'POST',
           headers: {
@@ -300,6 +354,7 @@
             'X-Requested-With': 'XMLHttpRequest',
           },
           credentials: 'same-origin',
+          body: body,
         })
           .then(function (r) { return r.json(); })
           .then(function (data) {

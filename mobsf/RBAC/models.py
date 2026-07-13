@@ -444,3 +444,89 @@ class AdbConnection(models.Model):
             if not self.is_active:
                 self.is_active = True
                 self.save(update_fields=['is_active', 'updated_at'])
+
+
+# ─────────────────────────────────────────────────────── AI model integrations
+class ModelIntegration(models.Model):
+    """A configured local LLM endpoint (e.g. Ollama) for AI enrichment.
+
+    Lets an admin wire the AI model host through the Integrations dashboard
+    instead of the ``MOBINSPECT_AI_BASE_URL`` env var. At most one row may be
+    ``is_active=True``; the active row's endpoint + model drive AI enrichment
+    (GraniteClient prefers it over the settings fallback). ``base_url`` is a
+    network egress target — it is validated (scheme/host/port, enclave-only)
+    before any request, treat it as security-critical.
+    """
+
+    STATUS_UNKNOWN = 'unknown'
+    STATUS_CONNECTED = 'connected'
+    STATUS_FAILED = 'failed'
+    STATUS_TIMEOUT = 'timeout'
+    STATUS_CHOICES = (
+        (STATUS_UNKNOWN, 'Unknown'),
+        (STATUS_CONNECTED, 'Connected'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_TIMEOUT, 'Timeout'),
+    )
+
+    # Each role has at most one configured endpoint (enforced in the view via
+    # update_or_create on role). generate = report/summary model,
+    # classify = short classification model.
+    ROLE_GENERATE = 'generate'
+    ROLE_CLASSIFY = 'classify'
+    ROLE_CHOICES = (
+        (ROLE_GENERATE, 'Generation'),
+        (ROLE_CLASSIFY, 'Classification'),
+    )
+
+    label = models.CharField(max_length=80, blank=True, default='')
+    role = models.CharField(
+        max_length=20, choices=ROLE_CHOICES, default=ROLE_GENERATE,
+    )
+    base_url = models.CharField(
+        max_length=255,
+        help_text='Model endpoint, e.g. http://127.0.0.1:11434',
+    )
+    model_name = models.CharField(
+        max_length=128, help_text='Model tag, e.g. granite4:3b',
+    )
+    is_active = models.BooleanField(
+        default=True, help_text='Whether this role endpoint is in use.',
+    )
+    last_status = models.CharField(
+        max_length=50, choices=STATUS_CHOICES, default=STATUS_UNKNOWN,
+    )
+    last_status_message = models.TextField(blank=True)
+    last_status_at = models.DateTimeField(null=True, blank=True)
+    detected_models = models.TextField(
+        blank=True, default='',
+        help_text='Comma-separated models detected at the endpoint.',
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='model_integrations',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['label']
+
+    def __str__(self):
+        flag = ' (active)' if self.is_active else ''
+        return f'{self.label} [{self.model_name} @ {self.base_url}]{flag}'
+
+    def set_active(self):
+        """Make this the sole active model integration (atomic)."""
+        from django.db import transaction
+        with transaction.atomic():
+            (type(self).objects
+             .select_for_update()
+             .filter(is_active=True)
+             .exclude(pk=self.pk)
+             .update(is_active=False))
+            if not self.is_active:
+                self.is_active = True
+                self.save(update_fields=['is_active', 'updated_at'])

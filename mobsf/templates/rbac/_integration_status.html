@@ -1,0 +1,6 @@
+{% comment %}Reusable status pill for an integration card. Expects `status`.{% endcomment %}
+{% if status == 'connected' %}<span class="badge badge-passed">Connected</span>
+{% elif status == 'failed' %}<span class="badge badge-critical">Failed</span>
+{% elif status == 'timeout' %}<span class="badge badge-high">Timeout</span>
+{% elif status == 'notset' %}<span class="badge badge-unknown">Not configured</span>
+{% else %}<span class="badge badge-unknown">Untested</span>{% endif %}

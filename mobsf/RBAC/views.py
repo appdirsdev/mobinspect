@@ -46,6 +46,7 @@ from mobsf.RBAC.models import (
     AdbConnection,
     ApiKey,
     AuditEvent,
+    ModelIntegration,
     Role,
     RoleAssignment,
 )
@@ -501,13 +502,349 @@ def _adb_devices_list():
 @require_permission('settings.view')
 def adb_connections_list(request):
     """List configured ADB connections, active one highlighted per platform."""
-    connections = (
-        AdbConnection.objects.select_related('created_by').all()
-    )
     return render(request, 'rbac/adb_connections.html', {
-        'title': 'Integrations · ADB Connections',
+        'title': 'Integrations',
         'version': settings.MOBSF_VER,
-        'connections': connections,
+        'android': AdbConnection.objects.filter(
+            platform=AdbConnection.PLATFORM_ANDROID).first(),
+        'ios': AdbConnection.objects.filter(
+            platform=AdbConnection.PLATFORM_IOS).first(),
+        'gen_model': ModelIntegration.objects.filter(
+            role=ModelIntegration.ROLE_GENERATE).first(),
+        'classify_model': ModelIntegration.objects.filter(
+            role=ModelIntegration.ROLE_CLASSIFY).first(),
+        # env fallbacks to prefill empty cards
+        'ai_base_url_default': getattr(settings, 'MOBINSPECT_AI_BASE_URL', ''),
+        'gen_model_default': getattr(settings, 'MOBINSPECT_AI_MODEL_GENERATE', ''),
+        'classify_model_default': getattr(settings, 'MOBINSPECT_AI_MODEL_CLASSIFY', ''),
+        'android_identifier_default': getattr(settings, 'ANALYZER_IDENTIFIER', ''),
+    })
+
+
+# ─────────────────────── Integrations · fixed-box save/test ───────────────
+@login_required
+@require_permission('settings.manage')
+@require_http_methods(['POST'])
+def device_save(request, platform):
+    """Upsert the single Android/iOS device box and test it."""
+    if platform not in dict(AdbConnection.PLATFORM_CHOICES):
+        return redirect('rbac:adb_connections')
+    host_port = _validate_host_port(request.POST.get('host_port', ''))
+    if not host_port:
+        messages.error(
+            request, 'Invalid device address. Use host:port or [ipv6]:port '
+                     '(e.g. 127.0.0.1:5555).')
+        return redirect('rbac:adb_connections')
+    label = ('Android device' if platform == AdbConnection.PLATFORM_ANDROID
+             else 'iOS device')
+    conn = AdbConnection.objects.filter(platform=platform).first()
+    if AdbConnection.objects.filter(host_port=host_port).exclude(
+            pk=conn.pk if conn else None).exists():
+        messages.error(request, f'"{host_port}" is already used by another device.')
+        return redirect('rbac:adb_connections')
+    if conn:
+        conn.host_port = host_port
+        conn.label = label
+    else:
+        conn = AdbConnection(
+            platform=platform, host_port=host_port, label=label,
+            created_by=request.user)
+    conn.is_active = True
+    conn.save()
+    status, message = _run_adb(['connect', conn.host_port])
+    conn.last_status = status
+    conn.last_status_message = message
+    conn.last_status_at = timezone.now()
+    conn.save(update_fields=[
+        'last_status', 'last_status_message', 'last_status_at', 'updated_at'])
+    audit.record(
+        request, 'integration.adb.save',
+        target_type='adb_connection', target_id=conn.pk,
+        metadata={'platform': platform, 'host_port': host_port})
+    messages.success(request, f'{label} saved.')
+    return redirect('rbac:adb_connections')
+
+
+@login_required
+@require_permission('settings.manage')
+@require_http_methods(['POST'])
+def model_save(request, role):
+    """Upsert the single generation/classification model box and test it."""
+    if role not in dict(ModelIntegration.ROLE_CHOICES):
+        return redirect('rbac:adb_connections')
+    from mobsf.StaticAnalyzer.views.common.llm.client import (
+        _host_is_enclave, parse_ai_endpoint)
+    base_url = (request.POST.get('base_url', '') or '').strip().rstrip('/')[:255]
+    model_name = (request.POST.get('model_name', '') or '').strip()[:128]
+    parsed = parse_ai_endpoint(base_url)
+    if not parsed or not model_name:
+        messages.error(
+            request, 'Provide a valid endpoint (http(s)://host:port) and a model.')
+        return redirect('rbac:adb_connections')
+    if not _host_is_enclave(parsed.hostname):
+        messages.error(
+            request, 'Endpoint host must be loopback or a private/in-enclave address.')
+        return redirect('rbac:adb_connections')
+    label = dict(ModelIntegration.ROLE_CHOICES)[role] + ' model'
+    integ, _created = ModelIntegration.objects.update_or_create(
+        role=role,
+        defaults={'base_url': base_url, 'model_name': model_name,
+                  'label': label, 'is_active': True})
+    _apply_model_probe(integ)
+    audit.record(
+        request, 'integration.model.save',
+        target_type='model_integration', target_id=integ.pk,
+        metadata={'role': role, 'base_url': base_url, 'model': model_name})
+    messages.success(request, f'{label} saved.')
+    return redirect('rbac:adb_connections')
+
+
+@login_required
+@require_permission('settings.manage')
+@require_http_methods(['POST'])
+def device_test_key(request, platform):
+    """AJAX test of the Android/iOS device box.
+
+    Tests the address currently in the form when one is supplied (so Test
+    agrees with Save & Test), and falls back to the saved row otherwise. A
+    typed address is validated exactly the way Save validates it, and is not
+    persisted.
+    """
+    posted_raw = request.POST.get('host_port', '')
+    if (posted_raw or '').strip():
+        host_port = _validate_host_port(posted_raw)
+        if not host_port:
+            return JsonResponse({
+                'success': False, 'status': 'failed',
+                'message': 'Invalid device address. Use host:port or [ipv6]:port.',
+                'last_status_at': timezone.now().isoformat()})
+        # Mirror device_save's cross-card uniqueness so Test can't show
+        # CONNECTED for an address Save would reject as a duplicate.
+        own = AdbConnection.objects.filter(platform=platform).first()
+        if AdbConnection.objects.filter(host_port=host_port).exclude(
+                pk=own.pk if own else None).exists():
+            return JsonResponse({
+                'success': False, 'status': 'failed',
+                'message': f'"{host_port}" is already used by another device.',
+                'last_status_at': timezone.now().isoformat()})
+        status, message = _run_adb(['connect', host_port])
+        audit.record(
+            request, 'integration.adb.test', target_type='adb_connection',
+            metadata={'platform': platform, 'host_port': host_port,
+                      'result': status})
+        return JsonResponse({
+            'success': status == AdbConnection.STATUS_CONNECTED,
+            'status': status, 'message': message,
+            'last_status_at': timezone.now().isoformat()})
+    conn = AdbConnection.objects.filter(platform=platform).first()
+    if not conn:
+        return JsonResponse({'success': False, 'status': 'unknown',
+                             'message': 'Not configured yet.'})
+    status, message = _run_adb(['connect', conn.host_port])
+    conn.last_status = status
+    conn.last_status_message = message
+    conn.last_status_at = timezone.now()
+    conn.save(update_fields=[
+        'last_status', 'last_status_message', 'last_status_at', 'updated_at'])
+    audit.record(
+        request, 'integration.adb.test', target_type='adb_connection',
+        target_id=conn.pk, metadata={'platform': platform,
+                                     'host_port': conn.host_port, 'result': status})
+    return JsonResponse({
+        'success': status == AdbConnection.STATUS_CONNECTED,
+        'status': status, 'message': message,
+        'last_status_at': conn.last_status_at.isoformat()})
+
+
+@login_required
+@require_permission('settings.manage')
+@require_http_methods(['POST'])
+def model_test_key(request, role):
+    """AJAX test of the generation/classification model box.
+
+    Tests the endpoint currently in the form when one is supplied — so Test
+    reflects unsaved edits and always agrees with what Save & Test would probe
+    (they call the same enclave-checked _probe_model_endpoint) — and only falls
+    back to the saved row when the field is empty. A typed value is validated
+    and enclave-checked before any request, and is never persisted; only Save
+    writes the row.
+    """
+    posted = (request.POST.get('base_url', '') or '').strip().rstrip('/')[:255]
+    if posted:
+        model_name = (request.POST.get('model_name', '') or '').strip()[:128]
+        if not model_name:
+            # Save requires a model name (see model_save) — Test must reject the
+            # same way so the two never disagree on an endpoint-only card.
+            return JsonResponse({
+                'success': False, 'status': 'failed',
+                'message': 'Provide a model name (e.g. granite4:3b).',
+                'last_status_at': timezone.now().isoformat(), 'models_list': []})
+        status, message, models = _probe_model_endpoint(posted)
+        audit.record(
+            request, 'integration.model.test', target_type='model_integration',
+            metadata={'role': role, 'base_url': posted, 'result': status})
+        return JsonResponse({
+            'success': status == ModelIntegration.STATUS_CONNECTED,
+            'status': status, 'message': message,
+            'last_status_at': timezone.now().isoformat(),
+            'models_list': models})
+    integ = ModelIntegration.objects.filter(role=role).first()
+    if not integ:
+        return JsonResponse({'success': False, 'status': 'unknown',
+                             'message': 'Not configured yet.'})
+    status, message, models = _apply_model_probe(integ)
+    audit.record(
+        request, 'integration.model.test', target_type='model_integration',
+        target_id=integ.pk,
+        metadata={'role': role, 'base_url': integ.base_url, 'result': status})
+    return JsonResponse({
+        'success': status == ModelIntegration.STATUS_CONNECTED,
+        'status': status, 'message': message,
+        'last_status_at': integ.last_status_at.isoformat(),
+        'models_list': models})
+
+
+# ─────────────────────────────────────────────── AI model integrations
+def _probe_model_endpoint(base_url):
+    """Probe an AI model endpoint (Ollama /api/tags). Enclave-only, bounded.
+
+    Returns (status, message, detected_models_list). Never raises.
+    """
+    import requests
+    from mobsf.StaticAnalyzer.views.common.llm.client import (
+        _host_is_enclave, parse_ai_endpoint)
+    base = (base_url or '').strip().rstrip('/')
+    parsed = parse_ai_endpoint(base)
+    if not parsed:
+        return ModelIntegration.STATUS_FAILED, 'URL must be http(s)://host:port', []
+    if not _host_is_enclave(parsed.hostname):
+        return (ModelIntegration.STATUS_FAILED,
+                'Host must be loopback/private (in-enclave)', [])
+    try:
+        resp = requests.get(base + '/api/tags', timeout=(5, 10),
+                            allow_redirects=False)
+        if resp.status_code != 200:
+            return ModelIntegration.STATUS_FAILED, f'HTTP {resp.status_code}', []
+        models = [m.get('name') for m in (resp.json().get('models') or [])
+                  if m.get('name')]
+        return (ModelIntegration.STATUS_CONNECTED,
+                f'{len(models)} model(s) available', models)
+    except requests.exceptions.Timeout:
+        return ModelIntegration.STATUS_TIMEOUT, 'Connection timed out', []
+    except Exception as exp:
+        return ModelIntegration.STATUS_FAILED, type(exp).__name__, []
+
+
+def _apply_model_probe(integ):
+    status, message, models = _probe_model_endpoint(integ.base_url)
+    integ.last_status = status
+    integ.last_status_message = message[:2000]
+    integ.last_status_at = timezone.now()
+    integ.detected_models = ', '.join(models)[:2000]
+    integ.save(update_fields=[
+        'last_status', 'last_status_message', 'last_status_at',
+        'detected_models', 'updated_at',
+    ])
+    return status, message, models
+
+
+@login_required
+@require_permission('settings.manage')
+@require_http_methods(['POST'])
+def model_integration_add(request):
+    """Create an AI model integration from POSTed label + base_url + model."""
+    label = (request.POST.get('label', '') or '').strip()[:80]
+    base_url = (request.POST.get('base_url', '') or '').strip().rstrip('/')[:255]
+    model_name = (request.POST.get('model_name', '') or '').strip()[:128]
+    if not label or not base_url or not model_name:
+        messages.error(request, 'Label, endpoint URL and model are all required.')
+        return redirect('rbac:adb_connections')
+    from mobsf.StaticAnalyzer.views.common.llm.client import (
+        _host_is_enclave, parse_ai_endpoint)
+    parsed = parse_ai_endpoint(base_url)
+    if not parsed:
+        messages.error(
+            request, 'Invalid endpoint. Use http(s)://host:port '
+                     '(e.g. http://127.0.0.1:11434).')
+        return redirect('rbac:adb_connections')
+    if not _host_is_enclave(parsed.hostname):
+        messages.error(
+            request, 'Endpoint host must be loopback or a private/in-enclave '
+                     'address (no public hosts).')
+        return redirect('rbac:adb_connections')
+    if ModelIntegration.objects.filter(base_url=base_url).exists():
+        messages.error(request, f'An integration for "{base_url}" already exists.')
+        return redirect('rbac:adb_connections')
+
+    integ = ModelIntegration.objects.create(
+        label=label, base_url=base_url, model_name=model_name,
+        created_by=request.user,
+    )
+    status, _msg, _models = _apply_model_probe(integ)
+    # Only auto-activate a reachable endpoint, and only if none is active yet.
+    if (status == ModelIntegration.STATUS_CONNECTED
+            and not ModelIntegration.objects.filter(is_active=True).exists()):
+        integ.set_active()
+    audit.record(
+        request, 'integration.model.add',
+        target_type='model_integration', target_id=integ.pk,
+        metadata={'label': label, 'base_url': base_url, 'model': model_name})
+    messages.success(request, f'Model integration "{label}" added.')
+    return redirect('rbac:adb_connections')
+
+
+@login_required
+@require_permission('settings.manage')
+@require_http_methods(['POST'])
+def model_integration_remove(request, integ_id):
+    """Delete an AI model integration."""
+    integ = get_object_or_404(ModelIntegration, pk=integ_id)
+    label = integ.label
+    integ.delete()
+    audit.record(
+        request, 'integration.model.remove',
+        target_type='model_integration', target_id=integ_id,
+        metadata={'label': label})
+    messages.success(request, f'Model integration "{label}" removed.')
+    return redirect('rbac:adb_connections')
+
+
+@login_required
+@require_permission('settings.manage')
+@require_http_methods(['POST'])
+def model_integration_set_active(request, integ_id):
+    """Make a model integration the sole active one used for AI enrichment."""
+    integ = get_object_or_404(ModelIntegration, pk=integ_id)
+    integ.set_active()
+    audit.record(
+        request, 'integration.model.set_active',
+        target_type='model_integration', target_id=integ.pk,
+        metadata={'label': integ.label, 'base_url': integ.base_url})
+    messages.success(request, f'"{integ.label}" is now the active AI model.')
+    return redirect('rbac:adb_connections')
+
+
+@login_required
+@require_permission('settings.manage')
+@require_http_methods(['POST'])
+def model_integration_test(request, integ_id):
+    """Probe the model endpoint and report status as JSON."""
+    integ = get_object_or_404(ModelIntegration, pk=integ_id)
+    status, message, models = _apply_model_probe(integ)
+    audit.record(
+        request, 'integration.model.test',
+        target_type='model_integration', target_id=integ.pk,
+        metadata={'base_url': integ.base_url,
+                  'result': ('success'
+                             if status == ModelIntegration.STATUS_CONNECTED
+                             else 'failed'),
+                  'message': message})
+    return JsonResponse({
+        'success': status == ModelIntegration.STATUS_CONNECTED,
+        'status': status,
+        'message': message,
+        'last_status_at': integ.last_status_at.isoformat(),
+        'models_list': models,
     })
 
 
