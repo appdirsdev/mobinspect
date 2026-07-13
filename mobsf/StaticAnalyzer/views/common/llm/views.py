@@ -9,8 +9,9 @@ and poll the enrichment. Both are admin-only and read-only.
 import logging
 
 from django.conf import settings
+from django.contrib import messages
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from mobsf.MobSF.utils import is_md5, python_list
 from mobsf.MobSF.views.authentication import login_required
@@ -36,6 +37,58 @@ def _is_ai_admin(request):
     return has_any_permission(effective_user(request), [_ADMIN_AI_PERM])
 
 
+# level -> (bar width %, badge severity tone) for the risk chart. Presentation
+# only; the level itself is already validated against RISK_LEVELS at parse time.
+_RISK_VIS = {
+    'none': (10, 'passed'), 'low': (34, 'low'), 'medium': (58, 'medium'),
+    'high': (82, 'high'), 'critical': (100, 'critical'), 'unknown': (4, 'neutral'),
+}
+
+
+def _risk_for_display(raw):
+    """Attach a bar width + badge tone to each validated risk record."""
+    out = []
+    for r in python_list(raw):
+        if not isinstance(r, dict):
+            continue
+        level = str(r.get('level', 'unknown'))
+        pct, tone = _RISK_VIS.get(level, _RISK_VIS['unknown'])
+        out.append({
+            'dimension': r.get('dimension', ''), 'level': level,
+            'rationale': r.get('rationale', ''), 'pct': pct, 'tone': tone,
+        })
+    return out
+
+
+# Per-level RISK contribution (0-100). The overall AI risk score is a
+# DETERMINISTIC aggregate of the model's categorical levels — the model never
+# emits the number itself, so it can't be hallucinated. Higher = more risk.
+_RISK_SCORE = {'none': 0, 'low': 25, 'medium': 50, 'high': 75, 'critical': 100}
+
+
+def _risk_score(risk_records):
+    """Overall AI risk score out of 100 (higher = more risk), aggregated from
+    the classified dimensions only. Returns None when nothing was classified."""
+    vals = [_RISK_SCORE[r['level']] for r in risk_records
+            if isinstance(r, dict) and r.get('level') in _RISK_SCORE]
+    if not vals:
+        return None
+    return round(sum(vals) / len(vals))
+
+
+def _score_tone(score):
+    """Severity tone for the risk-score dial (mirrors the bar palette)."""
+    if score is None:
+        return 'neutral'
+    if score >= 75:
+        return 'critical'
+    if score >= 50:
+        return 'high'
+    if score >= 25:
+        return 'medium'
+    return 'passed'
+
+
 def _enrichment_ctx(checksum):
     """Return (status, context) for a scan's enrichment.
 
@@ -52,28 +105,47 @@ def _enrichment_ctx(checksum):
         return row.STATUS, {'checksum': checksum, 'ai_status': row.STATUS}
     if row.STATUS == 'failed':
         return 'failed', {'checksum': checksum, 'ai_status': 'failed'}
+    risk = _risk_for_display(row.RISK_CLASSIFICATION)
+    score = _risk_score(risk)
     return 'done', {
         'checksum': checksum,
         'ai_status': 'done',
         'ai_summary': row.EXEC_SUMMARY,
         'ai_findings': python_list(row.FINDING_EXPLANATIONS),
         'ai_secrets': row.SECRETS_TRIAGE,
+        'ai_risk': risk,
+        'ai_risk_score': score,
+        'ai_risk_tone': _score_tone(score),
+        'ai_anomalies': python_list(row.ANOMALIES),
         'ai_model': row.MODEL_USED,
     }
+
+
+# States where the model never produced a report -> the dashboard is disabled
+# and the user is bounced out (per requirement: "if model not generated any
+# report, user cannot enter"). 'running'/'pending'/'done' are allowed through.
+_DASHBOARD_BLOCKED = ('disabled', 'invalid', 'none', 'failed')
 
 
 @login_required
 @require_permission(_ADMIN_AI_PERM)
 def ai_dashboard(request, checksum):
-    """Standalone admin-only AI Security Analysis page."""
+    """Standalone admin-only AI Security Analysis page.
+
+    Disabled unless the model has produced (or is producing) a report — a
+    blocked state redirects the operator back to the scans list.
+    """
     try:
         status, ctx = _enrichment_ctx(checksum)
+        if status in _DASHBOARD_BLOCKED:
+            messages.info(
+                request, 'AI analysis is not available for this scan yet.')
+            return redirect('recent')
         ctx['ai_page_status'] = status
         return render(request, _PAGE, ctx)
     except Exception:
         logger.exception('Failed to render AI dashboard for %s', checksum)
-        return render(request, _PAGE, {
-            'checksum': checksum, 'ai_page_status': 'failed'})
+        return redirect('recent')
 
 
 @login_required

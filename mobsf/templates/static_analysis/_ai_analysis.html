@@ -35,6 +35,47 @@
         the findings before acting on it.
       </p>
 
+      {% if ai_risk %}
+        <div class="mi-risk-chart rounded-lg border border-border-subtle bg-surface-2 p-4">
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <h3 class="text-small font-semibold uppercase tracking-wide text-text-primary">Risk classification</h3>
+            <span class="badge badge-neutral text-tiny">classification model · advisory</span>
+          </div>
+          <div class="space-y-2.5">
+            {% for r in ai_risk %}
+              <div>
+                <div class="flex items-center gap-3">
+                  <span class="w-36 flex-shrink-0 text-tiny text-text-secondary truncate" title="{{ r.dimension }}">{{ r.dimension }}</span>
+                  <span class="flex-1 h-2 rounded-full bg-surface-4 overflow-hidden inline-flex">
+                    <span class="mi-risk-bar mi-risk-{{ r.tone }} h-full rounded-full" style="width: {{ r.pct }}%"></span>
+                  </span>
+                  <span class="badge badge-{{ r.tone }} text-tiny flex-shrink-0 w-16 justify-center">{{ r.level }}</span>
+                </div>
+                {% if r.rationale %}<p class="text-tiny text-text-tertiary mt-1 ml-36">{{ r.rationale }}</p>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <p class="text-tiny text-text-tertiary mt-3">Advisory AI classification — not the deterministic security score.</p>
+        </div>
+      {% endif %}
+
+      {% if ai_anomalies %}
+        <div class="rounded-lg border border-border-subtle bg-surface-2 p-4">
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <h3 class="text-small font-semibold uppercase tracking-wide text-text-primary">Anomalies &amp; suggestions</h3>
+            <span class="badge badge-neutral text-tiny">classification model · advisory</span>
+          </div>
+          <div class="space-y-3">
+            {% for a in ai_anomalies %}
+              <div class="border-l-2 border-border-strong pl-4">
+                <p class="text-small text-text-primary" style="white-space:pre-wrap; word-wrap:break-word;">{{ a.anomaly }}</p>
+                <p class="text-tiny text-text-secondary mt-1" style="white-space:pre-wrap; word-wrap:break-word;"><span class="font-semibold uppercase tracking-wide text-text-tertiary">Fix</span> · {{ a.suggestion }}</p>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
       {% for s in ai_findings %}
         <div class="border-l-2 border-border-strong pl-4">
           <h3 class="text-small font-semibold uppercase tracking-wide text-text-primary mb-1">
@@ -45,6 +86,16 @@
       {% empty %}
         <p class="text-small text-text-tertiary">No AI analysis was produced for this scan.</p>
       {% endfor %}
+
+      {% if ai_secrets %}
+        <div class="border-l-2 border-border-strong pl-4">
+          <h3 class="text-small font-semibold uppercase tracking-wide text-text-primary mb-1">
+            Secrets triage
+            <span class="badge badge-neutral text-tiny ml-1">classification model</span>
+          </h3>
+          <p class="ai-prose text-small text-text-secondary" style="white-space:pre-wrap; word-wrap:break-word;">{{ ai_secrets }}</p>
+        </div>
+      {% endif %}
     {% endif %}
   </div>
 </section>

@@ -198,6 +198,11 @@ class AIEnrichment(models.Model):
     EXEC_SUMMARY = models.TextField(default='')
     FINDING_EXPLANATIONS = models.TextField(default=[])
     SECRETS_TRIAGE = models.TextField(default='')
+    # Per-dimension categorical risk classification (advisory; NOT a numeric
+    # score). Stored as a stringified list of {dimension, level, rationale}.
+    RISK_CLASSIFICATION = models.TextField(default=[])
+    # Correlated anomalies + suggestions. Stringified list of {anomaly, suggestion}.
+    ANOMALIES = models.TextField(default=[])
     MODEL_USED = models.CharField(max_length=128, default='')
     CREATED_AT = models.DateTimeField(default=timezone.now)
     UPDATED_AT = models.DateTimeField(default=timezone.now)

@@ -454,10 +454,13 @@ MOBINSPECT_AI_ENABLED = os.getenv(
     'MOBINSPECT_AI_ENABLED', '').strip().lower() in ('1', 'true', 'yes', 'on')
 MOBINSPECT_AI_BASE_URL = os.getenv(
     'MOBINSPECT_AI_BASE_URL', 'http://127.0.0.1:11434').strip().rstrip('/')
+# Use the local Granite 4.1 3B (granite4:3b) for BOTH generation and
+# classification for now. Point MOBINSPECT_AI_MODEL_GENERATE at a larger model
+# (e.g. granite4:8b) later when it is available on the model host.
 MOBINSPECT_AI_MODEL_GENERATE = os.getenv(
-    'MOBINSPECT_AI_MODEL_GENERATE', 'granite4:8b')
+    'MOBINSPECT_AI_MODEL_GENERATE', 'granite4:3b')
 MOBINSPECT_AI_MODEL_CLASSIFY = os.getenv(
-    'MOBINSPECT_AI_MODEL_CLASSIFY', 'granite4:micro')
+    'MOBINSPECT_AI_MODEL_CLASSIFY', 'granite4:3b')
 # Egress pinning / TLS
 MOBINSPECT_AI_ALLOWED_HOSTS = [
     h.strip() for h in os.getenv('MOBINSPECT_AI_ALLOWED_HOSTS', '').split(',')
@@ -470,6 +473,17 @@ MOBINSPECT_AI_READ_TIMEOUT = int(os.getenv('MOBINSPECT_AI_READ_TIMEOUT', '60'))
 MOBINSPECT_AI_MAX_RESPONSE_BYTES = int(
     os.getenv('MOBINSPECT_AI_MAX_RESPONSE_BYTES', '2097152'))
 MOBINSPECT_AI_NUM_PREDICT = int(os.getenv('MOBINSPECT_AI_NUM_PREDICT', '768'))
+# Larger output budget for the one-shot comprehensive report (6 sections).
+MOBINSPECT_AI_REPORT_TOKENS = int(os.getenv('MOBINSPECT_AI_REPORT_TOKENS', '1200'))
+# Output cap for the classification model's short secret-triage call (stage 2).
+MOBINSPECT_AI_TRIAGE_TOKENS = int(os.getenv('MOBINSPECT_AI_TRIAGE_TOKENS', '400'))
+# Ollama runtime options. num_ctx is the context WINDOW (input+output tokens):
+# Ollama defaults to ~4096, which truncates a complete static-analysis prompt —
+# raise it (Granite 4.x supports 128K; 8192 comfortably fits one app profile).
+MOBINSPECT_AI_NUM_CTX = int(os.getenv('MOBINSPECT_AI_NUM_CTX', '8192'))
+MOBINSPECT_AI_TOP_P = float(os.getenv('MOBINSPECT_AI_TOP_P', '0.9'))
+# How long Ollama keeps the model loaded between calls (avoids reload latency).
+MOBINSPECT_AI_KEEP_ALIVE = os.getenv('MOBINSPECT_AI_KEEP_ALIVE', '10m')
 MOBINSPECT_AI_MAX_ITEMS = int(os.getenv('MOBINSPECT_AI_MAX_ITEMS', '25'))
 # Aggregate wall-clock budget (seconds) for one enrichment run — bounds total
 # time on the shared scan worker pool so AI can never starve real scans.

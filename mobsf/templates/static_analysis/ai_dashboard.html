@@ -91,11 +91,41 @@
   @keyframes mi-float { 0%, 100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-22px,0); } }
   @keyframes mi-pulse { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(2.4); opacity: 0; } }
 
+  /* AI risk SCORE ring (0-100, higher = more risk). --score set inline, --sc by tone. */
+  .mi-score-ring { position: relative; width: 118px; height: 118px; margin: 0 auto; border-radius: 50%; }
+  .mi-score-ring::before { content:''; position:absolute; inset:0; border-radius:50%;
+    background: conic-gradient(var(--sc) calc(var(--score,0) * 1%), rgb(var(--surface-3)) 0); }
+  .mi-score-ring::after { content:''; position:absolute; inset:11px; border-radius:50%; background: rgb(var(--surface-1)); }
+  .mi-score-val { position:absolute; inset:0; z-index:1; display:flex; align-items:baseline; justify-content:center; }
+  .mi-score-num { font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: rgb(var(--text-primary)); font-variant-numeric: tabular-nums; }
+  .mi-score-den { font-size: 13px; color: rgb(var(--text-tertiary)); margin-left: 1px; }
+  .mi-score-passed{--sc:#16A34A} .mi-score-low{--sc:#2563EB} .mi-score-medium{--sc:#D97706}
+  .mi-score-high{--sc:#EA580C} .mi-score-critical{--sc:#DC2626} .mi-score-neutral{--sc:#64748B}
+  :root[data-theme="dark"] .mi-score-passed{--sc:#4ADE80} :root[data-theme="dark"] .mi-score-low{--sc:#60A5FA}
+  :root[data-theme="dark"] .mi-score-medium{--sc:#FBBF24} :root[data-theme="dark"] .mi-score-high{--sc:#FB923C}
+  :root[data-theme="dark"] .mi-score-critical{--sc:#F87171} :root[data-theme="dark"] .mi-score-neutral{--sc:#94A3B8}
+
+  /* AI risk-classification bars — severity palette, theme-aware (matches badges). */
+  .mi-risk-bar { transition: width .5s cubic-bezier(.4,0,.2,1); min-width: 2px; }
+  .mi-risk-passed   { background:#16A34A; }
+  .mi-risk-low      { background:#2563EB; }
+  .mi-risk-medium   { background:#D97706; }
+  .mi-risk-high     { background:#EA580C; }
+  .mi-risk-critical { background:#DC2626; }
+  .mi-risk-neutral  { background:#64748B; }
+  :root[data-theme="dark"] .mi-risk-passed   { background:#4ADE80; }
+  :root[data-theme="dark"] .mi-risk-low      { background:#60A5FA; }
+  :root[data-theme="dark"] .mi-risk-medium   { background:#FBBF24; }
+  :root[data-theme="dark"] .mi-risk-high     { background:#FB923C; }
+  :root[data-theme="dark"] .mi-risk-critical { background:#F87171; }
+  :root[data-theme="dark"] .mi-risk-neutral  { background:#94A3B8; }
+
   @media (prefers-reduced-motion: reduce) {
     .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
     .mi-live-dot::before { animation: none; opacity: 0; }
     .mi-step.is-active .mi-step-dot::after { animation: none; opacity: 0; }
     .mi-meta-card, .mi-copy-btn { transition: none; }
+    .mi-risk-bar { transition: none; }
   }
 </style>
 {% endblock %}
@@ -259,6 +289,15 @@
         {% include "static_analysis/_ai_analysis.html" %}
       </div>
       <aside class="space-y-4">
+        {% if ai_risk_score is not None %}
+        <div class="mi-meta-card card card-body text-center">
+          <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-3">AI risk score</p>
+          <div class="mi-score-ring mi-score-{{ ai_risk_tone }}" style="--score: {{ ai_risk_score }}" role="img" aria-label="AI risk score {{ ai_risk_score }} out of 100">
+            <span class="mi-score-val"><span class="mi-score-num">{{ ai_risk_score }}</span><span class="mi-score-den">/100</span></span>
+          </div>
+          <p class="text-tiny text-text-tertiary mt-3">Higher = more risk. Advisory AI aggregate — not the deterministic security score.</p>
+        </div>
+        {% endif %}
         <div class="mi-meta-card card card-body" x-data="{ copied: false }">
           <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2">Scan reference</p>
           <div class="flex items-start gap-2">
@@ -279,14 +318,6 @@
           </p>
           <p class="text-small font-mono text-text-primary break-all">{{ ai_model }}</p>
           <p class="text-tiny text-text-tertiary mt-1">Running locally, on-device.</p>
-        </div>
-        {% endif %}
-        {% if ai_secrets %}
-        <div class="mi-meta-card card card-body">
-          <p class="text-tiny uppercase tracking-wide text-text-tertiary font-semibold mb-2 inline-flex items-center gap-1.5">
-            {% icon "key" size=12 %} Secrets triage
-          </p>
-          <p class="text-tiny text-text-secondary" style="white-space:pre-wrap; word-wrap:break-word;">{{ ai_secrets }}</p>
         </div>
         {% endif %}
         <div class="mi-meta-card card card-body">

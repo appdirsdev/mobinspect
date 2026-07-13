@@ -19,6 +19,24 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+def parse_ai_endpoint(url):
+    """Parse + validate an AI endpoint URL. Returns the parsed result or None.
+
+    Safe against urlparse().port raising ValueError on non-numeric / out-of-range
+    ports (e.g. ':99999', ':abc') — those return None rather than propagating.
+    """
+    try:
+        parsed = urlparse((url or '').strip())
+        port = parsed.port  # lazy property; raises ValueError on a bad port
+    except ValueError:
+        return None
+    except Exception:
+        return None
+    if parsed.scheme not in ('http', 'https') or not parsed.hostname or not port:
+        return None
+    return parsed
+
+
 def _host_is_enclave(host):
     """True only if the host resolves exclusively to loopback/private addresses."""
     try:
@@ -41,19 +59,48 @@ def _host_is_enclave(host):
 class GraniteClient:
     """Talk to a local Granite model. Returns text or None; never raises."""
 
-    def __init__(self):
+    def __init__(self, role='generate'):
         self.enabled = bool(getattr(settings, 'MOBINSPECT_AI_ENABLED', False))
-        self.base_url = getattr(
-            settings, 'MOBINSPECT_AI_BASE_URL', '').strip().rstrip('/')
+        self.role = role if role in ('generate', 'classify') else 'generate'
+        self.base_url, self.model = self._resolve_target(self.role)
+
+    @staticmethod
+    def _resolve_target(role='generate'):
+        """Endpoint + model for a role: prefer the DB ModelIntegration, else settings.
+
+        Each role (generate / classify) has at most one configured endpoint in
+        the Integrations section, which wins over the env/settings fallback.
+        Uses apps.get_model so this works whether or not the RBAC
+        ModelIntegration model/migration is present yet.
+        """
+        settings_model = (
+            'MOBINSPECT_AI_MODEL_CLASSIFY' if role == 'classify'
+            else 'MOBINSPECT_AI_MODEL_GENERATE')
+        default_model = getattr(settings, settings_model, 'granite4:3b')
+        try:
+            from django.apps import apps
+            model_cls = apps.get_model('rbac', 'ModelIntegration')
+            row = model_cls.objects.filter(role=role, is_active=True).first()
+            if row and (row.base_url or '').strip():
+                return (row.base_url.strip().rstrip('/'),
+                        (row.model_name or '').strip())
+            # A classify-only feature with no classify endpoint configured should
+            # reuse the generate host (one Ollama serving several models is the
+            # common case) rather than dialing the localhost default and failing
+            # on every scan.
+            if role == 'classify':
+                gen = model_cls.objects.filter(
+                    role='generate', is_active=True).first()
+                if gen and (gen.base_url or '').strip():
+                    return (gen.base_url.strip().rstrip('/'), default_model)
+        except Exception:
+            pass
+        return (getattr(settings, 'MOBINSPECT_AI_BASE_URL', '').strip().rstrip('/'),
+                default_model)
 
     def _validate_endpoint(self):
-        try:
-            parsed = urlparse(self.base_url)
-        except Exception:
-            return None
-        if parsed.scheme not in ('http', 'https'):
-            return None
-        if not parsed.hostname or not parsed.port:
+        parsed = parse_ai_endpoint(self.base_url)
+        if not parsed:
             return None
         hostport = f'{parsed.hostname}:{parsed.port}'
         allow = getattr(settings, 'MOBINSPECT_AI_ALLOWED_HOSTS', [])
@@ -67,23 +114,31 @@ class GraniteClient:
             return None
         return parsed
 
-    def generate(self, system, prompt, model=None):
+    def generate(self, system, prompt, model=None, num_predict=None):
         """Return the model's text response, or None on any failure."""
         if not self.enabled:
             return None
         if not self._validate_endpoint():
             return None
-        model = model or getattr(
-            settings, 'MOBINSPECT_AI_MODEL_GENERATE', 'granite4:8b')
+        model = model or self.model or getattr(
+            settings, 'MOBINSPECT_AI_MODEL_GENERATE', 'granite4:3b')
         url = f'{self.base_url}/api/generate'
         payload = {
             'model': model,
             'system': system,
             'prompt': prompt,
             'stream': False,
+            # Keep the model resident between calls to avoid reload latency.
+            'keep_alive': getattr(settings, 'MOBINSPECT_AI_KEEP_ALIVE', '10m'),
             'options': {
-                'num_predict': int(getattr(settings, 'MOBINSPECT_AI_NUM_PREDICT', 768)),
+                # Context WINDOW (input+output). Must be large enough for the
+                # complete static-analysis prompt or Ollama truncates it.
+                'num_ctx': int(getattr(settings, 'MOBINSPECT_AI_NUM_CTX', 8192)),
+                # Max tokens to GENERATE.
+                'num_predict': int(
+                    num_predict or getattr(settings, 'MOBINSPECT_AI_NUM_PREDICT', 768)),
                 'temperature': 0.2,
+                'top_p': float(getattr(settings, 'MOBINSPECT_AI_TOP_P', 0.9)),
             },
         }
         verify = getattr(settings, 'MOBINSPECT_AI_TLS_VERIFY', True)
