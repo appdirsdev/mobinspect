@@ -1,5 +1,5 @@
 {% extends "base/app.html" %}
-{% load static %}{% load mi_icons %}{% load rbac %}{% load mi_score %}
+{% load static %}{% load mi_icons %}{% load rbac %}{% load mi_score %}{% load ai_tags %}
 
 {% block page_title %}Static · iOS — {{ app_name|default:file_name }}{% endblock %}
 
@@ -85,7 +85,7 @@
         class="w-16 h-16 rounded-xl bg-surface-2 object-contain flex-shrink-0 shadow-elevation-1"
         alt=""/>
       <div class="min-w-0">
-        <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1 inline-flex items-center gap-1.5">{% icon "smartphone" size=12 %} Static · iOS</p>
+        <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1 inline-flex items-center gap-1.5"><span class="w-3.5 h-3.5 inline-flex flex-shrink-0 align-middle">{% include "components/logo_mark.html" %}</span> MobInspect · Static · iOS</p>
         <h1 class="text-h2 truncate">
           {{ app_name }}
           {% if app_version %}<span class="text-text-tertiary font-normal">v{{ app_version }}</span>{% endif %}
@@ -95,7 +95,7 @@
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 no-print" id="scan_options">
-      {% can 'admin.ai.view' %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endcan %}
+      {% can 'admin.ai.view' %}{% ai_dashboard_ready md5 as ai_ready %}{% if ai_ready %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endif %}{% endcan %}
       <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="mi-pillbtn btn btn-md" role="button">
         {% icon "shield-check" size=14 %} Scorecard
       </a>

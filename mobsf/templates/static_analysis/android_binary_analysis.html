@@ -1,5 +1,5 @@
 {% extends "base/app.html" %}
-{% load static %}{% load mi_icons %}{% load rbac %}{% load mi_score %}
+{% load static %}{% load mi_icons %}{% load rbac %}{% load mi_score %}{% load ai_tags %}
 
 {% block page_title %}{{ app_name|default:file_name }} — Android static analysis{% endblock %}
 
@@ -124,7 +124,7 @@
            class="w-14 h-14 rounded-xl bg-surface-2 object-contain flex-shrink-0 shadow-elevation-2 ring-1 ring-border-subtle" />
       <div class="min-w-0">
         <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold inline-flex items-center gap-1.5">
-          {% icon "smartphone" size=12 %} Static · Android{% if app_type %} · {{ app_type|upper }}{% endif %}
+          <span class="w-3.5 h-3.5 inline-flex flex-shrink-0 align-middle">{% include "components/logo_mark.html" %}</span> MobInspect · Static · Android{% if app_type %} · {{ app_type|upper }}{% endif %}
         </p>
         <h1 class="text-h2 truncate mt-0.5">{{ app_name|default:file_name }}{% if version_name %} <span class="text-text-tertiary font-normal">v{{ version_name }}</span>{% endif %}</h1>
         {% if package_name %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ package_name }}</p>{% endif %}
@@ -137,7 +137,7 @@
       {% if app_type not in 'so' %}
         <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="mi-pillbtn btn btn-md">{% icon "shield-check" size=14 %} Scorecard</a>
       {% endif %}
-      {% can 'admin.ai.view' %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endcan %}
+      {% can 'admin.ai.view' %}{% ai_dashboard_ready md5 as ai_ready %}{% if ai_ready %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endif %}{% endcan %}
       <a href="{% url 'static_analyzer' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md">{% icon "activity" size=14 %} Rescan</a>
       {% if app_type not in 'jar,aar,so' %}
         <a onclick="dynamic_loader()" href="{% url 'dynamic_analyzer' checksum=md5 %}" class="btn btn-secondary btn-md">{% icon "smartphone" size=14 %} Dynamic</a>
@@ -326,9 +326,9 @@
     <a href="{% url 'download_binary' checksum=md5 %}" class="btn btn-ghost btn-sm">{% icon "download" size=14 %} {{ app_type|upper }}</a>
   </div>
 
-  {# Scan logs modal (Alpine) — popup overlay. Close on backdrop click via
+  {% comment %} Scan logs modal (Alpine) — popup overlay. Close on backdrop click via
      @click.self (NOT @click.outside, which fires on the same click that
-     opens the modal and immediately closes it again). #}
+     opens the modal and immediately closes it again). {% endcomment %}
   <div x-show="modal === 'scan_logs'" x-cloak @keydown.escape.window="modal = ''"
        @click.self="modal = ''"
        class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
@@ -1552,6 +1552,8 @@
     };
   }
 </script>
+<!-- jQuery — required by DataTables and suppression.js below -->
+<script src="{% static 'adminlte/plugins/jquery.min.js' %}"></script>
 <!-- DataTables -->
 <script src="{% static "datatables/js/pdfmake.min.js" %}"></script>
 <script src="{% static "datatables/js/vfs_fonts.js" %}"></script>

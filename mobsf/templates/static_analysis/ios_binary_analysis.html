@@ -1,5 +1,5 @@
 {% extends "base/app.html" %}
-{% load static %}{% load mi_icons %}{% load rbac %}{% load mi_score %}
+{% load static %}{% load mi_icons %}{% load rbac %}{% load mi_score %}{% load ai_tags %}
 
 {% block page_title %}{{ app_name|default:file_name }} — iOS static analysis{% endblock %}
 
@@ -111,7 +111,7 @@
            class="w-14 h-14 rounded-xl bg-surface-2 object-contain flex-shrink-0 shadow-elevation-2 ring-1 ring-border-subtle" />
       <div class="min-w-0">
         <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold inline-flex items-center gap-1.5">
-          {% icon "smartphone" size=12 %} Static · iOS
+          <span class="w-3.5 h-3.5 inline-flex flex-shrink-0 align-middle">{% include "components/logo_mark.html" %}</span> MobInspect · Static · iOS
         </p>
         <h1 class="text-h2 truncate mt-0.5">{{ app_name|default:file_name }}{% if app_version %} <span class="text-text-tertiary font-normal">v{{ app_version }}</span>{% endif %}</h1>
         {% if bundle_id %}<p class="text-small text-text-secondary mt-0.5 font-mono truncate">{{ bundle_id }}</p>{% endif %}
@@ -122,7 +122,7 @@
       <button type="button" class="btn btn-ghost btn-md" @click="modal = 'toc'">{% icon "layers" size=14 %} Contents</button>
       <a href="{% url 'recent' %}" class="btn btn-ghost btn-md">{% icon "chevron-left" size=14 %} Back</a>
       <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="mi-pillbtn btn btn-md">{% icon "shield-check" size=14 %} Scorecard</a>
-      {% can 'admin.ai.view' %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endcan %}
+      {% can 'admin.ai.view' %}{% ai_dashboard_ready md5 as ai_ready %}{% if ai_ready %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endif %}{% endcan %}
       <a href="{% url 'static_analyzer_ios' checksum=md5 %}?rescan=1" class="btn btn-secondary btn-md">{% icon "activity" size=14 %} Rescan</a>
       <a href="{% url 'pdf' checksum=md5 %}" class="btn btn-ghost btn-md">{% icon "file-text" size=14 %} PDF</a>
       <a href="{% url 'download_binary' checksum=md5 %}" class="btn btn-ghost btn-md">{% icon "download" size=14 %} IPA</a>
@@ -1416,6 +1416,8 @@
     };
   }
 </script>
+<!-- jQuery — required by DataTables and suppression.js below -->
+<script src="{% static 'adminlte/plugins/jquery.min.js' %}"></script>
 <!-- DataTables -->
 <script src="{% static "datatables/js/pdfmake.min.js" %}"></script>
 <script src="{% static "datatables/js/vfs_fonts.js" %}"></script>
