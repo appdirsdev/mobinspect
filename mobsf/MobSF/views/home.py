@@ -411,6 +411,50 @@ def api_docs(request):
     return render(request, template, context)
 
 
+@login_required
+def help_center(request):
+    """In-app documentation / user guide."""
+    faqs = [
+        ('Why is the AI Dashboard button missing on a report?',
+         'The button only appears once AI enrichment has actually completed '
+         'for that scan. If no model connection is configured yet, or '
+         'enrichment hasn’t run, there is nothing to show, so the '
+         'button stays hidden rather than opening an empty page.'),
+        ('Does any of my data leave my network?',
+         'No. Scans, reports, and AI enrichment all run locally against '
+         'services on your own network. There is no cloud upload step and '
+         'no external API call as part of normal operation.'),
+        ('Can this run in a fully offline / air-gapped environment?',
+         'Yes. Static analysis, dynamic analysis, and AI enrichment all '
+         'work without internet access, provided the AI model itself is '
+         'hosted somewhere reachable on your local network.'),
+        ('What is the difference between the security score and the AI '
+         'risk score?',
+         'The security score is a deterministic calculation from the '
+         'findings on a scan and is always available. The AI risk score '
+         'only appears after AI enrichment runs, and is itself computed '
+         'from fixed risk categories rather than generated freely by the '
+         'model — both are reproducible, neither is a subjective '
+         'opinion.'),
+        ('How do I give someone else access?',
+         'An Administrator creates the account from Users and assigns it '
+         'a role from Roles. Access takes effect immediately and every '
+         'permission-gated action is recorded in the Audit log.'),
+        ('A finding keeps reappearing after I’ve already reviewed it.',
+         'Suppress it from the finding’s row menu on the report — '
+         'either for that rule everywhere, or for that rule in specific '
+         'files only. Suppressed findings stay hidden on future rescans '
+         'until you remove the suppression.'),
+    ]
+    context = {
+        'title': 'Help',
+        'version': settings.MOBSF_VER,
+        'help_faqs': faqs,
+    }
+    template = 'general/help.html'
+    return render(request, template, context)
+
+
 def about(request):
     """About Route."""
     context = {

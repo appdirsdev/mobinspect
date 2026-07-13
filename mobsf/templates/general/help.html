@@ -1,0 +1,236 @@
+{% extends "base/app.html" %}
+{% load static %}{% load mi_icons %}{% load rbac %}
+
+{% block page_title %}Help{% endblock %}
+
+{% block extra_head %}
+<style>
+  .mi-report-hero { position: relative; }
+  .mi-report-glow { position: absolute; inset: 0; pointer-events: none; }
+  .mi-report-glow::before {
+    content: ''; position: absolute; width: 320px; height: 320px; top: -150px; right: -60px;
+    border-radius: 9999px; filter: blur(60px); opacity: .5;
+    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  :root[data-theme="dark"] .mi-report-glow::before { opacity: .36; }
+  .mi-chip { transition: transform .18s ease; flex-shrink: 0; }
+  .card:hover > .card-header .mi-chip { transform: scale(1.06); }
+  .mi-quicknav a { transition: background .15s ease, color .15s ease, border-color .15s ease; white-space: nowrap; }
+  .mi-quicknav a.is-active { background: rgba(37,99,235,.12); border-color: rgba(37,99,235,.35); color: #2563EB; }
+  :root[data-theme="dark"] .mi-quicknav a.is-active { color: #60A5FA; }
+  .mi-quicknav-scroll::-webkit-scrollbar { height: 5px; }
+  .mi-quicknav-scroll::-webkit-scrollbar-thumb { background: rgb(var(--border-default)); border-radius: 9999px; }
+  .mi-help-table th, .mi-help-table td { padding: 0.6rem 0.9rem; text-align: left; vertical-align: top; }
+  .mi-help-table thead th { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: rgb(var(--text-secondary)); border-bottom: 1px solid rgb(var(--border-subtle)); }
+  .mi-help-table tbody tr { border-bottom: 1px solid rgb(var(--border-subtle)); }
+  .mi-help-table tbody tr:last-child { border-bottom: none; }
+  details.mi-faq summary { cursor: pointer; list-style: none; }
+  details.mi-faq summary::-webkit-details-marker { display: none; }
+  details.mi-faq .mi-faq-chevron { transition: transform .15s ease; }
+  details.mi-faq[open] .mi-faq-chevron { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) {
+    .mi-report-glow::before { animation: none !important; }
+    .mi-chip, .mi-quicknav a, details.mi-faq .mi-faq-chevron { transition: none !important; }
+  }
+  @keyframes mi-float {
+    0%, 100% { transform: translate3d(0,0,0); }
+    50%      { transform: translate3d(0,-22px,0); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ─────────── Page header ─────────── #}
+<header class="mi-report-hero card mi-glass relative overflow-hidden p-0 mb-4" data-reveal>
+  <div class="mi-report-glow" aria-hidden="true"></div>
+  <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-6 py-6">
+    <div class="flex items-center gap-4 min-w-0">
+      <span class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-mobinspect-500/15 text-mobinspect-500 flex-shrink-0">{% icon "help-circle" size=26 %}</span>
+      <div class="min-w-0">
+        <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1">Documentation</p>
+        <h1 class="text-h2">Help &amp; user guide</h1>
+        <p class="text-small text-text-secondary mt-0.5">Everything you need to run scans, read reports, and configure the platform.</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+{# ─────────── Quick-jump nav ─────────── #}
+<nav class="mi-quicknav sticky top-0 z-10 mb-6" data-quicknav aria-label="Help sections">
+  <div class="mi-quicknav-scroll flex items-center gap-1 overflow-x-auto py-2 px-2 rounded-lg border border-border-subtle bg-surface-1/90 backdrop-blur shadow-elevation-1">
+    <a href="#getting-started" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Getting started</a>
+    <a href="#running-a-scan" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Running a scan</a>
+    <a href="#understanding-reports" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Reading a report</a>
+    <a href="#security-score" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Security score</a>
+    <a href="#ai-dashboard" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">AI Dashboard</a>
+    <a href="#integrations" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Integrations</a>
+    <a href="#dynamic-analysis" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Dynamic analysis</a>
+    <a href="#roles-permissions" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">Roles &amp; access</a>
+    <a href="#api-access" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">API access</a>
+    <a href="#faq" class="text-tiny px-2.5 py-1.5 rounded-md border border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-2">FAQ</a>
+  </div>
+</nav>
+
+{# ─────────── Getting started ─────────── #}
+<a id="getting-started" class="anchor"></a>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "upload-cloud" size=16 %}</span> Getting started</h2></div>
+  <div class="p-6 space-y-4 text-small text-text-secondary leading-relaxed">
+    <p>This platform performs automated <strong class="text-text-primary">static and dynamic security analysis</strong> of mobile applications. Upload an app once and it is decompiled, inspected against a large rule set covering permissions, manifest configuration, network security, embedded secrets, known-vulnerable libraries, and insecure code patterns — then summarized into a single report with a security score, so your team can triage findings without reading source code line by line.</p>
+    <p>It is built for application security teams, mobile developers doing self-review before release, and SOC/NOC analysts who need a fast, consistent read on an app's risk posture.</p>
+    <div class="overflow-x-auto rounded-lg border border-border-subtle mt-4">
+      <table class="mi-help-table w-full text-small">
+        <thead><tr><th>Platform</th><th>Supported file types</th></tr></thead>
+        <tbody>
+          <tr><td class="text-text-primary font-medium">Android</td><td class="font-mono text-tiny">APK · AAB · XAPK · JAR · AAR · SO · source ZIP</td></tr>
+          <tr><td class="text-text-primary font-medium">iOS</td><td class="font-mono text-tiny">IPA · Mach-O / DYLIB · source ZIP (Xcode / Swift projects)</td></tr>
+          <tr><td class="text-text-primary font-medium">Windows</td><td class="font-mono text-tiny">APPX</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# ─────────── Running a scan ─────────── #}
+<a id="running-a-scan" class="anchor"></a>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "activity" size=16 %}</span> Running a scan</h2></div>
+  <div class="p-6 space-y-3 text-small text-text-secondary leading-relaxed">
+    <ol class="space-y-2 list-decimal list-inside">
+      <li>From <strong class="text-text-primary">New scan</strong>, drag a supported file onto the upload panel or click <strong class="text-text-primary">Choose file</strong>.</li>
+      <li>The app is queued and analyzed automatically — no configuration required. You're redirected to the report once it starts.</li>
+      <li>Once complete, the report page shows a security score, app metadata, and every analysis section, each with its own anchor in the section tab bar at the top of the report.</li>
+      <li>Use <strong class="text-text-primary">Rescan</strong> to re-run analysis after a rule-set update, or <strong class="text-text-primary">Compare</strong> to diff two versions of the same app side by side.</li>
+      <li>All past scans are listed under <strong class="text-text-primary">Scans</strong>, searchable by app name, package, file name, or hash.</li>
+    </ol>
+  </div>
+</section>
+
+{# ─────────── Understanding your report ─────────── #}
+<a id="understanding-reports" class="anchor"></a>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "file-text" size=16 %}</span> Reading a report</h2></div>
+  <div class="p-6 space-y-4 text-small text-text-secondary leading-relaxed">
+    <p>Every report is organized into sections, navigable from the tab bar pinned to the top of the page. What each one covers:</p>
+    <div class="overflow-x-auto rounded-lg border border-border-subtle">
+      <table class="mi-help-table w-full text-small">
+        <thead><tr><th>Section</th><th>What it tells you</th></tr></thead>
+        <tbody>
+          <tr><td class="text-text-primary font-medium">Permissions</td><td>Every permission the app declares, with a plain-language explanation and a risk rating for each.</td></tr>
+          <tr><td class="text-text-primary font-medium">Network security</td><td>Whether traffic is encrypted, TLS/certificate pinning misconfigurations, cleartext-traffic exceptions.</td></tr>
+          <tr><td class="text-text-primary font-medium">Manifest / Info.plist</td><td>App-configuration issues — exported components without protection, debuggable builds, backup flags, ATS exceptions.</td></tr>
+          <tr><td class="text-text-primary font-medium">Code analysis</td><td>Insecure coding patterns found in the decompiled or provided source — weak crypto, insecure storage, unsafe WebView settings, and similar.</td></tr>
+          <tr><td class="text-text-primary font-medium">Components</td><td>Activities, services, broadcast receivers, and content providers, flagging which are exported (reachable by other apps) and unprotected.</td></tr>
+          <tr><td class="text-text-primary font-medium">Libraries / SBOM</td><td>Every third-party library the app bundles, so you can cross-check versions against your own vulnerability tracking.</td></tr>
+          <tr><td class="text-text-primary font-medium">Trackers</td><td>Known analytics and advertising trackers detected in the binary.</td></tr>
+          <tr><td class="text-text-primary font-medium">Secrets</td><td>Hardcoded API keys, tokens, and credentials found in strings or source — always worth a manual look before shipping.</td></tr>
+          <tr><td class="text-text-primary font-medium">URLs / Emails / Server locations</td><td>Every embedded URL and email address, plus the countries the app's declared endpoints resolve to.</td></tr>
+          <tr><td class="text-text-primary font-medium">Firebase</td><td>Whether an exposed Firebase database was detected and is publicly readable.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Findings you've already triaged can be <strong class="text-text-primary">suppressed</strong> per rule (or per rule + file) directly from the finding's row menu, so future rescans don't re-surface what you've already reviewed.</p>
+  </div>
+</section>
+
+{# ─────────── Security score ─────────── #}
+<a id="security-score" class="anchor"></a>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "gauge" size=16 %}</span> Security score</h2></div>
+  <div class="p-6 space-y-3 text-small text-text-secondary leading-relaxed">
+    <p>Every report shows a <strong class="text-text-primary">0–100 security score</strong> at the top. It is calculated deterministically from the findings on that specific scan — each finding deducts points according to its severity, and the total is banded into <strong class="text-text-primary">Passed</strong>, <strong class="text-text-primary">Low</strong>, <strong class="text-text-primary">Medium</strong>, <strong class="text-text-primary">High</strong>, or <strong class="text-text-primary">Critical</strong>. It is not an estimate or an AI opinion — the same findings will always produce the same score.</p>
+    <p>Analytics rolls this up across your whole scan history so you can track average score, issue volume, and trend over time.</p>
+  </div>
+</section>
+
+{# ─────────── AI Dashboard ─────────── #}
+<a id="ai-dashboard" class="anchor"></a>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "zap" size=16 %}</span> AI Dashboard</h2></div>
+  <div class="p-6 space-y-4 text-small text-text-secondary leading-relaxed">
+    <p>Once a report finishes, an optional AI enrichment pass can read its findings and produce four extra views, available from the <strong class="text-text-primary">AI Dashboard</strong> button on the report page:</p>
+    <ul class="space-y-2 list-disc list-inside">
+      <li><strong class="text-text-primary">Executive summary</strong> — a plain-language recap of the app's overall risk posture, written for a non-technical stakeholder.</li>
+      <li><strong class="text-text-primary">Secrets triage</strong> — a second pass over any detected secrets/credentials, helping distinguish likely-real exposures from test fixtures and false positives.</li>
+      <li><strong class="text-text-primary">Risk classification</strong> — each risk dimension (network, permissions, platform &amp; manifest, code, privacy &amp; trackers, secrets) rated on a fixed none/low/medium/high/critical scale, with a short rationale.</li>
+      <li><strong class="text-text-primary">Anomalies &amp; suggestions</strong> — patterns across the findings a reviewer might otherwise miss, each paired with a concrete next step.</li>
+    </ul>
+    <p>The dashboard also shows an <strong class="text-text-primary">AI risk score out of 100</strong> — this is computed server-side from the categorical risk ratings above, the same way the report's security score is computed; the model never outputs a number directly, so the score can't be prompted into being inflated or deflated.</p>
+    <p>The AI Dashboard is only reachable once enrichment has actually completed for that scan — if no AI report exists yet (or the model isn't configured), the button is hidden and the page redirects rather than showing an empty or broken view.</p>
+    <p>Enrichment runs against a model you host yourself (see <a href="#integrations" class="text-text-brand hover:underline">Integrations</a> below) — nothing leaves your network, so this works the same in a fully offline / air-gapped environment as it does online.</p>
+  </div>
+</section>
+
+{# ─────────── Integrations ─────────── #}
+<a id="integrations" class="anchor"></a>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "sliders" size=16 %}</span> Integrations</h2></div>
+  <div class="p-6 space-y-3 text-small text-text-secondary leading-relaxed">
+    <p>The <strong class="text-text-primary">Integrations</strong> admin page connects the platform to services on your own network — nothing here reaches the public internet:</p>
+    <ul class="space-y-2 list-disc list-inside">
+      <li><strong class="text-text-primary">AI model connection</strong> — host, port, and model name for report generation and classification. Connections are restricted to private/loopback network ranges, and <strong class="text-text-primary">Test connection</strong> validates the exact values on the form before you save, so you always know a saved connection actually works.</li>
+      <li><strong class="text-text-primary">Device / ADB connections</strong> — the host and port of an Android device or emulator used for dynamic analysis.</li>
+    </ul>
+    <p>Both are scoped per role, so different teams can point at different model hosts or device pools without stepping on each other.</p>
+  </div>
+</section>
+
+{# ─────────── Dynamic analysis ─────────── #}
+<a id="dynamic-analysis" class="anchor"></a>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "smartphone" size=16 %}</span> Dynamic analysis</h2></div>
+  <div class="p-6 space-y-3 text-small text-text-secondary leading-relaxed">
+    <p>Beyond static analysis, apps can be installed and exercised on a connected Android device or emulator to observe actual runtime behavior — API calls made, network requests sent, files written, and activities launched — which surfaces issues that only show up when the app is actually running. Start it from <strong class="text-text-primary">Dynamic</strong> in the sidebar once a device is connected under Integrations.</p>
+  </div>
+</section>
+
+{# ─────────── Roles & permissions ─────────── #}
+<a id="roles-permissions" class="anchor"></a>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "shield" size=16 %}</span> Roles &amp; access</h2></div>
+  <div class="p-6 space-y-4 text-small text-text-secondary leading-relaxed">
+    <p>Access is role-based: every user is assigned a role, and every role is an explicit set of permissions. Four roles ship by default and can be adjusted or extended from <strong class="text-text-primary">Roles</strong>:</p>
+    <div class="overflow-x-auto rounded-lg border border-border-subtle">
+      <table class="mi-help-table w-full text-small">
+        <thead><tr><th>Role</th><th>Typical use</th></tr></thead>
+        <tbody>
+          <tr><td class="text-text-primary font-medium">Administrator</td><td>Full access, including user, role, and integration management.</td></tr>
+          <tr><td class="text-text-primary font-medium">Security Analyst</td><td>Runs scans, triages and suppresses findings, uses dynamic analysis and the API.</td></tr>
+          <tr><td class="text-text-primary font-medium">Viewer</td><td>Read-only access to scans, reports, and analytics.</td></tr>
+          <tr><td class="text-text-primary font-medium">API User</td><td>Programmatic-only access for CI/CD pipelines — no interactive login features.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Every permission-gated action — including sign-ins, scan uploads, and integration changes — is written to the <strong class="text-text-primary">Audit log</strong> for traceability.</p>
+  </div>
+</section>
+
+{# ─────────── API access ─────────── #}
+<a id="api-access" class="anchor"></a>
+<section class="card mi-glass card-hover mb-6" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "key" size=16 %}</span> API access</h2></div>
+  <div class="p-6 space-y-3 text-small text-text-secondary leading-relaxed">
+    <p>Every scan action — upload, scan, fetch a report as JSON or PDF, search, delete — is available over a REST API, so it can be scripted into a CI/CD pipeline. Generate a personal API key from <strong class="text-text-primary">API keys</strong>, then see the full endpoint reference and request examples on the <a href="{% url 'api_docs' %}" class="text-text-brand hover:underline">API documentation</a> page.</p>
+  </div>
+</section>
+
+{# ─────────── FAQ ─────────── #}
+<a id="faq" class="anchor"></a>
+<section class="card mi-glass card-hover mb-10" data-reveal>
+  <div class="card-header"><h2 class="text-h3 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-8 h-8 rounded-md bg-mobinspect-500/15 text-mobinspect-500">{% icon "help-circle" size=16 %}</span> Frequently asked questions</h2></div>
+  <div class="p-2 sm:p-4">
+    {% for q, a in help_faqs %}
+    <details class="mi-faq border-b border-border-subtle last:border-b-0">
+      <summary class="flex items-center justify-between gap-3 px-4 py-3.5 text-small font-medium text-text-primary hover:bg-surface-2/40 rounded-md">
+        <span>{{ q }}</span>
+        <span class="mi-faq-chevron text-text-tertiary flex-shrink-0">{% icon "chevron-down" size=15 %}</span>
+      </summary>
+      <div class="px-4 pb-4 text-small text-text-secondary leading-relaxed">{{ a }}</div>
+    </details>
+    {% endfor %}
+  </div>
+</section>
+
+{% endblock %}

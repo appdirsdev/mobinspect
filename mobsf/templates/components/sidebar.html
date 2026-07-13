@@ -6,23 +6,20 @@
   + micro-animations live in the #mi-chrome stylesheet (base/app.html); all
   functional wiring (urls, can-gates, active state, collapse) is unchanged.
 {% endcomment %}
-<div class="flex items-center gap-2 px-4 h-topbar border-b border-border-subtle">
-  <a href="{% url 'home' %}" class="mi-brand flex items-center gap-2.5 min-w-0 group">
-    <span class="mi-brand-badge inline-flex w-8 h-8 rounded-lg shadow-elevation-1 transition-transform duration-fast group-hover:scale-105">
+<div class="flex items-center h-topbar border-b border-border-subtle"
+     :class="sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-4'">
+  <a href="{% url 'home' %}" class="mi-brand flex items-center gap-2.5 min-w-0 group"
+     title="MobInspect"
+     @mouseenter="if (sidebarCollapsed) { const r = $el.getBoundingClientRect(); navTip = { show: true, x: r.right + 12, y: r.top + r.height/2, label: 'MobInspect · Home' } }"
+     @mouseleave="navTip.show = false">
+    <span class="mi-brand-badge inline-flex rounded-xl shadow-elevation-1 transition-transform duration-fast group-hover:scale-105"
+          :class="sidebarCollapsed ? 'w-11 h-11' : 'w-9 h-9'">
       {% include "components/logo_mark.html" %}
     </span>
-    <span x-show="!sidebarCollapsed" x-transition.opacity class="font-semibold tracking-tight text-text-primary truncate">
+    <span x-show="!sidebarCollapsed" x-transition.opacity class="text-h4 font-semibold tracking-tight text-text-primary truncate">
       Mob<span class="text-text-brand">Inspect</span>
     </span>
   </a>
-  <button
-    type="button"
-    class="ml-auto p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors duration-fast"
-    aria-label="Toggle sidebar"
-    @click="sidebarCollapsed = !sidebarCollapsed; localStorage.setItem('mi-sidebar', sidebarCollapsed ? 'collapsed' : 'expanded')"
-  >
-    <span class="inline-flex transition-transform duration-base" :class="sidebarCollapsed ? 'rotate-180' : ''">{% icon "chevron-left" size=16 %}</span>
-  </button>
 </div>
 
 <nav class="flex-1 overflow-y-auto px-2 py-4 space-y-0.5">
@@ -107,8 +104,15 @@
   {% endwith %}
 </nav>
 
-{# ── Bottom utility group: theme + sign out (mirrors CyberGuard's settings/logout/theme cluster; only real, working actions — no dummy "Settings" icon since Integrations above already serves that role) ── #}
+{# ── Bottom utility group: help + theme + sign out (mirrors CyberGuard's settings/logout/theme cluster; only real, working actions — no dummy "Settings" icon since Integrations above already serves that role) ── #}
 <div class="border-t border-border-subtle p-2 space-y-0.5">
+  {% with cur=request.resolver_match.url_name %}
+    {% if cur == 'help_center' %}
+      {% include "components/sidebar_item.html" with url='help_center' icon='help-circle' label='Help' active=True %}
+    {% else %}
+      {% include "components/sidebar_item.html" with url='help_center' icon='help-circle' label='Help' active=False %}
+    {% endif %}
+  {% endwith %}
   <button
     type="button"
     class="mi-nav-item group flex items-center gap-3 px-2.5 h-9 rounded-lg text-small font-medium text-text-secondary hover:text-text-primary w-full"
@@ -117,6 +121,8 @@
     x-data="{ pref: (window.MI && window.MI.theme) ? window.MI.theme.get() : 'dark' }"
     @click="pref = window.MI.theme.cycle()"
     @mi:theme-change.window="pref = $event.detail.value"
+    @mouseenter="if (sidebarCollapsed) { const r = $el.getBoundingClientRect(); navTip = { show: true, x: r.right + 12, y: r.top + r.height/2, label: 'Theme' } }"
+    @mouseleave="navTip.show = false"
     :title="'Theme: ' + pref"
   >
     <span class="mi-nav-ico flex-shrink-0">
@@ -133,6 +139,8 @@
       class="mi-nav-item group flex items-center gap-3 px-2.5 h-9 rounded-lg text-small font-medium text-text-secondary hover:text-text-primary w-full"
       :class="sidebarCollapsed ? 'justify-center !px-0' : ''"
       title="Sign out"
+      @mouseenter="if (sidebarCollapsed) { const r = $el.getBoundingClientRect(); navTip = { show: true, x: r.right + 12, y: r.top + r.height/2, label: 'Sign out' } }"
+      @mouseleave="navTip.show = false"
     >
       <span class="mi-nav-ico flex-shrink-0">{% icon "log-out" size=18 %}</span>
       <span x-show="!sidebarCollapsed" x-transition.opacity class="truncate">Sign out</span>
@@ -141,7 +149,11 @@
 </div>
 
 <div class="border-t border-border-subtle p-3">
-  <div class="flex items-center gap-2.5 min-w-0">
+  <div class="flex items-center gap-2.5 min-w-0"
+       :class="sidebarCollapsed ? 'justify-center' : ''"
+       title="{% if request.user.is_authenticated %}{{ request.user.username }}{% endif %}"
+       @mouseenter="if (sidebarCollapsed) { const r = $el.getBoundingClientRect(); navTip = { show: true, x: r.right + 12, y: r.top + r.height/2, label: '{{ request.user.username|escapejs|default:'Account' }}' } }"
+       @mouseleave="navTip.show = false">
     <div class="mi-avatar-ring w-8 h-8 flex-shrink-0">
       <div class="w-full h-full rounded-full bg-surface-1 text-mobinspect-500 flex items-center justify-center font-semibold text-small">
         {% if request.user.is_authenticated %}{{ request.user.username|slice:":1"|upper }}{% else %}?{% endif %}

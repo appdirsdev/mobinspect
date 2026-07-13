@@ -1,22 +1,18 @@
 {% comment %}
-  MobInspect brand mark — a minimal geometric "M" monogram on a brand-gradient
-  app tile (mobile-app metaphor). Deliberately reductive / iconic (Apple·Google
-  house-style): one letterform, one gradient, legible from 16px to hero size.
-  The center vertex dips to a point for a precise, shield-like silhouette.
-  Self-contained (own tile), so it sits on any background. Pass a Tailwind size
-  via `cls`, e.g. {% include "components/logo_mark.html" with cls="w-8 h-8" %}
+  MobInspect brand mark — a medallion monogram: a bold geometric "M" set on a
+  solid circular seal. Classical form (medallion/seal), modern execution
+  (flat geometry, single confident stroke, no ornamentation). Carries the
+  brand's blue identity; legible down to 16px favicon size.
+  Pass a Tailwind size via `cls`, e.g.
+    {% include "components/logo_mark.html" with cls="w-8 h-8" %}
 {% endcomment %}
 <svg viewBox="0 0 64 64" fill="none" class="{{ cls|default:'w-full h-full' }} block" role="img" aria-label="MobInspect logo">
   <defs>
-    <linearGradient id="mimarkTile" x1="6" y1="2" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+    <linearGradient id="mimarkSeal" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
       <stop stop-color="#3C82F6"/><stop offset="1" stop-color="#1D4ED8"/>
     </linearGradient>
   </defs>
-  {# app tile #}
-  <rect width="64" height="64" rx="15" fill="url(#mimarkTile)"/>
-  {# subtle top gloss for depth #}
-  <path d="M0 15A15 15 0 0 1 15 0H49A15 15 0 0 1 64 15V23H0Z" fill="#fff" opacity="0.10"/>
-  {# "M" monogram #}
-  <path d="M17 46V21l15 15 15-15V46" stroke="#fff" stroke-width="6.4"
+  <circle cx="32" cy="32" r="32" fill="url(#mimarkSeal)"/>
+  <path d="M16 48 V16 L32 30 L48 16 V48" fill="none" stroke="#fff" stroke-width="6"
         stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

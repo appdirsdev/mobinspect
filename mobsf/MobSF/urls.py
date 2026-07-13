@@ -246,6 +246,7 @@ if settings.API_ONLY == '0':
                 home.generate_download,
                 name='generate_downloads'),
         re_path(r'^about$', home.about, name='about'),
+        re_path(r'^help/$', home.help_center, name='help_center'),
         re_path(r'^api_docs$', home.api_docs, name='api_docs'),
         re_path(r'^recent_scans/$', home.recent_scans, name='recent'),
         re_path(fr'^recent_scans/{paginate}/$',

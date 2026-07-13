@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="MobInspect">
   <defs>
-    <linearGradient id="miT" x1="6" y1="2" x2="58" y2="62" gradientUnits="userSpaceOnUse"><stop stop-color="#3C82F6"/><stop offset="1" stop-color="#1D4ED8"/></linearGradient>
+    <linearGradient id="mimarkSeal" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse"><stop stop-color="#3C82F6"/><stop offset="1" stop-color="#1D4ED8"/></linearGradient>
   </defs>
-  <rect width="64" height="64" rx="15" fill="url(#miT)"/>
-  <path d="M0 15A15 15 0 0 1 15 0H49A15 15 0 0 1 64 15V23H0Z" fill="#fff" opacity="0.10"/>
-  <path d="M16 47V20l16 16 16-16v27" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="32" cy="32" r="32" fill="url(#mimarkSeal)"/>
+  <path d="M16 48 V16 L32 30 L48 16 V48" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
