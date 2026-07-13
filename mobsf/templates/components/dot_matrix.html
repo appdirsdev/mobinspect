@@ -24,10 +24,10 @@
     <div class="flex flex-col items-center gap-1.5 flex-shrink-0" title="{{ label }}: {{ value }} {{ unit }}{{ value|pluralize }}">
       <div class="flex flex-col-reverse gap-1">
         {% for n in "123456" %}
-          {# widthratio yields a string; |add:0 forces a real int so this
+          {% comment %} widthratio yields a string; |add:0 forces a real int so this
              comparison against the int forloop.counter isn't a silent
              type-mismatch no-op (verified: without the coercion every dot
-             renders empty regardless of the real value). #}
+             renders empty regardless of the real value). {% endcomment %}
           {% if forloop.counter <= filled|add:0 %}
             <span class="w-2 h-2 rounded-full bg-chart-amber"></span>
           {% else %}

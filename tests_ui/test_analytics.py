@@ -72,71 +72,35 @@ def test_analytics_page_loads_without_traceback(admin_page):
     _assert_no_traceback(page)
 
 
-def test_primary_kpi_tiles_show_settled_numbers(admin_page):
-    """Total scans / Platforms / Avg score / Findings all render a settled,
-    parseable numeric counter (or the '-' placeholder for the score tile
-    when no app has been scored yet)."""
+def test_kpi_strip_shows_five_tiles_with_settled_numbers(admin_page):
+    """The redesigned KPI strip is one row of 5 real-metric tiles (matching
+    the home dashboard): Total scans / This week / Avg score / Issues /
+    Fleet health. Each count-up settles to a real number; Fleet health
+    carries a trailing % and one decimal; Avg score shows a number (white,
+    with a tier pill) or the '—' placeholder when nothing is scored yet."""
     page = admin_page
     _goto_analytics(page)
 
-    total_tile = _kpi_tile(page, 'Total scans')
-    expect(total_tile).to_be_visible()
-    total_val = _settled_text(total_tile.locator(COUNTER_VALUE_SELECTOR).first)
-    _assert_numeric(total_val, 'Total scans')
+    expect(page.locator('div.mi-stat')).to_have_count(5)
 
-    platforms_tile = _kpi_tile(page, 'Platforms')
-    expect(platforms_tile).to_be_visible()
-    platforms_val = _settled_text(platforms_tile.locator(COUNTER_VALUE_SELECTOR).first)
-    _assert_numeric(platforms_val, 'Platforms')
+    for label in ('Total scans', 'This week', 'Issues'):
+        tile = _kpi_tile(page, label)
+        expect(tile).to_be_visible()
+        val = _settled_text(tile.locator('.mi-num').first)
+        _assert_numeric(val, label)
 
-    findings_tile = _kpi_tile(page, 'Findings')
-    expect(findings_tile).to_be_visible()
-    findings_val = _settled_text(findings_tile.locator(COUNTER_VALUE_SELECTOR).first)
-    _assert_numeric(findings_val, 'Findings')
-
-    score_tile = _kpi_tile(page, 'Avg score')
-    expect(score_tile).to_be_visible()
-    score_text = score_tile.inner_text()
-    if '—' in score_text:
-        # No scored apps yet: dashboard shows the "—" placeholder instead
-        # of a counter widget. Nothing further to assert.
-        pass
-    else:
-        score_val = _settled_text(score_tile.locator(COUNTER_VALUE_SELECTOR).first)
-        _assert_numeric(score_val, 'Avg score')
-
-    _assert_no_traceback(page)
-
-
-def test_secondary_kpi_tiles_show_settled_numbers(admin_page):
-    """This week / Fleet health / Android / iOS+Windows counters render and
-    settle to real numeric values (Fleet health uses one decimal)."""
-    page = admin_page
-    _goto_analytics(page)
-
-    week_tile = _kpi_tile(page, 'This week')
-    expect(week_tile).to_be_visible()
-    week_val = _settled_text(week_tile.locator(COUNTER_VALUE_SELECTOR).first)
-    _assert_numeric(week_val, 'This week')
-
+    # Fleet health renders "<n.n>%" — strip the unit before the numeric check.
     fleet_tile = _kpi_tile(page, 'Fleet health')
     expect(fleet_tile).to_be_visible()
-    fleet_val = _settled_text(fleet_tile.locator(COUNTER_VALUE_SELECTOR).first)
+    fleet_val = _settled_text(fleet_tile.locator('.mi-num').first).rstrip('%').strip()
     _assert_numeric(fleet_val, 'Fleet health')
 
-    android_tile = _kpi_tile(page, 'Android')
-    expect(android_tile).to_be_visible()
-    android_val = _settled_text(android_tile.locator(COUNTER_VALUE_SELECTOR).first)
-    _assert_numeric(android_val, 'Android')
-
-    ios_win_tile = _kpi_tile(page, 'iOS / Windows')
-    expect(ios_win_tile).to_be_visible()
-    counters = ios_win_tile.locator(COUNTER_VALUE_SELECTOR)
-    expect(counters).to_have_count(2)
-    ios_val = _settled_text(counters.nth(0))
-    win_val = _settled_text(counters.nth(1))
-    _assert_numeric(ios_val, 'iOS')
-    _assert_numeric(win_val, 'Windows')
+    # Avg score: a plain number (not a counter widget) or the em-dash.
+    score_tile = _kpi_tile(page, 'Avg score')
+    expect(score_tile).to_be_visible()
+    score_text = score_tile.locator('.mi-num').first.inner_text().strip()
+    if score_text != '—':
+        _assert_numeric(score_text, 'Avg score')
 
     _assert_no_traceback(page)
 
@@ -214,18 +178,26 @@ def test_severity_buckets_render_with_labels_and_counts(admin_page):
     _assert_no_traceback(page)
 
 
-def test_severity_distribution_chart_renders(admin_page):
-    """The standalone 'Severity distribution' donut (with its own Chart.js
-    legend) renders next to the average security score."""
+def test_severity_mix_chart_and_score_gauge_render(admin_page):
+    """The 'Severity mix' donut renders, and the adjacent 'Avg security
+    score' card shows the semicircle gauge (or its empty state)."""
     page = admin_page
     _goto_analytics(page)
 
-    severity_dist_card = page.locator('div.card', has_text='Severity distribution').first
+    severity_dist_card = page.locator('div.card', has_text='Severity mix').first
     expect(severity_dist_card).to_be_visible()
     canvas = severity_dist_card.locator('#severity_chart')
     expect(canvas).to_be_visible()
     box = canvas.bounding_box()
     assert box and box['width'] > 0 and box['height'] > 0
+
+    # The average-security-score card carries the semicircle gauge with its
+    # numeric readout (when at least one app has been scored).
+    score_card = page.locator('div.card', has_text='Avg security score').first
+    expect(score_card).to_be_visible()
+    gauge = score_card.locator('.mi-semi')
+    if gauge.count():
+        expect(gauge.locator('.mi-semi-num')).to_be_visible()
 
     _assert_no_traceback(page)
 

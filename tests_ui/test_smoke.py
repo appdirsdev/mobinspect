@@ -67,17 +67,19 @@ def test_theme_toggle_still_cycles_and_persists(admin_page):
 
 
 def test_both_theme_toggles_stay_in_sync(admin_page):
-    """Two independent toggle buttons exist now (sidebar + topbar), each its
-    own isolated Alpine component. Clicking one must update the other's
-    displayed icon/title immediately (via the shared mi:theme-change window
-    event), not just on the next full reload — otherwise they'd visibly
-    disagree about the current theme until the user navigates away."""
+    """Independent theme-toggle buttons (topbar + desktop sidebar, plus a
+    third in the md-only mobile drawer) each own an isolated Alpine
+    component. Clicking one must update the others' displayed icon/title
+    immediately (via the shared mi:theme-change window event), not just on
+    the next reload. On this desktop viewport only the 2 non-drawer toggles
+    are visible (the drawer's is md:hidden), so we sync-check those two."""
     page = admin_page
     page.goto('/', wait_until='domcontentloaded')
     page.evaluate("localStorage.removeItem('mi-theme')")
     page.reload(wait_until='domcontentloaded')
 
-    toggles = page.get_by_label('Toggle theme')
+    # Scope to the VISIBLE toggles — the mobile drawer's copy is md:hidden.
+    toggles = page.locator('button[aria-label="Toggle theme"]:visible')
     expect(toggles).to_have_count(2)
     first, second = toggles.first, toggles.nth(1)
 

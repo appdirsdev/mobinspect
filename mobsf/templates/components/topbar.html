@@ -2,11 +2,12 @@
 {# Topbar — page context · theme toggle · notifications · user menu #}
 <div class="flex items-center gap-3 w-full px-4 lg:px-6">
 
-  {# Mobile sidebar toggle #}
+  {# Mobile sidebar toggle — opens the off-canvas drawer (base/app.html) #}
   <button
     type="button"
     class="mi-iconbtn md:hidden p-2 rounded-lg text-text-secondary hover:bg-surface-2"
     aria-label="Open menu"
+    @click="mobileNav = true"
   >
     {% icon "menu" size=20 %}
   </button>

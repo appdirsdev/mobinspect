@@ -5,6 +5,8 @@
   :class="sidebarCollapsed ? 'justify-center !px-0' : ''"
   aria-current="{% if active %}page{% else %}false{% endif %}"
   title="{{ label }}"
+  @mouseenter="if (sidebarCollapsed) { const r = $el.getBoundingClientRect(); navTip = { show: true, x: r.right + 12, y: r.top + r.height/2, label: '{{ label|escapejs }}' } }"
+  @mouseleave="navTip.show = false"
 >
   <span class="mi-nav-ico flex-shrink-0">{% icon icon size=18 %}</span>
   <span x-show="!sidebarCollapsed" x-transition.opacity class="truncate">{{ label }}</span>

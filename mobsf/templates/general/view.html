@@ -135,8 +135,8 @@
         </div>
       </div>
     </div>
-    {# Raw copy of the source, kept off-DOM-visible so EnlighterJS's markup
-       rewrites of #code_block never affect the copy-to-clipboard text. #}
+    {% comment %} Raw copy of the source, kept off-DOM-visible so EnlighterJS's markup
+       rewrites of #code_block never affect the copy-to-clipboard text. {% endcomment %}
     <textarea id="code_raw" class="sr-only" tabindex="-1" aria-hidden="true" readonly>{{ data }}</textarea>
   {% endif %}
 

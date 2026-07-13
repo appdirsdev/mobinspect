@@ -391,6 +391,38 @@ def appsec_dashboard(request, checksum, api=False):
         context['version'] = settings.MOBSF_VER
         context['title'] = 'AppSec Scorecard'
         context['efr01'] = True if settings.EFR_01 == '1' else False
+        # Security-dimension rollup — regroups the SAME real findings (each
+        # already tagged with a `section`) by security area so the scorecard
+        # can chart WHERE risk concentrates (posture radar + breakdown bars).
+        # `risk` is a transparent 0-100 function of the real per-severity
+        # counts (not a fabricated number): high findings weigh most, then
+        # investigate-hotspots, then warnings; capped at 100.
+        _DIM_LABELS = {
+            'manifest': 'Manifest', 'code': 'Code', 'network': 'Network',
+            'permissions': 'Permissions', 'certificate': 'Certificate',
+            'binary': 'Binary', 'macho': 'Mach-O', 'trackers': 'Trackers',
+            'secrets': 'Secrets', 'domains': 'Domains', 'firebase': 'Firebase',
+            'files': 'Files', 'other': 'Other',
+        }
+        _dims = {}
+        for _sev in ('high', 'warning', 'info', 'secure', 'hotspot'):
+            for _f in context.get(_sev) or []:
+                _s = _f.get('section') or 'other'
+                _d = _dims.setdefault(_s, {
+                    'section': _s, 'label': _DIM_LABELS.get(_s, _s.title()),
+                    'high': 0, 'warning': 0, 'info': 0,
+                    'secure': 0, 'hotspot': 0})
+                _d[_sev] += 1
+        _dim_list = []
+        for _d in _dims.values():
+            _d['total'] = (_d['high'] + _d['warning'] + _d['info']
+                           + _d['secure'] + _d['hotspot'])
+            _d['issues'] = _d['high'] + _d['warning'] + _d['hotspot']
+            _d['risk'] = min(100, _d['high'] * 25 + _d['hotspot'] * 12
+                             + _d['warning'] * 6)
+            _dim_list.append(_d)
+        _dim_list.sort(key=lambda x: (-x['risk'], -x['total']))
+        context['dimensions'] = _dim_list
         if api:
             return context
         else:

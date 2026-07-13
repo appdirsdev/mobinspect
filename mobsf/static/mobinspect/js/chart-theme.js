@@ -26,7 +26,19 @@
     Chart.defaults.scale.grid.color = readVar('--border-subtle') || '#E2E8F0';
     Chart.defaults.plugins.tooltip.backgroundColor = readVar('--surface-4') || '#1F2937';
     Chart.defaults.plugins.tooltip.titleColor      = readVar('--text-primary') || '#0F172A';
-    Chart.defaults.plugins.tooltip.bodyColor       = readVar('--text-secondary') || '#475569';
+    // Body uses text-PRIMARY (not secondary) for AA contrast on the dark
+    // tooltip background — secondary measured ~3.2:1 on surface-4.
+    Chart.defaults.plugins.tooltip.bodyColor       = readVar('--text-primary') || '#0F172A';
+    // Honor reduced-motion app-wide: Chart.js entrance animations can't be
+    // reached by the CSS reduced-motion rule (they run on <canvas>), so gate
+    // them here. Only DISABLE for reduced motion (a valid `false`); never
+    // replace the animation object wholesale with a plain {duration,easing}
+    // literal — that strips Chart.js's internal animation structure and
+    // throws "this._fn is not a function", blanking the canvas.
+    if (window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      Chart.defaults.animation = false;
+    }
     Chart.defaults.plugins.tooltip.borderColor     = readVar('--border-default') || '#CBD5E1';
     Chart.defaults.plugins.tooltip.borderWidth     = 1;
     Chart.defaults.plugins.tooltip.padding         = 12;

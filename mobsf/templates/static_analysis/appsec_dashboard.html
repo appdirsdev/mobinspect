@@ -22,15 +22,27 @@
     filter: blur(56px); opacity: .45;
   }
   .mi-hero-glow::before {
-    width: 240px; height: 240px; top: -100px; right: -30px;
-    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+    width: 260px; height: 260px; top: -110px; right: -30px;
+    background: radial-gradient(circle at center, rgba(254,74,35,.5), transparent 70%);
     animation: mi-float 17s ease-in-out infinite;
   }
   .mi-hero-glow::after {
-    width: 190px; height: 190px; bottom: -110px; left: 12%;
-    background: radial-gradient(circle at center, rgba(59,130,246,.34), transparent 70%);
+    width: 200px; height: 200px; bottom: -110px; left: 12%;
+    background: radial-gradient(circle at center, rgba(141,92,252,.32), transparent 70%);
     animation: mi-float 22s ease-in-out infinite reverse;
   }
+
+  /* Page-level warm ambient bloom behind all content (dashboard parity). */
+  .mi-ambient { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .mi-ambient::before { content: ''; position: absolute; left: 0; right: 0; top: -120px; height: 780px;
+    background:
+      radial-gradient(1000px 560px at 80% 0%, rgba(254,74,35,.15), transparent 62%),
+      radial-gradient(760px 480px at 12% 4%, rgba(141,92,252,.10), transparent 60%); }
+  .mi-glass { box-shadow: inset 0 1px 0 0 rgba(255,255,255,.04); }
+  .mi-meta-chip { display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 9px; border-radius: 9999px; font-size: 11px;
+    background: rgb(var(--surface-2)); color: rgb(var(--text-secondary));
+    border: 1px solid rgb(var(--border-subtle)); }
   .mi-hero-grid {
     background-image:
       linear-gradient(var(--border-subtle) 1px, transparent 1px),
@@ -105,6 +117,9 @@
 {% block content %}
 {% with h=high|length w=warning|length i=info|length s=secure|length ho=hotspot|length %}
 {% with total=h|add:w|add:i|add:s|add:ho %}
+<div class="relative">
+<div class="mi-ambient" aria-hidden="true"></div>
+<div class="relative z-[1]">
 
 {# ══════════════════ Scorecard header ══════════════════ #}
 <header class="mi-hero relative overflow-hidden rounded-xl border border-border-subtle mb-6" data-reveal>
@@ -129,7 +144,8 @@
       />
       <div class="min-w-0">
         <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1 inline-flex items-center gap-1.5">
-          {% icon "shield-check" size=13 %} AppSec scorecard
+          <span class="w-4 h-4 inline-flex flex-shrink-0">{% include "components/logo_mark.html" %}</span>
+          MobInspect · AppSec scorecard
         </p>
         <h1 class="text-h2 truncate">{{ app_name|default:file_name }} {% if version_name %}<span class="text-text-tertiary font-normal">v{{ version_name }}</span>{% endif %}</h1>
         <div class="flex items-center gap-1 mt-0.5 min-w-0" x-data="{ copied: false }">
@@ -157,102 +173,96 @@
   </div>
 </header>
 
-{# ─────────── KPI cards ─────────── #}
+{# ══════════════════ Score · severity · posture ══════════════════ #}
 {% if not efr01 %}
-<section
-  class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8"
-  style="--mi-score-accent:{{ security_score|score_color|default:'rgb(var(--score-unknown))' }}"
->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5" data-reveal
+  style="--mi-score-accent:{{ security_score|score_color|default:'rgb(var(--score-unknown))' }}">
 
-  {# Security Score #}
-  <div class="mi-stat card mi-glass card-body" data-reveal>
-    <div class="flex items-center justify-between gap-2">
-      <p class="text-tiny uppercase text-text-secondary">Security score</p>
-      <span class="w-7 h-7 rounded-md bg-chart-amber/10 text-chart-amber inline-flex items-center justify-center flex-shrink-0">
-        {% icon "gauge" size=14 %}
-      </span>
+  {# Security score — thick semicircle gauge + risk grade #}
+  <div class="card mi-glass">
+    <div class="card-header">
+      <h3 class="text-h4">Security score</h3>
+      <span class="mi-meta-chip">{% if total_trackers %}{{ trackers }} tracker{{ trackers|pluralize }}{% else %}score{% endif %}</span>
     </div>
-    <div class="mt-3 flex items-center justify-center">
-      {% include "components/gauge_arc.html" with value=security_score color="var(--mi-score-accent)" sub_label="/ 100" size_class="w-36 h-36" animate=True %}
-    </div>
-  </div>
-
-  {# Risk Grade #}
-  <div class="mi-stat card mi-glass card-body" data-reveal>
-    <div class="flex items-center justify-between gap-2">
-      <p class="text-tiny uppercase text-text-secondary">Risk grade</p>
-      <span class="w-7 h-7 rounded-md bg-chart-violet/10 text-chart-violet inline-flex items-center justify-center flex-shrink-0">
-        {% icon "shield-alert" size=14 %}
-      </span>
-    </div>
-    <div class="flex items-center justify-center gap-1.5 mt-6">
-      {% with tier=security_score|score_tier %}
-      {% if tier == 'critical' %}
-        <span class="w-9 h-9 rounded-md bg-severity-passed/15 text-severity-passed dark:bg-severity-passed-dark/15 dark:text-severity-passed-dark text-h4 font-bold flex items-center justify-center opacity-40">A</span>
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">B</span>
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">C</span>
-        <span class="mi-grade-active w-12 h-12 rounded-md bg-severity-critical text-white text-h2 font-bold flex items-center justify-center shadow-elevation-2">F</span>
-      {% elif tier == 'medium' %}
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">A</span>
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">B</span>
-        <span class="mi-grade-active w-12 h-12 rounded-md bg-severity-medium text-white text-h2 font-bold flex items-center justify-center shadow-elevation-2">C</span>
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">F</span>
-      {% elif tier == 'low' %}
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">A</span>
-        <span class="mi-grade-active w-12 h-12 rounded-md bg-severity-low text-white text-h2 font-bold flex items-center justify-center shadow-elevation-2">B</span>
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">C</span>
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">F</span>
-      {% else %}
-        <span class="mi-grade-active w-12 h-12 rounded-md bg-severity-passed text-white text-h2 font-bold flex items-center justify-center shadow-elevation-2">A</span>
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">B</span>
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">C</span>
-        <span class="w-9 h-9 rounded-md text-text-tertiary text-h4 font-bold flex items-center justify-center opacity-40">F</span>
-      {% endif %}
-      {% endwith %}
-    </div>
-    <p class="text-tiny text-text-tertiary text-center mt-3">Weighted High / Medium / Secure ratio</p>
-  </div>
-
-  {# Severity distribution #}
-  <div class="mi-stat card mi-glass card-body" data-reveal>
-    <div class="flex items-center justify-between gap-2">
-      <p class="text-tiny uppercase text-text-secondary">Severity distribution</p>
-      <span class="w-7 h-7 rounded-md bg-chart-amber/10 text-chart-amber inline-flex items-center justify-center flex-shrink-0">
-        {% icon "bar-chart-3" size=14 %}
-      </span>
-    </div>
-    <div class="relative h-32 mt-2">
-      <canvas id="severity_chart"></canvas>
-      <div class="mi-donut-center" aria-hidden="true">
-        <span class="text-h3 tabular leading-none">{{ total }}</span>
-        <span class="text-tiny text-text-tertiary">finding{{ total|pluralize }}</span>
+    <div class="card-body flex flex-col items-center justify-center">
+      {% include "components/gauge_semi.html" with value=security_score color="var(--mi-score-accent)" unit="" sub_label="/ 100" uid="score" %}
+      <div class="flex items-center justify-center gap-1.5 mt-1">
+        {% with tier=security_score|score_tier %}
+        {% if tier == 'critical' %}
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">A</span>
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">B</span>
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">C</span>
+          <span class="mi-grade-active w-9 h-9 rounded-md bg-severity-critical text-white text-h4 font-bold flex items-center justify-center shadow-elevation-2">F</span>
+        {% elif tier == 'medium' %}
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">A</span>
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">B</span>
+          <span class="mi-grade-active w-9 h-9 rounded-md bg-severity-medium text-white text-h4 font-bold flex items-center justify-center shadow-elevation-2">C</span>
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">F</span>
+        {% elif tier == 'low' %}
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">A</span>
+          <span class="mi-grade-active w-9 h-9 rounded-md bg-severity-low text-white text-h4 font-bold flex items-center justify-center shadow-elevation-2">B</span>
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">C</span>
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">F</span>
+        {% else %}
+          <span class="mi-grade-active w-9 h-9 rounded-md bg-severity-passed text-white text-h4 font-bold flex items-center justify-center shadow-elevation-2">A</span>
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">B</span>
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">C</span>
+          <span class="w-7 h-7 rounded-md text-text-tertiary text-small font-bold flex items-center justify-center opacity-40">F</span>
+        {% endif %}
+        {% endwith %}
       </div>
     </div>
   </div>
 
-  {# Privacy / Trackers #}
-  <div
-    class="mi-stat card mi-glass card-body"
-    data-reveal
-  >
-    <div class="flex items-center justify-between gap-2">
-      <p class="text-tiny uppercase text-text-secondary">Privacy risk</p>
-      <span class="w-7 h-7 rounded-md bg-chart-violet/10 text-chart-violet inline-flex items-center justify-center flex-shrink-0">
-        {% icon "eye" size=14 %}
-      </span>
+  {# Severity distribution donut #}
+  <div class="card mi-glass">
+    <div class="card-header">
+      <h3 class="text-h4">Severity mix</h3>
+      <span class="mi-meta-chip">{{ total }} finding{{ total|pluralize }}</span>
     </div>
-    <div class="mt-3 flex flex-col items-center">
-      <span
-        class="inline-flex items-center justify-center w-24 h-24 rounded-full text-white text-display shadow-elevation-2"
-        style="background-color: {% if total_trackers %}{% if trackers == 0 %}#16A34A{% elif trackers > 4 %}#DC2626{% else %}#475569{% endif %}{% else %}#94A3B8{% endif %};"
-      >{% if total_trackers %}{{ trackers }}{% else %}—{% endif %}</span>
-      <p class="text-small text-text-secondary mt-2">
-        {% if total_trackers %}User / device trackers{% else %}Not scanned{% endif %}
-      </p>
+    <div class="card-body">
+      <div class="relative h-52">
+        <canvas id="severity_chart" aria-hidden="true"></canvas>
+        <div class="mi-donut-center" aria-hidden="true">
+          <span class="text-h2 tabular leading-none">{{ total }}</span>
+          <span class="text-tiny text-text-tertiary">findings</span>
+        </div>
+      </div>
     </div>
   </div>
 
+  {# Security posture radar (signature advanced chart) #}
+  <div class="card mi-glass">
+    <div class="card-header">
+      <h3 class="text-h4">Security posture</h3>
+      <span class="mi-meta-chip">risk by area</span>
+    </div>
+    <div class="card-body">
+      {% if dimensions %}
+        <div class="relative h-52"><canvas id="posture_radar" aria-hidden="true"></canvas></div>
+      {% else %}
+        <div class="h-52 flex flex-col items-center justify-center text-center gap-2 text-text-tertiary text-small">
+          <span class="w-11 h-11 rounded-full bg-surface-2 inline-flex items-center justify-center">{% icon "shield" size=20 %}</span>
+          <span>No categorized findings.</span>
+        </div>
+      {% endif %}
+    </div>
+  </div>
 </section>
+
+{# ══════════════════ Risk by security area (dimension breakdown) ══════════════════ #}
+{% if dimensions %}
+<section class="card mi-glass mb-6" data-reveal>
+  <div class="card-header">
+    <h3 class="text-h3">Risk by security area</h3>
+    <span class="mi-meta-chip">{{ dimensions|length }} area{{ dimensions|length|pluralize }}</span>
+  </div>
+  <div class="card-body">
+    <div class="relative" id="dimbar-box"><canvas id="dimension_bars" aria-hidden="true"></canvas></div>
+    <p class="text-tiny text-text-tertiary mt-3">Findings regrouped by security area — bars show each area's severity split; the posture radar above maps area risk (0–100, higher = more concentrated risk).</p>
+  </div>
+</section>
+{% endif %}
 {% endif %}
 
 {# ─────────── Findings summary ─────────── #}
@@ -343,6 +353,8 @@
   <div id="grp-hotspot" class="scroll-mt-24">{% include "static_analysis/_finding_group.html" with items=hotspot level="unknown" label="HOTSPOT" %}</div>
 </section>
 
+</div>
+</div>
 {% endwith %}
 {% endwith %}
 {% endblock %}
@@ -353,39 +365,100 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ dimensions|json_script:"appsec-dims" }}
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    if (typeof Chart === 'undefined') return;
-    const ctx = document.getElementById('severity_chart');
-    if (!ctx) return;
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof Chart === 'undefined') return;
+  const J = (id) => { const el = document.getElementById(id); return el ? JSON.parse(el.textContent) : null; };
+  const cssVar = (n, f) => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    return v ? 'rgb(' + v.replace(/\s+/g, ' ') + ')' : f;
+  };
+  const grid = () => cssVar('--border-subtle', '#333');
+  const SEV = { high: '#DC2626', warning: '#D97706', info: '#2563EB', secure: '#16A34A', hotspot: '#64748B' };
 
-    new Chart(ctx, {
+  // Severity distribution donut.
+  const sEl = document.getElementById('severity_chart');
+  if (sEl) {
+    new Chart(sEl, {
       type: 'doughnut',
       data: {
         labels: ['High', 'Medium', 'Info', 'Secure', 'Hotspot'],
         datasets: [{
           data: [{{ high|length }}, {{ warning|length }}, {{ info|length }}, {{ secure|length }}, {{ hotspot|length }}],
-          backgroundColor: ['#DC2626', '#D97706', '#2563EB', '#16A34A', '#64748B'],
-          borderWidth: 0,
+          backgroundColor: [SEV.high, SEV.warning, SEV.info, SEV.secure, SEV.hotspot],
+          borderWidth: 0, spacing: 2,
         }],
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: {
-          legend: { display: true, position: 'right' },
-        },
-        animation: { duration: 320, easing: 'easeOutQuart' },
+        responsive: true, maintainAspectRatio: false, cutout: '66%',
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } } },
       },
     });
-  });
+  }
+
+  const dims = J('appsec-dims') || [];
+
+  // Security-posture radar — per-area risk (0-100), derived transparently
+  // from the real per-severity finding counts.
+  const rEl = document.getElementById('posture_radar');
+  if (rEl && dims.length) {
+    new Chart(rEl, {
+      type: 'radar',
+      data: {
+        labels: dims.map(function (d) { return d.label; }),
+        datasets: [{
+          label: 'Risk', data: dims.map(function (d) { return d.risk; }),
+          borderColor: '#FE4A23', backgroundColor: 'rgba(254,74,35,0.18)',
+          borderWidth: 2, pointBackgroundColor: '#FE4A23', pointRadius: 2.5, pointHoverRadius: 5,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: function (c) { return 'Risk ' + c.parsed.r + ' / 100'; } } } },
+        scales: {
+          r: { beginAtZero: true, min: 0, max: 100,
+            ticks: { display: false, stepSize: 25 },
+            grid: { color: grid() }, angleLines: { color: grid() },
+            pointLabels: { font: { size: 10 } } },
+        },
+      },
+    });
+  }
+
+  // Risk by security area — horizontal stacked bars (severity split per area).
+  const bEl = document.getElementById('dimension_bars');
+  if (bEl && dims.length) {
+    const box = document.getElementById('dimbar-box');
+    if (box) box.style.height = (dims.length * 34 + 44) + 'px';
+    new Chart(bEl, {
+      type: 'bar',
+      data: {
+        labels: dims.map(function (d) { return d.label; }),
+        datasets: [
+          { label: 'High', data: dims.map(function (d) { return d.high; }), backgroundColor: SEV.high, borderRadius: 3, borderSkipped: false },
+          { label: 'Medium', data: dims.map(function (d) { return d.warning; }), backgroundColor: SEV.warning, borderRadius: 3, borderSkipped: false },
+          { label: 'Info', data: dims.map(function (d) { return d.info; }), backgroundColor: SEV.info, borderRadius: 3, borderSkipped: false },
+          { label: 'Secure', data: dims.map(function (d) { return d.secure; }), backgroundColor: SEV.secure, borderRadius: 3, borderSkipped: false },
+          { label: 'Hotspot', data: dims.map(function (d) { return d.hotspot; }), backgroundColor: SEV.hotspot, borderRadius: 3, borderSkipped: false },
+        ],
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } } },
+        scales: {
+          x: { stacked: true, beginAtZero: true, grid: { color: grid() }, ticks: { precision: 0 } },
+          y: { stacked: true, grid: { display: false } },
+        },
+      },
+    });
+  }
+});
 </script>
 <script>
-  // Animated count-up helper for the KPI/stat numbers on this page
-  // (presentation only). Guarded so it safely coexists with the identical
-  // helper defined by static_analysis/_finding_group.html — whichever loads
-  // first wins, neither redefinition is observable.
+  // Animated count-up helper for the stat numbers on this page (presentation
+  // only). Guarded so it coexists with the identical helper in _finding_group.
   window.counter = window.counter || function counter(target) {
     return {
       shown: 0,

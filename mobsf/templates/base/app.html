@@ -253,14 +253,22 @@
 <body
   class="h-full antialiased bg-surface-0 text-text-primary"
   hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-  x-data="{ sidebarCollapsed: (localStorage.getItem('mi-sidebar') ?? 'collapsed') !== 'expanded' }"
+  x-data="{ sidebarCollapsed: true, mobileNav: false, navTip: { show: false, x: 0, y: 0, label: '' } }"
+  @keydown.escape.window="mobileNav = false"
+  :class="mobileNav ? 'overflow-hidden' : ''"
 >
+  {% comment %}Icon-only nav tooltip (desktop). A single fixed-position element
+     shared by all sidebar items — fixed so it escapes the sidebar's
+     overflow-y-auto clip; shown only when the rail is collapsed (icon-only).{% endcomment %}
+  <div x-show="navTip.show" x-cloak :style="`top:${navTip.y}px; left:${navTip.x}px`"
+       class="mi-navtip hidden md:flex fixed z-[60] items-center px-2.5 py-1 rounded-md bg-surface-4 border border-border-default text-text-primary text-tiny font-medium shadow-elevation-3 pointer-events-none -translate-y-1/2 whitespace-nowrap"
+       x-text="navTip.label" aria-hidden="true"></div>
+
   <div class="flex h-full">
 
-    {# ─────────── Sidebar ─────────── #}
+    {# ─────────── Sidebar (md+, minimal icon rail) ─────────── #}
     <aside
-      :class="sidebarCollapsed ? 'w-sidebar-collapsed' : 'w-sidebar'"
-      class="mi-aside hidden md:flex flex-col border-r border-border-subtle bg-surface-1 transition-[width] duration-base ease-out"
+      class="mi-aside hidden md:flex flex-col w-sidebar-collapsed border-r border-border-subtle bg-surface-1"
     >
       {% include "components/sidebar.html" %}
     </aside>
@@ -301,6 +309,32 @@
       </footer>
     </div>
   </div>
+
+  {% comment %}Mobile nav drawer (off-canvas, < md only). Placed at the end of
+     <body> (after the main shell) so `.first` selectors in tests/scripts
+     resolve to the visible desktop chrome; the drawer's own nav/theme
+     controls are md:hidden + x-cloak.{% endcomment %}
+  <div
+    x-show="mobileNav" x-cloak x-transition:enter="transition-opacity ease-out duration-200"
+    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+    x-transition:leave="transition-opacity ease-in duration-150"
+    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+    @click="mobileNav = false"
+    class="fixed inset-0 z-40 bg-black/60 md:hidden" aria-hidden="true"
+  ></div>
+  <aside
+    x-show="mobileNav" x-cloak
+    x-transition:enter="transition-transform ease-out duration-200"
+    x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
+    x-transition:leave="transition-transform ease-in duration-150"
+    x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full"
+    class="mi-aside fixed inset-y-0 left-0 z-50 w-sidebar bg-surface-1 border-r border-border-subtle md:hidden"
+    aria-label="Mobile navigation"
+  >
+    <div x-data="{ sidebarCollapsed: false }" class="flex flex-col h-full">
+      {% include "components/sidebar.html" %}
+    </div>
+  </aside>
 
   {# ─────────── Toast region ─────────── #}
   <div

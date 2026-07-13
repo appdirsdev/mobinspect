@@ -9,7 +9,7 @@ from django.db import migrations
 # (name, color, icon, description, [permission codenames])
 DEFAULT_ROLES = [
     (
-        'Administrator', '#DC2626', 'shield-alert',
+        'Administrator', '#8D5CFC', 'shield-alert',
         'Full access to all features, including user and role management.',
         '*',  # special marker — all permissions
     ),
@@ -36,7 +36,7 @@ DEFAULT_ROLES = [
         ],
     ),
     (
-        'API User', '#16A34A', 'key',
+        'API User', '#FE4A23', 'key',
         'Programmatic-only role for CI/CD pipelines.',
         [
             'api.use', 'scan.create', 'scan.view',

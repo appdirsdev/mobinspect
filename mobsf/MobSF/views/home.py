@@ -16,7 +16,7 @@ from django.conf import settings
 from django.utils.timezone import now
 from django.core.paginator import Paginator
 from django.db.models import Count
-from django.db.models.functions import TruncDate
+from django.db.models.functions import TruncDate, TruncMonth
 from django.http import HttpResponse, HttpResponseRedirect
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
@@ -79,6 +79,58 @@ HTTP_SERVER_ERROR = 500
 logger = logging.getLogger(__name__)
 register.filter('key', key)
 
+# Bound how many of the most-recent static scans the home dashboard scores in
+# one pass. Lower than Analytics' cap (100) because the home page is hit far
+# more often; 30 keeps it responsive while still giving a representative fleet
+# average and per-row scores for the recent-activity table.
+HOME_ROLLUP_LIMIT = 30
+
+
+def _home_security_rollup(md5s):
+    """Single bounded AppSec pass over the given recent-scan MD5s.
+
+    Returns ``(issues_total, avg_security_score, score_by_md5)`` — all from
+    the SAME real per-app scorecard used everywhere else (get_android_dashboard
+    / get_ios_dashboard), so nothing here is fabricated. ``issues_total`` counts
+    only the action-worthy buckets (high + warning + hotspot); it deliberately
+    excludes the ``secure`` (passing checks) and ``info`` buckets so a
+    well-secured fleet doesn't show an inflated "issues" number. The per-MD5
+    score map lets the recent-activity table show each app's real score for
+    free (no second scoring pass). Fails closed: any per-app error is skipped
+    and can never break the home page. Empty results when there are no scans.
+    """
+    issues_total = 0
+    scores = []
+    score_by_md5 = {}
+    if not md5s:
+        return 0, None, {}
+    try:
+        from mobsf.StaticAnalyzer.views.common.appsec import (
+            get_android_dashboard,
+            get_ios_dashboard,
+        )
+    except Exception:
+        logger.exception('Dashboard: appsec import failed')
+        return 0, None, {}
+    android = StaticAnalyzerAndroid.objects.filter(MD5__in=md5s)
+    ios = StaticAnalyzerIOS.objects.filter(MD5__in=md5s)
+    for entries, scorer in ((android, get_android_dashboard),
+                            (ios, get_ios_dashboard)):
+        for entry in entries:
+            try:
+                findings = scorer([entry])
+            except Exception:
+                logger.exception('Dashboard rollup failed for %s', entry.MD5)
+                continue
+            for sev in ('high', 'warning', 'hotspot'):
+                issues_total += len(findings.get(sev) or [])
+            score = findings.get('security_score')
+            if score is not None:
+                scores.append(score)
+                score_by_md5[entry.MD5] = score
+    avg = round(sum(scores) / len(scores)) if scores else None
+    return issues_total, avg, score_by_md5
+
 
 @login_required
 def index(request):
@@ -123,55 +175,83 @@ def index(request):
         'week': week_count,
         'week_delta_pct': week_delta_pct,
     }
-    # Latest-scan security score for the dashboard's arc gauge — deliberately
-    # scores only the single most recent app (cheap, one dashboard
-    # computation) rather than rolling up every recent scan the way
-    # Analytics does (bounded but still O(100) dashboard computations,
-    # too costly to repeat on every home-page load). Fails closed: any
-    # error here must never break the home page.
-    latest_score = None
-    if recent:
-        try:
-            from mobsf.StaticAnalyzer.views.common.appsec import (
-                get_android_dashboard,
-                get_ios_dashboard,
-            )
-            latest = recent[0]
-            if latest['ANALYZER'] == 'static_analyzer':
-                row = StaticAnalyzerAndroid.objects.filter(
-                    MD5=latest['MD5']).first()
-                if row:
-                    latest_score = get_android_dashboard(
-                        [row]).get('security_score')
-            elif latest['ANALYZER'] == 'static_analyzer_ios':
-                row = StaticAnalyzerIOS.objects.filter(
-                    MD5=latest['MD5']).first()
-                if row:
-                    latest_score = get_ios_dashboard(
-                        [row]).get('security_score')
-        except Exception:
-            logger.exception('Dashboard: latest-scan score lookup failed')
-            latest_score = None
+    # Fleet security rollup — one bounded AppSec pass over the most-recent
+    # HOME_ROLLUP_LIMIT static scans yields the fleet average security score,
+    # the total finding count, and a per-MD5 score map (reused below to score
+    # the recent-activity rows for free). All real scorecard data, never
+    # fabricated; fails closed so it can't break the page.
+    rollup_md5s = list(
+        scans.order_by('-TIMESTAMP')
+        .values_list('MD5', flat=True)[:HOME_ROLLUP_LIMIT])
+    issues_total, avg_security_score, score_by_md5 = _home_security_rollup(
+        rollup_md5s)
+    # Attach each recent row's real security score (or None) for the table's
+    # score badge — no extra scoring pass, just a map lookup.
+    for r in recent:
+        r['security_score'] = score_by_md5.get(r['MD5'])
+    latest_score = recent[0]['security_score'] if recent else None
 
-    # 14-day daily scan-count trend for the dot-matrix widget (cheap grouped
-    # count, same pattern as Analytics — see components/dot_matrix.html).
+    # Fleet coverage — the honest, NON-severity analog of the reference's
+    # "activity" gauge: what share of the distinct apps you've ever scanned
+    # were (re)scanned in the last 30 days. A neutral throughput/posture %, so
+    # the gauge's amber (data-viz) coloring is honest (never mis-colors a
+    # security score). Div-by-zero guarded.
+    month_ago = now() - timedelta(days=30)
+    distinct_total = (
+        scans.exclude(PACKAGE_NAME='')
+        .values('PACKAGE_NAME').distinct().count())
+    distinct_recent = (
+        scans.filter(TIMESTAMP__gte=month_ago).exclude(PACKAGE_NAME='')
+        .values('PACKAGE_NAME').distinct().count())
+    fleet_pct = round(distinct_recent / distinct_total * 100) if distinct_total else 0
+    fleet_sub = f'{distinct_recent} / {distinct_total} apps · 30d'
+
+    # 14-day daily scan-count trend (sparkline + the two-series "breakdown"
+    # line chart). Cheap grouped counts, same pattern as Analytics. The dual
+    # line uses REAL per-platform daily series (Android amber, iOS violet) —
+    # both honest, matching the reference's amber/violet duotone.
     trend_start = (now() - timedelta(days=13)).date()
-    daily = (
-        scans.filter(TIMESTAMP__date__gte=trend_start)
-        .annotate(day=TruncDate('TIMESTAMP'))
-        .values('day')
-        .annotate(c=Count('MD5'))
-        .order_by('day')
-    )
-    daily_map = OrderedDict()
-    for i in range(13, -1, -1):
-        d = (now() - timedelta(days=i)).date()
-        daily_map[d.isoformat()] = 0
-    for row in daily:
-        if row['day']:
-            daily_map[row['day'].isoformat()] = row['c']
-    trend_pairs = list(daily_map.items())
-    trend_max = max(daily_map.values()) if daily_map else 0
+
+    def _daily_series(analyzer=None):
+        dmap = OrderedDict()
+        for i in range(13, -1, -1):
+            dmap[(now() - timedelta(days=i)).date().isoformat()] = 0
+        qs = scans.filter(TIMESTAMP__date__gte=trend_start)
+        if analyzer:
+            qs = qs.filter(ANALYZER=analyzer)
+        for row in (qs.annotate(day=TruncDate('TIMESTAMP'))
+                    .values('day').annotate(c=Count('MD5'))):
+            if row['day']:
+                dmap[row['day'].isoformat()] = row['c']
+        return list(dmap.keys()), list(dmap.values())
+
+    trend_labels_14, total_daily = _daily_series()
+    _, android_daily = _daily_series('static_analyzer')
+    _, ios_daily = _daily_series('static_analyzer_ios')
+    trend_pairs = list(zip(trend_labels_14, total_daily))
+    trend_max = max(total_daily) if total_daily else 0
+
+    # Monthly scan volume (last 9 months, zero-filled) for the duotone bar
+    # chart. Scan volume is NON-severity, so the alternating amber/violet bars
+    # are legitimate decorative data-viz. Real TruncMonth grouping.
+    month_counts = {}
+    for row in (scans.annotate(mn=TruncMonth('TIMESTAMP'))
+                .values('mn').annotate(c=Count('MD5'))):
+        if row['mn']:
+            month_counts[(row['mn'].year, row['mn'].month)] = row['c']
+    month_labels, month_values = [], []
+    base = now().replace(day=1)
+    yy, mm = base.year, base.month
+    seq = []
+    for _ in range(9):
+        seq.append((yy, mm))
+        mm -= 1
+        if mm == 0:
+            mm = 12
+            yy -= 1
+    for (y, m) in reversed(seq):
+        month_labels.append(f'{y}-{m:02d}')
+        month_values.append(month_counts.get((y, m), 0))
 
     context = {
         'version': settings.MOBSF_VER,
@@ -179,8 +259,21 @@ def index(request):
         'exts': '|'.join(exts),
         'stats': stats,
         'latest_score': latest_score,
+        'avg_security_score': avg_security_score,
+        'issues_total': issues_total,
+        'rollup_scope': len(rollup_md5s),
+        'fleet_pct': fleet_pct,
+        'fleet_sub': fleet_sub,
+        'distinct_total': distinct_total,
+        'distinct_recent': distinct_recent,
         'trend_pairs': trend_pairs,
         'trend_max': trend_max,
+        'trend_labels_14': trend_labels_14,
+        'android_daily': android_daily,
+        'ios_daily': ios_daily,
+        'spark_values': total_daily,
+        'month_labels': month_labels,
+        'month_values': month_values,
         # Valid HTML file-input accept attribute: comma-separated, each
         # extension dotted (".apk,.xapk,..."). The template must NOT derive
         # this by stripping the '|' from `exts` — that yields one invalid

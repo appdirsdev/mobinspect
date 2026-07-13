@@ -100,6 +100,56 @@ def test_stats_all_zero_when_no_scans(su_client):
     }
 
 
+# ────────────────────────── redesign aggregates (dashboard mirror) ──────────
+@pytest.mark.django_db
+def test_dashboard_aggregates_empty_db_are_honest_zeros(su_client):
+    """The redesigned dashboard's new real-data aggregates must degrade to
+    honest empties on a zero-scan DB — never a fabricated value or a
+    div-by-zero. Renders 200 (the whole point: no crash on the new code)."""
+    resp = su_client.get('/')
+    assert resp.status_code == 200
+    ctx = resp.context
+    assert ctx['issues_total'] == 0
+    assert ctx['avg_security_score'] is None      # nothing scored -> None, not 0
+    assert ctx['fleet_pct'] == 0                   # div-by-zero guarded
+    assert ctx['distinct_total'] == 0
+    assert ctx['distinct_recent'] == 0
+    # Time series are zero-filled real windows, not empty/None.
+    assert ctx['android_daily'] == [0] * 14
+    assert ctx['ios_daily'] == [0] * 14
+    assert ctx['spark_values'] == [0] * 14
+    assert len(ctx['month_labels']) == 9 and ctx['month_values'] == [0] * 9
+
+
+@pytest.mark.django_db
+def test_dashboard_aggregates_reflect_real_rows(su_client):
+    """With real RecentScansDB rows, the new aggregates compute from the DB —
+    fleet coverage, distinct-app counts, per-platform daily series, and the
+    current month's volume all reflect the real rows (no StaticAnalyzer rows
+    exist here, so avg_security_score honestly stays None)."""
+    # Two distinct Android apps today, one older iOS app (distinct package).
+    _mk('a' * 32, analyzer=ANDROID, PACKAGE_NAME='com.a')
+    _mk('b' * 32, analyzer=ANDROID, PACKAGE_NAME='com.b')
+    _mk('c' * 32, analyzer=IOS, PACKAGE_NAME='com.c', ts=now() - timedelta(days=2))
+
+    resp = su_client.get('/')
+    assert resp.status_code == 200
+    ctx = resp.context
+
+    assert ctx['distinct_total'] == 3          # com.a / com.b / com.c
+    assert ctx['distinct_recent'] == 3         # all within 30 days
+    assert ctx['fleet_pct'] == 100             # 3 / 3
+    # Per-platform daily windows (14 days) sum to the real per-platform counts.
+    assert sum(ctx['android_daily']) == 2
+    assert sum(ctx['ios_daily']) == 1
+    assert sum(ctx['spark_values']) == 3       # total across both platforms
+    # Current month's bucket holds all 3 scans.
+    assert ctx['month_values'][-1] == 3
+    # No StaticAnalyzer scorecards exist for these MD5s -> honest None, not 0.
+    assert ctx['avg_security_score'] is None
+    assert ctx['issues_total'] == 0
+
+
 # ─────────────────────────────────────────────────────── platform split
 @pytest.mark.django_db
 def test_stats_platform_split_counts_correctly(su_client):
@@ -347,21 +397,26 @@ def test_index_view_called_directly_renders_stats_into_html(authed_request):
     HTML body* actually carries the computed counters — proving the
     stats dict is genuinely threaded through render(), not just built
     and discarded."""
+    # 4 scans total; one is older than 7 days so "this week" is a DISTINCT
+    # number (3) from the total (4) — makes each counter substring an
+    # unambiguous signal that the real computed count reached the template.
     _mk('11' + '0' * 30, analyzer=ANDROID)
     _mk('12' + '0' * 30, analyzer=ANDROID)
     _mk('13' + '0' * 30, analyzer=IOS)
-    _mk('14' + '0' * 30, analyzer=WINDOWS)
+    _mk('14' + '0' * 30, analyzer=WINDOWS, ts=now() - timedelta(days=10))
 
     req = authed_request('/')
     resp = home.index(req)
     assert resp.status_code == 200
     body = resp.content.decode('utf-8')
-    # home.html renders stats.total / stats.android as literal numbers via
-    # Alpine's x-data="counter(N)". Distinct values (total=4, android=2)
-    # make each substring an unambiguous signal that the real computed
-    # count reached the template, not a coincidental match.
+    # The redesigned KPI strip renders stats.total and stats.week as literal
+    # numbers via Alpine's x-data="counter(N)". Distinct values (total=4,
+    # week=3) prove the real computed counts reached the template.
     assert 'x-data="counter(4)"' in body  # stats.total == 4
-    assert 'x-data="counter(2)"' in body  # stats.android == 2
+    assert 'x-data="counter(3)"' in body  # stats.week == 3
+    # And the redesigned KPI labels are present (not the old tile set).
+    assert 'Total scans' in body
+    assert 'Apps tracked' in body
 
 
 @pytest.mark.django_db

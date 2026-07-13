@@ -33,7 +33,9 @@
 
     --text-primary:   15  23  42;
     --text-secondary: 71  85  105;
-    --text-tertiary: 148 163 184;
+    /* Darkened for WCAG AA: #64748B ≈ 4.6:1 on the light surfaces (was
+     * 148/163/184 ≈ 2.4:1 on #F8FAFC, a fail for small text). */
+    --text-tertiary: 100 116 139;
     --text-inverse:  248 250 252;
     --text-brand:    29  78 216;
 
@@ -53,20 +55,29 @@
   }
 
   [data-theme='dark'] {
-    --surface-0:  11  15  26;
-    --surface-1:  17  24  39;
-    --surface-2:  31  41  55;
-    --surface-3:  55  65  81;
-    --surface-4:  75  85  99;
+    /* Warm near-black surface ramp — pixel-matched to the CyberGuard
+     * reference (Dashboard.png: page ~rgb(23,23,23), cards ~rgb(31,31,31)),
+     * a neutral near-black with a faint warm bias (R>=G>=B). Replaces the
+     * previous navy/blue-black ramp, which cast the whole dark theme cool
+     * and muddied the violet (#8D5CFC) data-viz accent against it. Amber and
+     * violet both read cleanly against a neutral ground. */
+    --surface-0:  17  16  15;
+    --surface-1:  30  29  27;
+    --surface-2:  43  42  40;
+    --surface-3:  61  59  56;
+    --surface-4:  81  79  76;
 
-    --border-subtle:  31  41  55;
-    --border-default: 55  65  81;
-    --border-strong: 107 114 128;
+    --border-subtle:  43  42  40;
+    --border-default: 61  59  56;
+    --border-strong: 104 101  98;
 
-    --text-primary:   241 245 249;
-    --text-secondary: 148 163 184;
-    --text-tertiary:  100 116 139;
-    --text-inverse:    15  23  42;
+    --text-primary:   245 244 242;
+    --text-secondary: 166 162 158;
+    /* text-tertiary bumped for WCAG AA: ~4.9:1 on the warm near-black cards
+     * (was 122/118/114 ≈ 3.8:1, a fail for the small sub-labels/timestamps
+     * it's used on). Still visibly a de-emphasised gray. */
+    --text-tertiary:  151 147 143;
+    --text-inverse:    24  23  22;
     --text-brand:      59 130 246;
 
     --score-critical: 248 113 113;  /* severity-critical-dark  #F87171 */

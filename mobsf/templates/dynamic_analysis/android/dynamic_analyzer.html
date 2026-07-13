@@ -1518,9 +1518,9 @@ $("#stop").one( "click", function() {
 });
 </script>
 
-{# ─── Presentational-only additions: count-up tiles + live screen indicator. ───
+{% comment %} ─── Presentational-only additions: count-up tiles + live screen indicator. ───
      Purely additive; does not read from or modify any of the functional
-     jQuery/Frida/Terminal logic above. ─── #}
+     jQuery/Frida/Terminal logic above. ─── {% endcomment %}
 <script>
   // Animated count-up for the manifest insight tiles (real backend counts).
   function counter(target) {

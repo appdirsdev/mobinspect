@@ -5,22 +5,19 @@
 
 {% block extra_head %}
 <style>
-  /* ── Ambient header — brand glow + faint grid, theme-aware, low-motion
-       (analytics may sit on a monitoring wall, so keep it subtle) ── */
-  .mi-hero { background: rgb(var(--surface-1)); }
+  /* ── Ambient header glow + faint grid (matches the home dashboard) ── */
   .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
   .mi-hero-glow::before, .mi-hero-glow::after {
-    content: ''; position: absolute; border-radius: 9999px;
-    filter: blur(60px); opacity: .45;
+    content: ''; position: absolute; border-radius: 9999px; filter: blur(70px); opacity: .5;
   }
   .mi-hero-glow::before {
-    width: 300px; height: 300px; top: -120px; right: -60px;
+    width: 340px; height: 340px; top: -130px; right: -50px;
     background: radial-gradient(circle at center, rgba(254,74,35,.5), transparent 70%);
     animation: mi-float 18s ease-in-out infinite;
   }
   .mi-hero-glow::after {
-    width: 240px; height: 240px; bottom: -130px; left: 6%;
-    background: radial-gradient(circle at center, rgba(141,92,252,.35), transparent 70%);
+    width: 260px; height: 260px; bottom: -140px; left: 12%;
+    background: radial-gradient(circle at center, rgba(141,92,252,.3), transparent 70%);
     animation: mi-float 24s ease-in-out infinite reverse;
   }
   .mi-hero-grid {
@@ -28,59 +25,63 @@
       linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
       linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
     background-size: 34px 34px; opacity: .4;
-    -webkit-mask-image: radial-gradient(ellipse 70% 100% at 85% 0%, #000 10%, transparent 70%);
-            mask-image: radial-gradient(ellipse 70% 100% at 85% 0%, #000 10%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 72% 100% at 84% 0%, #000 10%, transparent 70%);
+            mask-image: radial-gradient(ellipse 72% 100% at 84% 0%, #000 10%, transparent 70%);
   }
-  :root[data-theme="dark"] .mi-hero-glow::before { opacity: .32; }
-  :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .24; }
 
-  /* Icon chip glow ring — signature touch for the page's primary badge */
-  .mi-chip { box-shadow: 0 0 0 4px rgba(254,74,35,.08); }
+  /* Page-level warm ambient bloom behind ALL content (home-dashboard parity). */
+  .mi-ambient { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .mi-ambient::before {
+    content: ''; position: absolute; left: 0; right: 0; top: -120px; height: 900px;
+    background:
+      radial-gradient(1100px 600px at 78% 0%, rgba(254,74,35,.18), transparent 62%),
+      radial-gradient(820px 520px at 14% 5%, rgba(141,92,252,.12), transparent 60%);
+  }
+  .mi-glass { box-shadow: inset 0 1px 0 0 rgba(255,255,255,.04); }
 
-  /* Metric tiles — accent top bar + hover lift */
+  /* KPI tiles — icon-chip + label / big number + pill (reference anatomy). */
   .mi-stat { position: relative; overflow: hidden;
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
   .mi-stat:hover { transform: translateY(-3px);
-    box-shadow: 0 14px 34px -18px rgba(0,0,0,.4); border-color: rgb(var(--border-default)); }
+    box-shadow: 0 14px 34px -18px rgba(0,0,0,.5); border-color: rgb(var(--border-default)); }
+  .mi-kpi-ico { width: 36px; height: 36px; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgb(var(--surface-2)); color: rgb(var(--text-secondary)); flex-shrink: 0; }
+  .mi-num { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 
-  /* Findings buckets — subtle lift on hover */
+  /* Card-header meta chip (echoes the reference's "Week ⌄" pills). */
+  .mi-meta-chip { display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 9px; border-radius: 9999px; font-size: 11px;
+    background: rgb(var(--surface-2)); color: rgb(var(--text-secondary));
+    border: 1px solid rgb(var(--border-subtle)); }
+
   .mi-bucket { transition: transform .16s ease, border-color .16s ease, background-color .16s ease; }
   .mi-bucket:hover { transform: translateY(-2px); border-color: rgb(var(--border-default)); background-color: rgb(var(--surface-2)); }
-
-  /* Table / list rows */
   .mi-row { transition: background-color .14s ease; }
-
-  /* Legend swatches mirrored from the donut palettes */
   .mi-dot { width: .5rem; height: .5rem; border-radius: 9999px; flex-shrink: 0; display: inline-block; }
 
   @media (prefers-reduced-motion: reduce) {
     .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
     .mi-stat, .mi-bucket, .mi-row { transition: none; }
   }
-  @keyframes mi-float {
-    0%, 100% { transform: translate3d(0,0,0); }
-    50%      { transform: translate3d(0,-20px,0); }
-  }
+  @keyframes mi-float { 0%,100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-20px,0); } }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="relative">
+<div class="mi-ambient" aria-hidden="true"></div>
+<div class="space-y-5 relative z-[1]">
 
   {# ══════════════════ Ambient header ══════════════════ #}
   <header class="mi-hero card relative overflow-hidden p-0" data-reveal>
     <div class="mi-hero-grid" aria-hidden="true"></div>
     <div class="mi-hero-glow" aria-hidden="true"></div>
     <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-6 py-6 md:px-8 md:py-7">
-      <div class="flex items-center gap-3 min-w-0">
-        <span class="mi-chip w-11 h-11 rounded-xl bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0 shadow-elevation-1">
-          {% icon "bar-chart-3" size=20 %}
-        </span>
-        <div class="min-w-0">
-          <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold">Fleet intelligence</p>
-          <h1 class="text-h1 mt-0.5">Analytics</h1>
-          <p class="text-small text-text-secondary mt-1 max-w-xl">Scan throughput, platform distribution, risk and fleet health.</p>
-        </div>
+      <div class="min-w-0">
+        <p class="text-tiny uppercase tracking-[0.2em] text-text-tertiary font-semibold mb-1.5">Fleet intelligence</p>
+        <h1 class="text-display font-bold leading-tight">Analytics</h1>
+        <p class="text-small text-text-secondary mt-1 max-w-xl">Scan throughput, platform distribution, risk and fleet health — computed live from your scan history.</p>
       </div>
       <a href="{% url 'recent' %}" class="btn btn-secondary btn-md self-start md:self-auto flex-shrink-0">
         {% icon "layers" size=14 %} View all scans
@@ -107,145 +108,139 @@
   </section>
   {% else %}
 
-  {# ─────────── Primary KPI strip ─────────── #}
-  <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
+  {# ══════════════════ KPI strip — 5 real metrics, reference anatomy ══════════════════ #}
+  <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4" data-reveal>
     {# Total scans #}
-    <div class="mi-stat card mi-glass card-body" data-reveal>
-      <div class="flex items-center justify-between">
-        <p class="text-tiny uppercase text-text-secondary">Total scans</p>
-        <span class="w-9 h-9 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center">{% icon "database" size=16 %}</span>
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ kpis.total_scans }})">
+      <div class="flex items-center gap-2.5">
+        <span class="mi-kpi-ico">{% icon "database" size=17 %}</span>
+        <span class="text-small text-text-secondary">Total scans</span>
       </div>
-      <p class="text-h2 tabular mt-3" x-data="counter({{ kpis.total_scans }})"><span x-text="shown">0</span></p>
-      <p class="text-tiny text-text-tertiary mt-2">{{ kpis.scans_this_week }} in the last 7 days</p>
-    </div>
-
-    {# Platforms covered #}
-    <div class="mi-stat card mi-glass card-body" data-reveal>
-      <div class="flex items-center justify-between">
-        <p class="text-tiny uppercase text-text-secondary">Platforms</p>
-        <span class="w-9 h-9 rounded-md bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center">{% icon "smartphone" size=16 %}</span>
+      <div class="flex items-end justify-between gap-2 mt-3">
+        <span class="mi-num text-display font-bold" x-text="shown">0</span>
+        <span class="mi-pill-delta">all-time</span>
       </div>
-      <p class="text-h2 tabular mt-3" x-data="counter({{ platform|length }})"><span x-text="shown">0</span></p>
-      <p class="text-tiny text-text-tertiary mt-2 truncate">{{ kpis.distinct_apps }} distinct app{{ kpis.distinct_apps|pluralize }}</p>
     </div>
-
-    {# Avg security score #}
-    <div class="mi-stat card mi-glass card-body" data-reveal>
-      <div class="flex items-center justify-between">
-        <p class="text-tiny uppercase text-text-secondary">Avg score</p>
-        <span class="w-9 h-9 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center">{% icon "gauge" size=16 %}</span>
+    {# This week + real delta #}
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ kpis.scans_this_week }})">
+      <div class="flex items-center gap-2.5">
+        <span class="mi-kpi-ico">{% icon "activity" size=17 %}</span>
+        <span class="text-small text-text-secondary">This week</span>
       </div>
-      {% if avg_security_score is not None %}
-        <div class="flex items-baseline gap-1 mt-3" x-data="counter({{ avg_security_score }})">
-          <p class="text-h2 tabular {{ avg_security_score|score_class }}"><span x-text="shown">0</span></p>
-          <span class="text-h4 text-text-tertiary">/100</span>
-        </div>
-        <p class="text-tiny text-text-tertiary mt-2">across {{ severity_apps }} scored app{{ severity_apps|pluralize }}</p>
-      {% else %}
-        <p class="text-h2 tabular mt-3 text-text-tertiary">—</p>
-        <p class="text-tiny text-text-tertiary mt-2">no scored apps yet</p>
-      {% endif %}
-    </div>
-
-    {# Findings #}
-    <div class="mi-stat card mi-glass card-body" data-reveal>
-      <div class="flex items-center justify-between">
-        <p class="text-tiny uppercase text-text-secondary">Findings</p>
-        <span class="w-9 h-9 rounded-md bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center">{% icon "shield-alert" size=16 %}</span>
-      </div>
-      <p class="text-h2 tabular mt-3" x-data="counter({{ severity_total }})"><span x-text="shown">0</span></p>
-      <p class="text-tiny text-text-tertiary mt-2">
-        <span class="text-severity-critical dark:text-severity-critical-dark font-medium">{{ severity.high }} high</span>
-        · {{ severity.warning }} medium
-      </p>
-    </div>
-  </section>
-
-  {# ─────────── Secondary KPI strip ─────────── #}
-  <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
-    {# This week + delta #}
-    <div class="mi-stat card mi-glass card-body" data-reveal>
-      <p class="text-tiny uppercase text-text-secondary">This week</p>
-      <div class="flex items-baseline gap-2 mt-3">
-        <p class="text-h2 tabular" x-data="counter({{ kpis.scans_this_week }})"><span x-text="shown">0</span></p>
+      <div class="flex items-end justify-between gap-2 mt-3">
+        <span class="mi-num text-display font-bold" x-text="shown">0</span>
         {% if kpis.delta_pct is not None %}
-          <span class="mi-pill-delta {% if kpis.delta_pct >= 0 %}up{% else %}down{% endif %}">
-            {% if kpis.delta_pct >= 0 %}{% icon "arrow-up" size=10 %}{% else %}{% icon "arrow-down" size=10 %}{% endif %}
-            {{ kpis.delta_pct }}%
+          <span class="mi-pill-delta">
+            {% if kpis.delta_pct >= 0 %}{% icon "arrow-up" size=10 %}<span class="sr-only">increase </span>{% else %}{% icon "arrow-down" size=10 %}<span class="sr-only">decrease </span>{% endif %}
+            {{ kpis.delta_pct|cut:"-" }}%
           </span>
+        {% else %}
+          <span class="mi-pill-delta">7d</span>
         {% endif %}
       </div>
-      <p class="text-tiny text-text-tertiary mt-2">{{ kpis.scans_prev_week }} prior 7-day window</p>
     </div>
-
-    {# Fleet health #}
-    <div class="mi-stat card mi-glass card-body" data-reveal>
-      <p class="text-tiny uppercase text-text-secondary">Fleet health</p>
-      <div class="flex items-baseline gap-1 mt-3" x-data="counter({{ kpis.fleet_pct }}, 1)">
-        <p class="text-h2 tabular"><span x-text="shown">0</span></p>
-        <span class="text-h4 text-text-tertiary">%</span>
+    {# Avg security score — number white, tier color on the pill #}
+    <div class="mi-stat card mi-glass card-body">
+      <div class="flex items-center gap-2.5">
+        <span class="mi-kpi-ico">{% icon "shield-check" size=17 %}</span>
+        <span class="text-small text-text-secondary">Avg score</span>
       </div>
-      <p class="text-tiny text-text-tertiary mt-2">{{ fleet_recent }} of {{ fleet_total }} app{{ fleet_total|pluralize }} scanned in 30d</p>
+      <div class="flex items-end justify-between gap-2 mt-3">
+        {% if avg_security_score is not None %}
+          <span class="mi-num text-display font-bold">{{ avg_security_score }}</span>
+          <span class="badge" style="background: rgb(var(--score-{{ avg_security_score|score_tier }}) / .15); color: {{ avg_security_score|score_color }}">{{ avg_security_score|score_tier }}</span>
+        {% else %}
+          <span class="mi-num text-display font-bold text-text-tertiary">—</span>
+        {% endif %}
+      </div>
     </div>
-
-    {# Android #}
-    <div class="mi-stat card mi-glass card-body" data-reveal>
-      <div class="flex items-center gap-2">
-        <span class="text-severity-passed dark:text-severity-passed-dark">{% icon "smartphone" size=16 %}</span>
-        <p class="text-tiny uppercase text-text-secondary">Android</p>
+    {# Issues — high + warning + hotspot over the recent scored apps #}
+    <div class="mi-stat card mi-glass card-body" x-data="counter({{ severity.high|add:severity.warning|add:severity.hotspot }})">
+      <div class="flex items-center gap-2.5">
+        <span class="mi-kpi-ico">{% icon "alert-triangle" size=17 %}</span>
+        <span class="text-small text-text-secondary">Issues</span>
       </div>
-      <p class="text-h2 tabular mt-3" x-data="counter({{ kpis.android }})"><span x-text="shown">0</span></p>
-      <p class="text-tiny text-text-tertiary mt-2">static reports</p>
+      <div class="flex items-end justify-between gap-2 mt-3">
+        <span class="mi-num text-display font-bold" x-text="shown">0</span>
+        <span class="mi-pill-delta">recent</span>
+      </div>
     </div>
-
-    {# iOS + Windows #}
-    <div class="mi-stat card mi-glass card-body" data-reveal>
-      <div class="flex items-center gap-2">
-        <span class="text-text-tertiary">{% icon "monitor" size=16 %}</span>
-        <p class="text-tiny uppercase text-text-secondary">iOS / Windows</p>
+    {# Fleet health — distinct apps scanned in the last 30 days #}
+    <div class="mi-stat card mi-glass card-body col-span-2 md:col-span-1" x-data="counter({{ kpis.fleet_pct }}, 1)">
+      <div class="flex items-center gap-2.5">
+        <span class="mi-kpi-ico">{% icon "smartphone" size=17 %}</span>
+        <span class="text-small text-text-secondary">Fleet health</span>
       </div>
-      <p class="text-h2 tabular mt-3">
-        <span x-data="counter({{ kpis.ios }})" x-text="shown">0</span>
-        <span class="text-text-tertiary">/</span>
-        <span x-data="counter({{ kpis.windows }})" x-text="shown">0</span>
-      </p>
-      <p class="text-tiny text-text-tertiary mt-2">static reports</p>
+      <div class="flex items-end justify-between gap-2 mt-3">
+        <span class="mi-num text-display font-bold"><span x-text="shown">0</span>%</span>
+        <span class="mi-pill-delta">30d</span>
+      </div>
     </div>
   </section>
 
-  {# ─────────── Trends + platform breakdown ─────────── #}
-  <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  {# ══════════════════ Command row: trend | severity mix | avg-score gauge ══════════════════ #}
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-4" data-reveal>
 
-    <div class="card mi-glass lg:col-span-2" data-reveal>
-      <div class="card-header flex items-center justify-between">
-        <h3 class="text-h3 flex items-center gap-2">
-          <span class="w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">{% icon "activity" size=14 %}</span>
-          Scans · last 30 days
-        </h3>
-        <span class="text-tiny text-text-tertiary">Daily count</span>
+    {# Scans · 30-day trend #}
+    <div class="card mi-glass">
+      <div class="card-header">
+        <h3 class="text-h4">Scan activity</h3>
+        <span class="mi-meta-chip">30d</span>
       </div>
       <div class="card-body">
-        <div class="h-64"><canvas id="trend_chart"></canvas></div>
-        <div class="mt-5 pt-5 border-t border-border-subtle">
-          <p class="text-tiny uppercase text-text-tertiary mb-3">Last 14 days, at a glance</p>
-          {% include "components/dot_matrix.html" with pairs=trend_recent_pairs max_value=trend_recent_max unit="scan" %}
-        </div>
+        <div class="h-52 relative"><canvas id="trend_chart" aria-hidden="true"></canvas></div>
       </div>
     </div>
 
-    <div class="card mi-glass" data-reveal>
-      <div class="card-header flex items-center justify-between">
-        <h3 class="text-h3 flex items-center gap-2">
-          <span class="w-7 h-7 rounded-md bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">{% icon "smartphone" size=14 %}</span>
-          By platform
-        </h3>
-        <span class="text-tiny text-text-tertiary">{{ kpis.total_scans }} total</span>
+    {# Severity distribution (donut) #}
+    <div class="card mi-glass">
+      <div class="card-header">
+        <h3 class="text-h4">Severity mix</h3>
+        <span class="mi-meta-chip">{{ severity_apps }} app{{ severity_apps|pluralize }}</span>
+      </div>
+      <div class="card-body">
+        {% if severity_total %}
+          <div class="h-52 relative"><canvas id="severity_chart" aria-hidden="true"></canvas></div>
+        {% else %}
+          <div class="h-52 flex flex-col items-center justify-center text-text-tertiary text-small gap-2">
+            <span class="w-11 h-11 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center">{% icon "shield-check" size=20 %}</span>
+            <span>No findings yet.</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Avg security score — the signature semicircle gauge, score-coloured #}
+    <div class="card mi-glass">
+      <div class="card-header">
+        <h3 class="text-h4">Avg security score</h3>
+        <span class="mi-meta-chip">fleet</span>
+      </div>
+      <div class="card-body flex items-center justify-center min-h-[208px]">
+        {% if avg_security_score is not None %}
+          {% include "components/gauge_semi.html" with value=avg_security_score color=avg_security_score|score_color unit="" sub_label="/ 100" uid="a" %}
+        {% else %}
+          <div class="flex flex-col items-center text-center gap-2">
+            <span class="w-11 h-11 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center">{% icon "gauge" size=20 %}</span>
+            <p class="text-small text-text-tertiary">Score shows once apps are scored.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  {# ══════════════════ Platform breakdown | Findings by severity ══════════════════ #}
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-4" data-reveal>
+
+    {# By platform (donut + legend) #}
+    <div class="card mi-glass">
+      <div class="card-header">
+        <h3 class="text-h4">By platform</h3>
+        <span class="mi-meta-chip">{{ kpis.total_scans }} total</span>
       </div>
       <div class="card-body">
         {% if platform %}
-          <div class="h-48 mb-4"><canvas id="platform_chart"></canvas></div>
+          <div class="h-44 mb-4 relative"><canvas id="platform_chart" aria-hidden="true"></canvas></div>
           <ul class="space-y-1.5">
             {% for k, v in platform.items %}
               {% cycle '#FE4A23' '#8D5CFC' '#FB923C' '#C4B5FD' '#64748B' as mi_platform_color silent %}
@@ -259,88 +254,40 @@
             {% endfor %}
           </ul>
         {% else %}
-          <div class="h-48 flex flex-col items-center justify-center gap-2 text-text-tertiary text-small">
-            <span class="w-12 h-12 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center">{% icon "smartphone" size=22 %}</span>
+          <div class="h-44 flex flex-col items-center justify-center gap-2 text-text-tertiary text-small">
+            <span class="w-11 h-11 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center">{% icon "smartphone" size=20 %}</span>
             <span>No platform data.</span>
           </div>
         {% endif %}
       </div>
     </div>
-  </section>
 
-  {# ─────────── Severity distribution ─────────── #}
-  <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <div class="card mi-glass" data-reveal>
-      <div class="card-header flex items-center justify-between">
-        <h3 class="text-h3 flex items-center gap-2">
-          <span class="w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">{% icon "gauge" size=14 %}</span>
-          Severity distribution
-        </h3>
-        <span class="text-tiny text-text-tertiary">Last {{ severity_apps }} scored app{{ severity_apps|pluralize }}</span>
+    {# Findings by severity — exact counts per bucket (semantic colours) #}
+    <div class="card mi-glass lg:col-span-2">
+      <div class="card-header">
+        <h3 class="text-h4">Findings by severity</h3>
+        <span class="mi-meta-chip">{{ severity_total }} finding{{ severity_total|pluralize }}</span>
       </div>
-      <div class="card-body">
-        {% if severity_total %}
-          <div class="h-48"><canvas id="severity_chart"></canvas></div>
-        {% else %}
-          <div class="h-48 flex flex-col items-center justify-center text-text-tertiary text-small gap-2">
-            <span class="w-12 h-12 rounded-full bg-surface-2 text-text-tertiary inline-flex items-center justify-center">{% icon "shield-check" size=22 %}</span>
-            <span>No findings yet.</span>
-          </div>
-        {% endif %}
-        {% if avg_security_score is not None %}
-          <div class="mt-4 pt-5 border-t border-border-subtle flex flex-col items-center text-center">
-            <p class="flex items-center gap-1.5 text-tiny uppercase text-text-secondary mb-2">
-              {% icon "gauge" size=14 %} Avg security score
-            </p>
-            {% include "components/gauge_arc.html" with value=avg_security_score color=avg_security_score|score_color sub_label="/ 100" animate=True %}
-          </div>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="card mi-glass lg:col-span-2" data-reveal>
-      <div class="card-header flex items-center justify-between">
-        <h3 class="text-h3 flex items-center gap-2">
-          <span class="w-7 h-7 rounded-md bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">{% icon "shield-alert" size=14 %}</span>
-          Findings by severity
-        </h3>
-        <span class="text-tiny text-text-tertiary">{{ severity_total }} finding{{ severity_total|pluralize }} across recent scans</span>
-      </div>
-      <div class="card-body grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div class="card-body grid grid-cols-2 lg:grid-cols-5 gap-3">
         <div class="mi-bucket rounded-lg border border-border-subtle px-4 py-4">
-          <div class="flex items-center gap-2 text-severity-critical dark:text-severity-critical-dark">
-            {% icon "alert-triangle" size=16 %}
-            <span class="text-tiny uppercase">High</span>
-          </div>
-          <p class="text-h2 tabular mt-2" x-data="counter({{ severity.high }})"><span x-text="shown">0</span></p>
+          <div class="flex items-center gap-2 text-severity-critical dark:text-severity-critical-dark">{% icon "alert-triangle" size=15 %}<span class="text-tiny uppercase">High</span></div>
+          <p class="mi-num text-h1 font-bold mt-2" x-data="counter({{ severity.high }})"><span x-text="shown">0</span></p>
         </div>
         <div class="mi-bucket rounded-lg border border-border-subtle px-4 py-4">
-          <div class="flex items-center gap-2 text-severity-medium dark:text-severity-medium-dark">
-            {% icon "alert-triangle" size=16 %}
-            <span class="text-tiny uppercase">Medium</span>
-          </div>
-          <p class="text-h2 tabular mt-2" x-data="counter({{ severity.warning }})"><span x-text="shown">0</span></p>
+          <div class="flex items-center gap-2 text-severity-medium dark:text-severity-medium-dark">{% icon "alert-triangle" size=15 %}<span class="text-tiny uppercase">Medium</span></div>
+          <p class="mi-num text-h1 font-bold mt-2" x-data="counter({{ severity.warning }})"><span x-text="shown">0</span></p>
         </div>
         <div class="mi-bucket rounded-lg border border-border-subtle px-4 py-4">
-          <div class="flex items-center gap-2 text-severity-low dark:text-severity-low-dark">
-            {% icon "info" size=16 %}
-            <span class="text-tiny uppercase">Info</span>
-          </div>
-          <p class="text-h2 tabular mt-2" x-data="counter({{ severity.info }})"><span x-text="shown">0</span></p>
+          <div class="flex items-center gap-2 text-severity-low dark:text-severity-low-dark">{% icon "info" size=15 %}<span class="text-tiny uppercase">Info</span></div>
+          <p class="mi-num text-h1 font-bold mt-2" x-data="counter({{ severity.info }})"><span x-text="shown">0</span></p>
         </div>
         <div class="mi-bucket rounded-lg border border-border-subtle px-4 py-4">
-          <div class="flex items-center gap-2 text-severity-passed dark:text-severity-passed-dark">
-            {% icon "check" size=16 %}
-            <span class="text-tiny uppercase">Secure</span>
-          </div>
-          <p class="text-h2 tabular mt-2" x-data="counter({{ severity.secure }})"><span x-text="shown">0</span></p>
+          <div class="flex items-center gap-2 text-severity-passed dark:text-severity-passed-dark">{% icon "check" size=15 %}<span class="text-tiny uppercase">Secure</span></div>
+          <p class="mi-num text-h1 font-bold mt-2" x-data="counter({{ severity.secure }})"><span x-text="shown">0</span></p>
         </div>
         <div class="mi-bucket rounded-lg border border-border-subtle px-4 py-4">
-          <div class="flex items-center gap-2 text-severity-unknown dark:text-severity-unknown-dark">
-            {% icon "search" size=16 %}
-            <span class="text-tiny uppercase">Hotspot</span>
-          </div>
-          <p class="text-h2 tabular mt-2" x-data="counter({{ severity.hotspot }})"><span x-text="shown">0</span></p>
+          <div class="flex items-center gap-2 text-severity-unknown dark:text-severity-unknown-dark">{% icon "search" size=15 %}<span class="text-tiny uppercase">Hotspot</span></div>
+          <p class="mi-num text-h1 font-bold mt-2" x-data="counter({{ severity.hotspot }})"><span x-text="shown">0</span></p>
         </div>
         <p class="col-span-2 lg:col-span-5 text-tiny text-text-tertiary pt-1">
           Aggregated from the AppSec scorecard over the {{ severity_limit }} most recent scans.
@@ -349,20 +296,17 @@
     </div>
   </section>
 
-  {# ─────────── Top apps + recent activity ─────────── #}
-  <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="card mi-glass" data-reveal>
-      <div class="card-header flex items-center justify-between">
-        <h3 class="text-h3 flex items-center gap-2">
-          <span class="w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber inline-flex items-center justify-center flex-shrink-0">{% icon "package" size=14 %}</span>
-          Top scanned apps
-        </h3>
-        <span class="text-tiny text-text-tertiary">by scan count</span>
+  {# ══════════════════ Top apps | Recent activity ══════════════════ #}
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-4" data-reveal>
+    <div class="card mi-glass">
+      <div class="card-header">
+        <h3 class="text-h3">Top scanned apps</h3>
+        <span class="mi-meta-chip">by scan count</span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-small">
           <thead>
-            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/50">
+            <tr class="text-tiny uppercase text-text-secondary border-b border-border-subtle bg-surface-2/40">
               <th class="text-left px-5 py-2.5 font-medium w-10">#</th>
               <th class="text-left px-5 py-2.5 font-medium">Package</th>
               <th class="text-left px-5 py-2.5 font-medium">Name</th>
@@ -371,9 +315,9 @@
           </thead>
           <tbody>
             {% for a in top_apps %}
-              <tr class="mi-row border-b border-border-subtle hover:bg-surface-2 transition-colors duration-fast">
+              <tr class="mi-row border-b border-border-subtle last:border-0 hover:bg-surface-2/60 transition-colors duration-fast">
                 <td class="px-5 py-2.5">
-                  <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-tiny font-semibold {% if forloop.counter == 1 %}bg-mobinspect-500 text-white{% elif forloop.counter == 2 %}bg-mobinspect-400 text-white{% elif forloop.counter == 3 %}bg-mobinspect-300 text-mobinspect-900{% else %}bg-surface-2 text-text-tertiary{% endif %}">{{ forloop.counter }}</span>
+                  <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-tiny font-semibold bg-surface-2 text-text-secondary">{{ forloop.counter }}</span>
                 </td>
                 <td class="px-5 py-2.5 font-mono text-mono text-text-secondary truncate max-w-xs">{{ a.PACKAGE_NAME }}</td>
                 <td class="px-5 py-2.5 text-text-primary truncate max-w-xs">{{ a.APP_NAME|default:"—" }}</td>
@@ -387,27 +331,24 @@
       </div>
     </div>
 
-    <div class="card mi-glass" data-reveal>
-      <div class="card-header flex items-center justify-between">
-        <h3 class="text-h3 flex items-center gap-2">
-          <span class="w-7 h-7 rounded-md bg-chart-violet/15 text-chart-violet inline-flex items-center justify-center flex-shrink-0">{% icon "activity" size=14 %}</span>
-          Recent activity
-        </h3>
+    <div class="card mi-glass">
+      <div class="card-header">
+        <h3 class="text-h3">Recent activity</h3>
         <a href="{% url 'recent' %}" class="text-small text-text-brand hover:underline inline-flex items-center gap-1">View all {% icon "arrow-up-right" size=14 %}</a>
       </div>
       <ul class="divide-y divide-border-subtle">
         {% for r in recent %}
-          <li class="mi-row px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors duration-fast cursor-pointer"
+          <li class="mi-row px-5 py-3 flex items-center gap-3 hover:bg-surface-2/60 transition-colors duration-fast cursor-pointer"
               onclick="window.location.href='/{{ r.ANALYZER }}/{{ r.MD5 }}/'">
             <span class="w-8 h-8 rounded-md {% if r.ANALYZER == 'static_analyzer_ios' %}bg-text-secondary/15 text-text-secondary{% else %}bg-severity-passed/15 text-severity-passed{% endif %} flex items-center justify-center flex-shrink-0">
               {% icon "package" size=14 %}
             </span>
             <div class="min-w-0 flex-1">
               <a href="/{{ r.ANALYZER }}/{{ r.MD5 }}/" class="text-small font-medium truncate hover:text-text-brand block">{{ r.APP_NAME|default:r.FILE_NAME|default:"Unnamed scan" }}</a>
-              <p class="text-tiny text-text-tertiary truncate font-mono">{{ r.MD5|slice:":12" }}…</p>
+              <p class="text-tiny text-text-tertiary truncate font-mono">{{ r.MD5|slice:":16" }}…</p>
             </div>
             {% if r.SCAN_TYPE %}
-              <span class="badge badge-unknown flex-shrink-0">{{ r.SCAN_TYPE }}</span>
+              <span class="badge badge-neutral flex-shrink-0">{{ r.SCAN_TYPE }}</span>
             {% endif %}
             <span class="text-tiny text-text-tertiary tabular whitespace-nowrap flex-shrink-0">{{ r.TIMESTAMP|timesince }} ago</span>
           </li>
@@ -418,6 +359,7 @@
     </div>
   </section>
   {% endif %}
+</div>
 </div>
 {% endblock %}
 
@@ -471,9 +413,11 @@ document.addEventListener('DOMContentLoaded', function () {
   // Trend line — backed by trend_labels / trend_values context vars.
   const tCtx = document.getElementById('trend_chart');
   if (tCtx) {
-    const labels = JSON.parse(document.getElementById('trend_labels').textContent);
+    const rawLabels = JSON.parse(document.getElementById('trend_labels').textContent);
+    // Shorten "2026-06-12" -> "06-12" for a legible axis.
+    const labels = rawLabels.map(function (d) { return String(d).slice(5); });
     const values = JSON.parse(document.getElementById('trend_values').textContent);
-    const trendGradient = tCtx.getContext('2d').createLinearGradient(0, 0, 0, 256);
+    const trendGradient = tCtx.getContext('2d').createLinearGradient(0, 0, 0, 220);
     trendGradient.addColorStop(0, 'rgba(254, 74, 35, 0.28)');
     trendGradient.addColorStop(1, 'rgba(254, 74, 35, 0)');
     new Chart(tCtx, {
@@ -509,9 +453,8 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         scales: {
           x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-          y: { beginAtZero: true, ticks: { precision: 0 } },
+          y: { beginAtZero: true, ticks: { precision: 0, maxTicksLimit: 4 } },
         },
-        animation: { duration: 600, easing: 'easeOutQuart' },
       },
     });
   }
@@ -549,7 +492,6 @@ document.addEventListener('DOMContentLoaded', function () {
             },
           },
         },
-        animation: { duration: 600, easing: 'easeOutQuart' },
       },
       plugins: [miCenterText('scans')],
     });
@@ -592,7 +534,6 @@ document.addEventListener('DOMContentLoaded', function () {
             },
           },
         },
-        animation: { duration: 600, easing: 'easeOutQuart' },
       },
       plugins: [miCenterText('findings')],
     });

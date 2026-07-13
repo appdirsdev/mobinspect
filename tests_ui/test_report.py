@@ -128,32 +128,34 @@ def test_android_report_findings_tables_render(admin_page):
 
 
 def test_appsec_dashboard_score_and_severity_render(admin_page):
-    """AppSec scorecard: security-score ring settles at a real numeric value
-    (0-100) and the severity-breakdown donut + quick-nav counts render."""
-    # Disable the count-up animation so the Alpine counter renders its final
-    # value immediately (deterministic — no arbitrary settle-timeout needed).
+    """AppSec scorecard (redesigned): the thick semicircle score gauge shows a
+    real 0-100 value with its risk-grade strip, the severity donut renders,
+    the security-posture radar + risk-by-area bars render, and the findings
+    quick-nav carries real counts."""
     admin_page.emulate_media(reduced_motion='reduce')
     admin_page.goto(f'/appsec_dashboard/{MD5}/', wait_until='domcontentloaded')
 
     expect(admin_page.locator('h1').first).to_contain_text('TikTok')
 
-    score_card = admin_page.locator('.mi-stat', has_text='Security score').first
+    # Score card: the security-score gauge readout is a real 0-100 number.
+    score_card = admin_page.locator('div.card', has_text='Security score').first
     expect(score_card).to_be_visible()
-    score_text = score_card.locator('span[x-text="shown"]')
-    expect(score_text).to_have_text(re.compile(r'^\d+$'))
-    score_val = int(score_text.inner_text())
+    score_num = score_card.locator('.mi-semi-num')
+    expect(score_num).to_be_visible()
+    score_val = int(re.sub(r'\D', '', score_num.inner_text()))
     assert 0 <= score_val <= 100
 
-    # Risk-grade badge (A/B/C/F) is rendered
-    grade_card = admin_page.locator('.mi-stat', has_text='Risk grade').first
-    expect(grade_card.locator('.mi-grade-active')).to_be_visible()
-    expect(grade_card.locator('.mi-grade-active')).to_have_text(
-        re.compile(r'^[ABCF]$'))
+    # Risk-grade strip (A/B/C/F) — the active grade sits in the same card.
+    grade = score_card.locator('.mi-grade-active')
+    expect(grade).to_be_visible()
+    expect(grade).to_have_text(re.compile(r'^[ABCF]$'))
 
-    # Severity donut chart canvas renders
+    # Severity donut + the two advanced charts (posture radar, risk-by-area).
     expect(admin_page.locator('#severity_chart')).to_be_visible()
+    expect(admin_page.locator('#posture_radar')).to_be_visible()
+    expect(admin_page.locator('#dimension_bars')).to_be_visible()
 
-    # Quick-nav severity badges carry real counts (findings breakdown)
+    # Quick-nav severity badges carry real counts (findings breakdown).
     quicknav = admin_page.locator('nav.mi-quicknav')
     expect(quicknav).to_be_visible()
     for label in ('High', 'Medium', 'Info', 'Secure'):

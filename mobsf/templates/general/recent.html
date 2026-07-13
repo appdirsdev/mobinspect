@@ -5,14 +5,38 @@
 
 {% block extra_head %}
 <style>
-  /* ── Icon-chip glow — small, contained nod to the dashboard's ambient style ── */
-  .mi-icon-chip { position: relative; z-index: 0; }
-  .mi-icon-chip::before {
-    content: ''; position: absolute; inset: -8px; z-index: -1;
-    border-radius: 9999px; filter: blur(12px); opacity: .5;
-    background: radial-gradient(circle at center, rgba(37,99,235,.5), transparent 70%);
+  /* ── Ambient hero: warm amber + violet bloom + faint grid (matches the
+     dashboard / dynamic pages — the warm scan-flow signature) ── */
+  .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+  .mi-hero-glow::before, .mi-hero-glow::after {
+    content: ''; position: absolute; border-radius: 9999px; filter: blur(70px); opacity: .5;
   }
-  :root[data-theme="dark"] .mi-icon-chip::before { opacity: .32; }
+  .mi-hero-glow::before {
+    width: 360px; height: 360px; top: -140px; right: -50px;
+    background: radial-gradient(circle at center, rgba(254,74,35,.5), transparent 70%);
+    animation: mi-float 16s ease-in-out infinite;
+  }
+  .mi-hero-glow::after {
+    width: 280px; height: 280px; bottom: -150px; left: 15%;
+    background: radial-gradient(circle at center, rgba(141,92,252,.3), transparent 70%);
+    animation: mi-float 22s ease-in-out infinite reverse;
+  }
+  .mi-hero-grid {
+    background-image:
+      linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+    background-size: 34px 34px; opacity: .45;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 78% 0%, #000 10%, transparent 72%);
+            mask-image: radial-gradient(ellipse 80% 80% at 78% 0%, #000 10%, transparent 72%);
+  }
+  /* Page-level bloom so the cards float over warm space (restrained vs. home). */
+  .mi-ambient { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .mi-ambient::before {
+    content: ''; position: absolute; left: 0; right: 0; top: -120px; height: 820px;
+    background:
+      radial-gradient(1000px 560px at 76% 0%, rgba(254,74,35,.15), transparent 62%),
+      radial-gradient(760px 480px at 14% 5%, rgba(141,92,252,.10), transparent 60%);
+  }
 
   /* ── Stat tiles: accent bar + hover lift + count-up ── */
   .mi-stat { position: relative; overflow: hidden;
@@ -48,32 +72,37 @@
 
   @media (prefers-reduced-motion: reduce) {
     .mi-stat, .mi-chip, .mi-row-ico, .mi-copy-hash { transition: none; }
+    .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
   }
+  @keyframes mi-float { 0%,100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-24px,0); } }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="relative">
+<div class="mi-ambient" aria-hidden="true"></div>
+<div class="space-y-6 relative z-[1]">
 
-  {# ══════════════════ Header ══════════════════ #}
-  <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3" data-reveal>
-    <div class="flex items-center gap-3 min-w-0">
-      <span class="mi-icon-chip w-10 h-10 rounded-xl bg-mobinspect-500/15 text-mobinspect-500 inline-flex items-center justify-center flex-shrink-0 shadow-elevation-1">
-        {% icon "layers" size=18 %}
-      </span>
-      <div class="min-w-0">
-        <p class="text-tiny uppercase text-text-tertiary">Static analysis</p>
-        <h1 class="text-h1">Scans</h1>
-        <p class="text-small text-text-secondary mt-0.5">
-          All static analysis scans, newest first.
-          {% if async_scans %}
-            <a href="{% url 'list_tasks' %}" class="text-text-brand hover:underline inline-flex items-center gap-1">View scan queue {% icon "arrow-up-right" size=11 %}</a>
-          {% endif %}
-        </p>
+  {# ══════════════════ Ambient hero ══════════════════ #}
+  <section class="mi-hero card relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+    <div class="relative z-10 px-6 py-7 md:px-9 md:py-8">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-tiny uppercase tracking-[0.2em] text-text-tertiary font-semibold mb-1.5">Static analysis</p>
+          <h1 class="text-display font-bold leading-tight">Scans</h1>
+          <p class="text-body text-text-secondary mt-2 max-w-xl">
+            Every static-analysis scan, newest first.
+            {% if async_scans %}
+              <a href="{% url 'list_tasks' %}" class="text-text-brand hover:underline inline-flex items-center gap-1">View scan queue {% icon "arrow-up-right" size=12 %}</a>
+            {% endif %}
+          </p>
+        </div>
+        <a href="{% url 'home' %}" class="btn btn-primary btn-lg flex-shrink-0">{% icon "plus" size=16 %} New scan</a>
       </div>
     </div>
-    <a href="{% url 'home' %}" class="btn btn-primary btn-md flex-shrink-0">{% icon "plus" size=14 %} New scan</a>
-  </header>
+  </section>
 
   {# ══════════════════ At-a-glance stat tiles (real counts from the current query) ══════════════════ #}
   {% if page_obj %}
@@ -288,6 +317,7 @@
       </div>
     {% endif %}
   </div>
+</div>
 </div>
 
 <script>

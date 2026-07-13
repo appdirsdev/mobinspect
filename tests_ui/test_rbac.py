@@ -271,8 +271,9 @@ def test_permissions_catalog_renders(admin_page):
     assert perm_rows.count() > 0
     expect(perm_rows.first).to_be_visible()
 
-    # "Roles" link back to the roles list
-    roles_link = page.locator('a', has_text='Roles').last
+    # "Roles" link back to the roles list (scope to a visible link — the
+    # md-only mobile-nav drawer contains a hidden duplicate "Roles" item).
+    roles_link = page.locator('a:visible', has_text='Roles').last
     expect(roles_link).to_be_visible()
 
     assert_no_traceback(page)

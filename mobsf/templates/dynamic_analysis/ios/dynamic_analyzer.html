@@ -1425,10 +1425,10 @@ function print_status(message){
 
 </script>
 
-{# ─── Presentational-only additions: live status dots + script count. ───
+{% comment %} ─── Presentational-only additions: live status dots + script count. ───
      Purely additive — reads DOM state via MutationObserver, never calls
      or overrides any function defined above, and never mutates the
-     functional jQuery/Frida/Terminal logic. ─── #}
+     functional jQuery/Frida/Terminal logic. ─── {% endcomment %}
 <script>
   // Mirror the real "Show Screen" / "Start Network Capture" button labels
   // onto small pulsing status chips in the Analysis Controls toolbar.
