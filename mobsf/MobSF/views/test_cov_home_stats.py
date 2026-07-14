@@ -26,6 +26,7 @@ from datetime import timedelta
 import pytest
 
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.backends.db import SessionStore
 from django.test import Client, RequestFactory
 from django.utils.timezone import now
 
@@ -78,6 +79,11 @@ def authed_request(db):
     def _make(path='/'):
         req = factory.get(path)
         req.user = user
+        # index() reads/pops request.session (the "welcome back once, then
+        # a security tip" behavior) — a plain RequestFactory request never
+        # runs SessionMiddleware, so wire up a real session store, same as
+        # a genuine request would carry.
+        req.session = SessionStore()
         return req
     return _make
 

@@ -13,7 +13,7 @@ import shutil
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, Client, RequestFactory
+from django.test import TestCase, Client, RequestFactory, override_settings
 
 from mobsf.MobSF.views import home
 from mobsf.StaticAnalyzer.models import (
@@ -122,6 +122,96 @@ class HomeViewsRealTests(TestCase):
         resp2, code2 = up2.upload_api()
         self.assertEqual(code2, home.HTTP_BAD_REQUEST)
         self.assertIn('error', resp2)
+
+    @override_settings(MOBINSPECT_MAX_UPLOAD_SIZE=10)
+    def test_upload_html_rejects_oversize_file(self):
+        # Real file, real size check — MOBINSPECT_MAX_UPLOAD_SIZE lowered to
+        # 10 bytes so a tiny upload exercises the real oversize branch
+        # without allocating anything close to the real 200MB default.
+        big = SimpleUploadedFile(
+            'big.apk', b'x' * 100, content_type='application/octet-stream')
+        resp = self.client.post('/upload/', {'file': big})
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'error')
+        self.assertIn('exceeds', data['description'])
+        self.assertIn('MB upload size limit', data['description'])
+
+    @override_settings(MOBINSPECT_MAX_UPLOAD_SIZE=10)
+    def test_upload_api_rejects_oversize_file(self):
+        big = SimpleUploadedFile(
+            'big.apk', b'x' * 100, content_type='application/octet-stream')
+        req = self._authed_request('POST', '/api/v1/upload', {'file': big})
+        up = home.Upload(req)
+        resp, code = up.upload_api()
+        self.assertEqual(code, home.HTTP_BAD_REQUEST)
+        self.assertIn('exceeds', resp['error'])
+
+    def test_upload_within_size_limit_is_not_rejected_for_size(self):
+        # A file well under the real default limit must never be rejected
+        # by the size guardrail (it still fails format validation here,
+        # proving the size check passed through to the next branch).
+        small = SimpleUploadedFile(
+            'small.txt', b'x' * 1000, content_type='text/plain')
+        resp = self.client.post('/upload/', {'file': small})
+        data = json.loads(resp.content)
+        self.assertEqual(data['description'], 'File format not Supported!')
+
+    # -------------------------------------------------------- greeting/tip
+    def test_index_shows_welcome_only_once_after_login(self):
+        session = self.client.session
+        session['just_logged_in'] = True
+        session.save()
+        resp = self.client.get('/')
+        self.assertTrue(resp.context['just_logged_in'])
+        self.assertIsNone(resp.context['security_tip'])
+
+        # The flag is popped on first use — an immediate second request in
+        # the same session must show a real, non-empty local security tip.
+        resp2 = self.client.get('/')
+        self.assertFalse(resp2.context['just_logged_in'])
+        self.assertIn(resp2.context['security_tip'], home.SECURITY_TIPS)
+
+    def test_avg_score_excludes_thin_library_formats(self):
+        # A raw .so has no manifest/permissions to evaluate — the real
+        # scorecard pass trivially scores it 100 (nothing to deduct). A
+        # real .apk with a genuine high-severity finding scores much lower.
+        # The FLEET AVERAGE must reflect only the real app, not be dragged
+        # up by the library's vacuous 100 — while the library's own score
+        # still appears on its individual recent-activity row.
+        _mk_recent('1' * 32, FILE_NAME='lib.so', SCAN_TYPE='so',
+                   PACKAGE_NAME='')
+        StaticAnalyzerAndroid.objects.create(
+            MD5='1' * 32, PACKAGE_NAME='', FILE_NAME='lib.so',
+            VERSION_NAME='', ICON_PATH='',
+            # A bare .so still runs the baseline "secure" checks (e.g. a
+            # passing certificate check) with nothing high/warning to
+            # offset them — same shape as the real formula that clamps a
+            # near-empty scorecard's score to 100.
+            CERTIFICATE_ANALYSIS=str({'certificate_findings': [
+                ['secure', 'Baseline passing check', 'Baseline OK'],
+            ]}))
+
+        _mk_recent('2' * 32, FILE_NAME='real.apk', SCAN_TYPE='apk',
+                   PACKAGE_NAME='com.cov.real')
+        StaticAnalyzerAndroid.objects.create(
+            MD5='2' * 32, PACKAGE_NAME='com.cov.real', FILE_NAME='real.apk',
+            VERSION_NAME='1.0', ICON_PATH='',
+            CERTIFICATE_ANALYSIS=str({'certificate_findings': [
+                ['high', 'Real finding description', 'Real High Finding'],
+            ]}))
+
+        resp = self.client.get('/')
+        self.assertEqual(resp.status_code, 200)
+        score_by_md5 = {r['MD5']: r['security_score']
+                        for r in resp.context['recent']}
+        # Both apps still show their own real per-row score.
+        self.assertEqual(score_by_md5['1' * 32], 100)
+        self.assertLess(score_by_md5['2' * 32], 100)
+        # But the fleet average must equal the real app's score alone —
+        # not a blend that the vacuous 100 would pull upward.
+        self.assertEqual(
+            resp.context['avg_security_score'], score_by_md5['2' * 32])
 
     # ----------------------------------------------------------- recent_scans
     def test_recent_scans_pagination_and_ipa_branch(self):

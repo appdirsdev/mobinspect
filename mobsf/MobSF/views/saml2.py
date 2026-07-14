@@ -189,6 +189,9 @@ def saml_acs(request):
             user.is_staff = False
             user.groups.add(Group.objects.get(name=role))
             login(request, user)
+        # Shown once on the dashboard right after this login; the home
+        # view pops it so a page refresh shows a security tip instead.
+        request.session['just_logged_in'] = True
         return redirect(get_redirect_url(req))
     except Exception as exp:
         return print_n_send_error_response(

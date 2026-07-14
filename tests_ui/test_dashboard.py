@@ -15,11 +15,16 @@ All tests run against the REAL running server / REAL data (no mocks).
 Non-destructive: never fills #uploadFile, never submits #upload_form,
 never deletes/creates scans.
 """
+import os
 import re
 
 from playwright.sync_api import expect
 
 NUMBER_RE = re.compile(r'^\d+$')
+
+BASE = os.environ.get('MOBINSPECT_UI_BASE', 'http://127.0.0.1:8000').rstrip('/')
+USER = os.environ.get('MOBINSPECT_ADMIN_USERNAME', 'admin')
+PWD = os.environ.get('MOBINSPECT_ADMIN_PASSWORD', 'admin')
 
 
 def _tile_number(page, label_text):
@@ -35,7 +40,11 @@ def test_dashboard_loads_without_error(admin_page):
     page = admin_page
     page.goto('/', wait_until='domcontentloaded')
     expect(page).to_have_title(re.compile('Dashboard'))
-    expect(page.locator('text=Welcome back').first).to_be_visible()
+    # The hero greeting shows "Welcome back" right after login, or a local
+    # security tip on any later visit in the same session (see
+    # test_greeting_shows_once_then_security_tip below for that behavior) —
+    # this is a smoke check, so it only asserts SOME greeting rendered.
+    expect(page.locator('#mi-hero-greeting')).to_be_visible()
     assert 'Traceback (most recent call last)' not in page.content()
 
 
@@ -225,7 +234,7 @@ def test_recent_scan_row_click_navigates_to_report_and_back(admin_page):
 
     page.go_back(wait_until='domcontentloaded')
     expect(page).to_have_url(re.compile(r'/$'))
-    expect(page.locator('text=Welcome back').first).to_be_visible()
+    expect(page.locator('#mi-hero-greeting')).to_be_visible()
 
 
 def test_dashboard_has_no_server_error_after_render(admin_page):
@@ -239,3 +248,31 @@ def test_dashboard_has_no_server_error_after_render(admin_page):
     content = page.content()
     assert 'Traceback (most recent call last)' not in content
     assert 'Internal Server Error' not in content
+
+
+def test_greeting_shows_once_then_security_tip(browser):
+    """A FRESH login (own browser context, not the shared session-scoped
+    admin_page) must show "Welcome back" on the very first dashboard view,
+    then a local security tip on every later visit in that same session."""
+    ctx = browser.new_context(base_url=BASE)
+    page = ctx.new_page()
+    page.goto(f'{BASE}/login/', wait_until='domcontentloaded')
+    page.fill('#id_username', USER)
+    page.fill('#id_password', PWD)
+    page.click('button[type=submit]')
+    page.wait_for_url(lambda u: '/login' not in u, timeout=20000)
+
+    # First view after login: the welcome message.
+    expect(page.locator('#mi-hero-greeting')).to_contain_text('Welcome back')
+
+    # Any later visit in the same session: a security tip, not the welcome
+    # message — and it must not be empty (proves it's real local content,
+    # not a blank/broken fallback).
+    page.reload(wait_until='domcontentloaded')
+    greeting = page.locator('#mi-hero-greeting')
+    expect(greeting).to_be_visible()
+    expect(greeting).not_to_contain_text('Welcome back')
+    tip_text = greeting.inner_text().strip()
+    assert len(tip_text) > 20
+
+    ctx.close()

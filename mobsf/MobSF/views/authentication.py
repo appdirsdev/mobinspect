@@ -72,6 +72,9 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
+            # Shown once on the dashboard right after this login; the home
+            # view pops it so a page refresh shows a security tip instead.
+            request.session['just_logged_in'] = True
             return redirect(redirect_url)
     else:
         form = AuthenticationForm()

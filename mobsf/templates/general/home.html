@@ -118,10 +118,17 @@
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-7">
         <div class="min-w-0">
           <p class="text-tiny uppercase tracking-[0.2em] text-text-tertiary font-semibold mb-1.5">Security dashboard</p>
-          <h1 class="text-display font-bold leading-tight">
+          {% if just_logged_in %}
+          <h1 id="mi-hero-greeting" class="text-display font-bold leading-tight">
             Welcome back{% if request.user.is_authenticated %},
             <span class="text-text-secondary">{{ request.user.username }}</span>{% endif %}
           </h1>
+          {% else %}
+          <h1 id="mi-hero-greeting" class="text-h2 font-semibold leading-snug max-w-2xl flex items-start gap-2.5">
+            <span class="text-text-brand flex-shrink-0 mt-0.5">{% icon "shield-check" size=22 %}</span>
+            <span>{{ security_tip }}</span>
+          </h1>
+          {% endif %}
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
           <a href="{% url 'recent' %}" class="btn btn-secondary btn-md">
@@ -441,8 +448,13 @@
           try { res = JSON.parse(xhr.responseText); }
           catch (e) { this.status = 'Server returned invalid response.'; this.uploading = false; return; }
           if (res.status === 'success' && res.hash && res.analyzer) {
-            this.status = 'Scan started — redirecting…';
-            window.location.href = '/' + res.analyzer + '/' + res.hash + '/';
+            this.status = 'Scanning ' + file.name + '…';
+            // The report URL is what actually triggers analysis server-side
+            // (it's fetched, not navigated to, so the scan still runs) —
+            // then land on Recent scans instead of the report page.
+            fetch('/' + res.analyzer + '/' + res.hash + '/', {credentials: 'same-origin'})
+              .then(() => { window.location.href = '{% url "recent" %}'; })
+              .catch(() => { window.location.href = '{% url "recent" %}'; });
           } else { this.status = res.description || 'Upload failed.'; this.uploading = false; }
         });
         xhr.addEventListener('error', () => { this.status = 'Network error during upload.'; this.uploading = false; });

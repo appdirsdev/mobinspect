@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import platform
+import random
 import re
 import shutil
 from pathlib import Path
@@ -85,6 +86,52 @@ register.filter('key', key)
 # average and per-row scores for the recent-activity table.
 HOME_ROLLUP_LIMIT = 30
 
+# Shown on the home dashboard on every visit after the first one in a
+# session (the first visit shows "Welcome back, <user>" instead). Fully
+# local/static so it works offline — no external quote API.
+SECURITY_TIPS = (
+    'Hardcoded API keys and secrets are one of the most common findings in '
+    'mobile apps — always check the Secrets section of a report before '
+    'shipping.',
+    'An exported Activity, Service, or Receiver without a permission check '
+    'can be launched by any other app on the device.',
+    'Cleartext HTTP traffic can be intercepted on any network the device '
+    'joins — enforce TLS and pin certificates for sensitive endpoints.',
+    'Debuggable builds (android:debuggable="true") let anyone attach a '
+    'debugger to your app in production — always disable it for release.',
+    'Weak or custom cryptography is a frequent root cause of real-world '
+    'breaches — prefer well-reviewed, standard libraries over homemade '
+    'crypto.',
+    'A backup-enabled app (android:allowBackup="true") can leak private '
+    'data through adb backup on a rooted or debug-enabled device.',
+    'Insecure WebView settings — especially JavaScript bridges — are a '
+    'common path from a malicious webpage to native code execution.',
+    'Third-party SDKs run with the same permissions as your app — audit '
+    'what each library actually does before bundling it.',
+    'A world-writable file or SQLite database lets any other app on the '
+    'device tamper with your data without needing special permissions.',
+    'Root and jailbreak detection raises the bar, but should never be the '
+    'only defense for data an attacker really wants.',
+    'Certificate pinning stops most man-in-the-middle attacks, but must be '
+    'paired with a safe update path or a compromised pin can brick '
+    'connectivity.',
+    'Requesting only the permissions your app actually uses shrinks your '
+    'attack surface and builds user trust.',
+    'Client-side checks (license, paywall, root detection) can always be '
+    'patched out of a binary — critical decisions belong on the server.',
+    'Logs are a common leak — never write tokens, passwords, or PII to '
+    'Logcat in a release build.',
+    'A Firebase or cloud storage bucket left open by default is one of the '
+    'fastest ways to expose an entire user base.',
+    'Deep links and intent filters should always validate their input — '
+    'treat them as untrusted, just like network input.',
+    'Static analysis catches what code review misses at scale — but pair '
+    'it with dynamic analysis to see what the app actually does at '
+    'runtime.',
+    'Obfuscation slows down reverse engineering, but it is not encryption '
+    '— never rely on it alone to protect a real secret.',
+)
+
 
 def _home_security_rollup(md5s):
     """Single bounded AppSec pass over the given recent-scan MD5s.
@@ -106,6 +153,7 @@ def _home_security_rollup(md5s):
         return 0, None, {}
     try:
         from mobsf.StaticAnalyzer.views.common.appsec import (
+            SCORE_AVERAGE_EXCLUDED_SCAN_TYPES,
             get_android_dashboard,
             get_ios_dashboard,
         )
@@ -114,6 +162,9 @@ def _home_security_rollup(md5s):
         return 0, None, {}
     android = StaticAnalyzerAndroid.objects.filter(MD5__in=md5s)
     ios = StaticAnalyzerIOS.objects.filter(MD5__in=md5s)
+    scan_type_by_md5 = dict(
+        RecentScansDB.objects.filter(MD5__in=md5s)
+        .values_list('MD5', 'SCAN_TYPE'))
     for entries, scorer in ((android, get_android_dashboard),
                             (ios, get_ios_dashboard)):
         for entry in entries:
@@ -126,8 +177,14 @@ def _home_security_rollup(md5s):
                 issues_total += len(findings.get(sev) or [])
             score = findings.get('security_score')
             if score is not None:
-                scores.append(score)
+                # Each app's own real score still shows on its row — only
+                # the fleet AVERAGE excludes thin library/binary formats
+                # (no manifest to evaluate, so their trivial 100 would
+                # silently inflate the average). See appsec.py for why.
                 score_by_md5[entry.MD5] = score
+                scan_type = scan_type_by_md5.get(entry.MD5)
+                if scan_type not in SCORE_AVERAGE_EXCLUDED_SCAN_TYPES:
+                    scores.append(score)
     avg = round(sum(scores) / len(scores)) if scores else None
     return issues_total, avg, score_by_md5
 
@@ -253,10 +310,18 @@ def index(request):
         month_labels.append(f'{y}-{m:02d}')
         month_values.append(month_counts.get((y, m), 0))
 
+    # "Welcome back, <user>" shows once, right after login; every later
+    # visit in the same session shows a local security tip instead (no
+    # external calls, works fully offline).
+    just_logged_in = request.session.pop('just_logged_in', False)
+    security_tip = None if just_logged_in else random.choice(SECURITY_TIPS)
+
     context = {
         'version': settings.MOBSF_VER,
         'mimes': mimes,
         'exts': '|'.join(exts),
+        'just_logged_in': just_logged_in,
+        'security_tip': security_tip,
         'stats': stats,
         'latest_score': latest_score,
         'avg_security_score': avg_security_score,
@@ -327,6 +392,11 @@ class Upload(object):
             return self.resp_json(response_data)
 
         self.file = request.FILES['file']
+        oversize_msg = self.oversize_message()
+        if oversize_msg:
+            logger.error(oversize_msg)
+            response_data['description'] = oversize_msg
+            return self.resp_json(response_data)
         self.file_type = FileType(self.file)
         if not self.file_type.is_allow_file():
             msg = 'File format not Supported!'
@@ -352,12 +422,24 @@ class Upload(object):
             api_response['error'] = FormUtil.errors_message(self.form)
             return api_response, HTTP_BAD_REQUEST
         self.file = request.FILES['file']
+        oversize_msg = self.oversize_message()
+        if oversize_msg:
+            api_response['error'] = oversize_msg
+            return api_response, HTTP_BAD_REQUEST
         self.file_type = FileType(self.file)
         if not self.file_type.is_allow_file():
             api_response['error'] = 'File format not Supported!'
             return api_response, HTTP_BAD_REQUEST
         api_response = self.upload()
         return api_response, 200
+
+    def oversize_message(self):
+        """Return an error message if the uploaded file exceeds the
+        configured size guardrail, else None."""
+        if self.file.size > settings.MOBINSPECT_MAX_UPLOAD_SIZE:
+            return (f'File exceeds the {settings.MOBINSPECT_MAX_UPLOAD_SIZE_MB}MB '
+                     'upload size limit!')
+        return None
 
     def upload(self):
         request = self.request
