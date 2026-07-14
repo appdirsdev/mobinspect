@@ -31,6 +31,7 @@ from mobsf.StaticAnalyzer.models import (
     StaticAnalyzerWindows,
 )
 from mobsf.StaticAnalyzer.views.common.appsec import (
+    SCORE_AVERAGE_EXCLUDED_SCAN_TYPES,
     get_android_dashboard,
     get_ios_dashboard,
 )
@@ -67,13 +68,15 @@ def _severity_rollup():
     scores = []
     apps_scored = 0
 
-    recent_md5 = list(
+    recent = list(
         RecentScansDB.objects
         .order_by('-TIMESTAMP')
-        .values_list('MD5', flat=True)[:SEVERITY_ROLLUP_LIMIT]
+        .values_list('MD5', 'SCAN_TYPE')[:SEVERITY_ROLLUP_LIMIT]
     )
-    if not recent_md5:
+    if not recent:
         return counts, apps_scored, scores
+    recent_md5 = [md5 for md5, _ in recent]
+    scan_type_by_md5 = dict(recent)
 
     android = StaticAnalyzerAndroid.objects.filter(MD5__in=recent_md5)
     ios = StaticAnalyzerIOS.objects.filter(MD5__in=recent_md5)
@@ -88,7 +91,8 @@ def _severity_rollup():
         for sev in counts:
             counts[sev] += len(findings.get(sev) or [])
         score = findings.get('security_score')
-        if score is not None:
+        scan_type = scan_type_by_md5.get(entry.MD5)
+        if score is not None and scan_type not in SCORE_AVERAGE_EXCLUDED_SCAN_TYPES:
             scores.append(score)
         apps_scored += 1
 
@@ -101,7 +105,8 @@ def _severity_rollup():
         for sev in counts:
             counts[sev] += len(findings.get(sev) or [])
         score = findings.get('security_score')
-        if score is not None:
+        scan_type = scan_type_by_md5.get(entry.MD5)
+        if score is not None and scan_type not in SCORE_AVERAGE_EXCLUDED_SCAN_TYPES:
             scores.append(score)
         apps_scored += 1
 

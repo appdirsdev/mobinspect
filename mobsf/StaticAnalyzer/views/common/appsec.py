@@ -28,6 +28,15 @@ from mobsf.RBAC.decorators import require_permission
 
 logger = logging.getLogger(__name__)
 
+# RecentScansDB.SCAN_TYPE values for raw library/binary artifacts that carry
+# no manifest or app descriptor (no permissions, no components, nothing an
+# app-level security score can meaningfully evaluate) — a scorecard pass over
+# one of these has no findings to deduct, so it always lands on a trivial,
+# non-representative 100. Averaged in with real apps, a handful of these
+# silently inflates a fleet's average score. Excluded from score AVERAGES
+# only; their real findings (if any) still count in severity/finding totals.
+SCORE_AVERAGE_EXCLUDED_SCAN_TYPES = frozenset({'jar', 'so', 'dylib'})
+
 
 def common_fields(findings, data):
     """Common Fields for Android and iOS."""

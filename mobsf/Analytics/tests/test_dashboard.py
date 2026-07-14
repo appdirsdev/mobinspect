@@ -87,3 +87,44 @@ def test_dashboard_denies_anonymous(client):
     # about the exact destination, only that we did NOT serve the page.
     assert resp.status_code in (302, 401, 403), (
         f'Anonymous user must be redirected/denied; got {resp.status_code}')
+
+
+@pytest.mark.django_db
+def test_avg_security_score_excludes_thin_library_formats(
+        client, django_user_model):
+    """A bare .so/.jar/.dylib has no manifest to evaluate — the real
+    scorecard formula clamps its near-empty result to a vacuous 100. The
+    fleet-wide "Avg security score" must not be dragged up by that; only
+    real app scans should feed the average."""
+    from mobsf.StaticAnalyzer.models import StaticAnalyzerAndroid
+
+    admin = _make_admin(django_user_model)
+    client.force_login(admin)
+
+    RecentScansDB.objects.create(
+        MD5='1' * 32, FILE_NAME='lib.so', SCAN_TYPE='so',
+        PACKAGE_NAME='', ANALYZER='static_analyzer',
+        TIMESTAMP=timezone.now())
+    StaticAnalyzerAndroid.objects.create(
+        MD5='1' * 32, PACKAGE_NAME='', FILE_NAME='lib.so',
+        VERSION_NAME='', ICON_PATH='',
+        CERTIFICATE_ANALYSIS=str({'certificate_findings': [
+            ['secure', 'Baseline passing check', 'Baseline OK'],
+        ]}))
+
+    RecentScansDB.objects.create(
+        MD5='2' * 32, FILE_NAME='real.apk', SCAN_TYPE='apk',
+        PACKAGE_NAME='com.cov.real', ANALYZER='static_analyzer',
+        TIMESTAMP=timezone.now())
+    StaticAnalyzerAndroid.objects.create(
+        MD5='2' * 32, PACKAGE_NAME='com.cov.real', FILE_NAME='real.apk',
+        VERSION_NAME='1.0', ICON_PATH='',
+        CERTIFICATE_ANALYSIS=str({'certificate_findings': [
+            ['high', 'Real finding description', 'Real High Finding'],
+        ]}))
+
+    resp = client.get(reverse('analytics:dashboard'))
+    assert resp.status_code == 200
+    # The .so's own vacuous 100 must not blend into the average — with the
+    # library excluded, the average equals the one real app's own score.
+    assert resp.context['avg_security_score'] < 100
