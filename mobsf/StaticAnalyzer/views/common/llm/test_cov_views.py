@@ -35,6 +35,7 @@ of scope for this file. What *is* security-critical and covered here:
 import inspect
 import os
 import re
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -42,8 +43,18 @@ from django.contrib.auth.models import AnonymousUser, Group
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 
-from mobsf.RBAC.models import Permission, Role, RoleAssignment
-from mobsf.StaticAnalyzer.models import AIEnrichment
+from mobsf.RBAC.models import (
+    AuditEvent,
+    ModelIntegration,
+    Permission,
+    Role,
+    RoleAssignment,
+)
+from mobsf.StaticAnalyzer.models import (
+    AIEnrichment,
+    StaticAnalyzerAndroid,
+    StaticAnalyzerIOS,
+)
 from mobsf.StaticAnalyzer.views.common.llm import views
 
 
@@ -716,3 +727,268 @@ def test_ai_dashboard_ready_tag_false_when_ai_disabled():
     from mobsf.StaticAnalyzer.templatetags.ai_tags import ai_dashboard_ready
     AIEnrichment.objects.create(MD5=CHK, STATUS='done')
     assert ai_dashboard_ready(CHK) is False
+
+
+# ═══════════ manual "Run AI analysis" trigger: _both_roles_configured ═══════
+def _configure_both_roles(**overrides):
+    defaults = {'base_url': 'http://127.0.0.1:11434', 'model_name': 'granite4:3b'}
+    defaults.update(overrides)
+    ModelIntegration.objects.create(
+        role=ModelIntegration.ROLE_GENERATE, label='Generation model', **defaults)
+    ModelIntegration.objects.create(
+        role=ModelIntegration.ROLE_CLASSIFY, label='Classification model', **defaults)
+
+
+@pytest.mark.django_db
+def test_both_roles_configured_false_with_no_rows():
+    assert views._both_roles_configured() is False
+
+
+@pytest.mark.django_db
+def test_both_roles_configured_false_with_only_one_role():
+    ModelIntegration.objects.create(
+        role=ModelIntegration.ROLE_GENERATE,
+        base_url='http://127.0.0.1:11434', model_name='granite4:3b')
+    assert views._both_roles_configured() is False
+
+
+@pytest.mark.django_db
+def test_both_roles_configured_true_when_both_active():
+    _configure_both_roles()
+    assert views._both_roles_configured() is True
+
+
+@pytest.mark.django_db
+def test_both_roles_configured_false_when_one_role_inactive():
+    """is_active is scoped per-role — deactivating just the classify row must
+    fail the check even though generate is still fully configured."""
+    _configure_both_roles()
+    ModelIntegration.objects.filter(
+        role=ModelIntegration.ROLE_CLASSIFY).update(is_active=False)
+    assert views._both_roles_configured() is False
+
+
+@pytest.mark.django_db
+def test_both_roles_configured_false_when_model_name_blank():
+    _configure_both_roles()
+    ModelIntegration.objects.filter(
+        role=ModelIntegration.ROLE_CLASSIFY).update(model_name='')
+    assert views._both_roles_configured() is False
+
+
+@pytest.mark.django_db
+def test_both_roles_configured_false_when_base_url_blank():
+    _configure_both_roles()
+    ModelIntegration.objects.filter(
+        role=ModelIntegration.ROLE_GENERATE).update(base_url='')
+    assert views._both_roles_configured() is False
+
+
+# ═══════════════════════════════════════ _report_exists
+@pytest.mark.django_db
+def test_report_exists_false_when_no_scan_row():
+    assert views._report_exists(CHK) is False
+
+
+@pytest.mark.django_db
+def test_report_exists_true_for_android_row():
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    assert views._report_exists(CHK) is True
+
+
+@pytest.mark.django_db
+def test_report_exists_true_for_ios_row():
+    StaticAnalyzerIOS.objects.create(MD5=CHK, FILE_NAME='a.ipa')
+    assert views._report_exists(CHK) is True
+
+
+# ═══════════════════════════════════════ ai_run_status
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=False)
+def test_ai_run_status_unavailable_when_ai_disabled():
+    assert views.ai_run_status(CHK) == 'unavailable'
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_status_unavailable_without_a_report():
+    _configure_both_roles()
+    assert views.ai_run_status(CHK) == 'unavailable'
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_status_unavailable_without_both_roles():
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    assert views.ai_run_status(CHK) == 'unavailable'
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_status_unavailable_for_bad_checksum():
+    _configure_both_roles()
+    assert views.ai_run_status('not-a-checksum-at-all') == 'unavailable'
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_status_ready_when_everything_configured_and_no_row_yet():
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+    assert views.ai_run_status(CHK) == 'ready'
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+@pytest.mark.parametrize('prior_status', ['done', 'failed'])
+def test_ai_run_status_ready_after_a_prior_run_finished(prior_status):
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+    AIEnrichment.objects.create(MD5=CHK, STATUS=prior_status)
+    assert views.ai_run_status(CHK) == 'ready'
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+@pytest.mark.parametrize('in_flight_status', ['pending', 'running'])
+def test_ai_run_status_running_when_already_in_flight(in_flight_status):
+    """Must never offer a duplicate trigger while one is still going."""
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+    AIEnrichment.objects.create(MD5=CHK, STATUS=in_flight_status)
+    assert views.ai_run_status(CHK) == 'running'
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_status_never_raises_on_unexpected_error(monkeypatch):
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+
+    def _boom(*a, **kw):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(AIEnrichment.objects, 'filter', _boom)
+    assert views.ai_run_status(CHK) == 'unavailable'
+
+
+# ═══════════════════════════ ai_run view (POST-only manual trigger)
+_TASKS_MODULE = 'mobsf.StaticAnalyzer.views.common.llm.tasks.enrich_in_background'
+
+
+@pytest.mark.django_db
+def test_ai_run_anonymous_redirects_to_login(client):
+    resp = client.post(reverse('ai_run', args=[CHK]))
+    assert resp.status_code == 302
+    assert 'login' in resp['Location']
+
+
+@pytest.mark.django_db
+def test_ai_run_denied_for_plain_user_403(plain_client):
+    resp = plain_client.post(reverse('ai_run', args=[CHK]))
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_get_request_never_triggers_enrichment(admin_client, monkeypatch):
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+    mock_enrich = MagicMock()
+    monkeypatch.setattr(_TASKS_MODULE, mock_enrich)
+    resp = admin_client.get(reverse('ai_run', args=[CHK]))
+    assert resp.status_code == 302
+    mock_enrich.assert_not_called()
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_not_ready_shows_error_and_never_enriches(admin_client, monkeypatch):
+    # AI enabled but neither role configured -> ai_run_status != 'ready'.
+    mock_enrich = MagicMock()
+    monkeypatch.setattr(_TASKS_MODULE, mock_enrich)
+    resp = admin_client.post(reverse('ai_run', args=[CHK]), follow=True)
+    assert resp.status_code == 200
+    mock_enrich.assert_not_called()
+    msgs = [str(m) for m in resp.context['messages']]
+    assert any('not available' in m for m in msgs)
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_ready_triggers_enrichment_and_audits(admin_client, monkeypatch):
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+    mock_enrich = MagicMock()
+    monkeypatch.setattr(_TASKS_MODULE, mock_enrich)
+    resp = admin_client.post(reverse('ai_run', args=[CHK]))
+    assert resp.status_code == 302
+    mock_enrich.assert_called_once_with(CHK)
+    assert AuditEvent.objects.filter(
+        action='ai.run.manual', target_id=CHK).exists()
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_wont_duplicate_while_already_running(admin_client, monkeypatch):
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+    AIEnrichment.objects.create(MD5=CHK, STATUS='running')
+    mock_enrich = MagicMock()
+    monkeypatch.setattr(_TASKS_MODULE, mock_enrich)
+    resp = admin_client.post(reverse('ai_run', args=[CHK]), follow=True)
+    mock_enrich.assert_not_called()
+    msgs = [str(m) for m in resp.context['messages']]
+    assert any('not available' in m for m in msgs)
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_redirects_back_to_a_safe_referer(admin_client, monkeypatch):
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+    monkeypatch.setattr(_TASKS_MODULE, MagicMock())
+    resp = admin_client.post(
+        reverse('ai_run', args=[CHK]),
+        HTTP_REFERER=f'/static_analyzer/{CHK}/')
+    assert resp.status_code == 302
+    assert resp.url == f'/static_analyzer/{CHK}/'
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_falls_back_to_recent_for_an_unsafe_referer(admin_client, monkeypatch):
+    """A referer pointing off-host must never be followed — falls back to
+    the Recent Scans page instead of an open redirect."""
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+    monkeypatch.setattr(_TASKS_MODULE, MagicMock())
+    resp = admin_client.post(
+        reverse('ai_run', args=[CHK]),
+        HTTP_REFERER='http://evil.example.com/phish')
+    assert resp.status_code == 302
+    assert reverse('recent') in resp.url
+
+
+# ═══════════════════════════ ai_tags.ai_run_status wrapper tag
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_status_tag_matches_the_view_helper():
+    from mobsf.StaticAnalyzer.templatetags.ai_tags import (
+        ai_run_status as tag_ai_run_status,
+    )
+    assert tag_ai_run_status(CHK) == 'unavailable'
+    StaticAnalyzerAndroid.objects.create(MD5=CHK, FILE_NAME='a.apk')
+    _configure_both_roles()
+    assert tag_ai_run_status(CHK) == 'ready'
+
+
+@pytest.mark.django_db
+def test_ai_run_status_tag_never_raises(monkeypatch):
+    from mobsf.StaticAnalyzer.templatetags import ai_tags
+
+    def _boom(_checksum):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(ai_tags, '_ai_run_status', _boom)
+    assert ai_tags.ai_run_status(CHK) == 'unavailable'

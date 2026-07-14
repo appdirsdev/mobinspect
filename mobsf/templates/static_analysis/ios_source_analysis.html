@@ -95,7 +95,7 @@
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 no-print" id="scan_options">
-      {% can 'admin.ai.view' %}{% ai_dashboard_ready md5 as ai_ready %}{% if ai_ready %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endif %}{% endcan %}
+      {% can 'admin.ai.view' %}{% ai_dashboard_ready md5 as ai_ready %}{% if ai_ready %}<a href="/ai_dashboard/{{ md5 }}/" class="btn btn-secondary btn-md">{% icon "zap" size=14 %} AI Dashboard</a>{% endif %}{% ai_run_status md5 as ai_run %}{% if ai_run == 'ready' %}<form method="post" action="{% url 'ai_run' checksum=md5 %}" class="inline-block">{% csrf_token %}<button type="submit" class="btn btn-secondary btn-md">{% icon "play" size=14 %} Run AI Analysis</button></form>{% elif ai_run == 'running' %}<span class="btn btn-secondary btn-md opacity-60 cursor-not-allowed" title="AI analysis in progress">{% icon "play" size=14 %} Analyzing…</span>{% endif %}{% endcan %}
       <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="mi-pillbtn btn btn-md" role="button">
         {% icon "shield-check" size=14 %} Scorecard
       </a>

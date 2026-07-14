@@ -513,6 +513,9 @@ if settings.API_ONLY == '0':
         urlpatterns.append(
             re_path(fr'^ai/report/{checksum_regex}/$',
                     _ai_views.ai_report, name='ai_report'))
+        urlpatterns.append(
+            re_path(fr'^ai/run/{checksum_regex}/$',
+                    _ai_views.ai_run, name='ai_run'))
     except Exception:
         import logging
         logging.getLogger(__name__).exception(

@@ -12,16 +12,22 @@ from django.conf import settings
 from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from mobsf.MobSF.utils import is_md5, python_list
 from mobsf.MobSF.views.authentication import login_required
+from mobsf.RBAC import audit
 from mobsf.RBAC.decorators import require_permission
 from mobsf.RBAC.permissions import (
     effective_user,
     has_any_permission,
     is_auth_disabled,
 )
-from mobsf.StaticAnalyzer.models import AIEnrichment
+from mobsf.StaticAnalyzer.models import (
+    AIEnrichment,
+    StaticAnalyzerAndroid,
+    StaticAnalyzerIOS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -170,3 +176,87 @@ def ai_report(request, checksum):
     except Exception:
         logger.exception('Failed to render AI report for %s', checksum)
         return HttpResponse(status=204)
+
+
+def _both_roles_configured():
+    """True when generate + classify each have an active, usable endpoint.
+
+    is_active is scoped PER ROLE in the DB (see GraniteClient._resolve_target,
+    which filters on role=role, is_active=True) — the two rows are meant to be
+    active at the same time, one per role. A stale class docstring on
+    ModelIntegration suggests a single global "active row", which is not how
+    the fixed generate/classify Integrations UI actually saves.
+    """
+    try:
+        from django.apps import apps
+        model_cls = apps.get_model('rbac', 'ModelIntegration')
+    except LookupError:
+        return False
+    for role in ('generate', 'classify'):
+        row = model_cls.objects.filter(role=role, is_active=True).first()
+        if not row or not (row.base_url or '').strip() or not (row.model_name or '').strip():
+            return False
+    return True
+
+
+def _report_exists(checksum):
+    return (StaticAnalyzerAndroid.objects.filter(MD5=checksum).exists()
+            or StaticAnalyzerIOS.objects.filter(MD5=checksum).exists())
+
+
+def ai_run_status(checksum):
+    """State of the manual "Run AI analysis" trigger for a scan.
+
+    'unavailable' — AI disabled, no report yet, or generate/classify aren't
+                     both configured.
+    'running'      — enrichment already in flight; don't offer a duplicate.
+    'ready'        — safe to trigger.
+    Best-effort: never raises.
+    """
+    if not getattr(settings, 'MOBINSPECT_AI_ENABLED', False):
+        return 'unavailable'
+    try:
+        if (not is_md5(checksum)
+                or not _report_exists(checksum)
+                or not _both_roles_configured()):
+            return 'unavailable'
+        row = AIEnrichment.objects.filter(MD5=checksum).only('STATUS').first()
+    except Exception:
+        return 'unavailable'
+    if row and row.STATUS in ('pending', 'running'):
+        return 'running'
+    return 'ready'
+
+
+@login_required
+@require_permission(_ADMIN_AI_PERM)
+def ai_run(request, checksum):
+    """POST-only: manually (re)trigger AI enrichment for a scan.
+
+    Enabled only when both model roles are configured and no enrichment is
+    already in flight for this scan (ai_run_status == 'ready'), so this
+    can't be used to pile up duplicate background runs.
+    """
+    referer = request.META.get('HTTP_REFERER', '')
+    if url_has_allowed_host_and_scheme(
+            referer, allowed_hosts={request.get_host()}):
+        back = redirect(referer)
+    else:
+        back = redirect('recent')
+
+    if request.method != 'POST':
+        return back
+    if not is_md5(checksum):
+        messages.error(request, 'Invalid scan reference.')
+        return redirect('recent')
+    if ai_run_status(checksum) != 'ready':
+        messages.error(
+            request, 'AI analysis is not available for this scan right now.')
+        return back
+
+    from mobsf.StaticAnalyzer.views.common.llm.tasks import enrich_in_background
+    enrich_in_background(checksum)
+    audit.record(request, 'ai.run.manual', target_type='scan', target_id=checksum)
+    messages.success(
+        request, 'AI analysis started — refresh in a moment to see results.')
+    return back
