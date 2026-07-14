@@ -206,6 +206,42 @@
     @apply block text-small font-medium text-text-secondary mb-1.5;
   }
 
+  /* DataTables toolbar (report-page finding tables). The vendored
+     datatables.combined.min.css is a Bootstrap-4 build — it only supplies
+     DataTables' own layout rules, not Bootstrap's .pagination/.page-item/
+     .page-link/.form-control styling, which this app never loads. Without
+     these, the search box and (worse) the pagination controls rendered as
+     completely bare, stacked <li> text with no buttons, spacing, or states. */
+  .dataTables_wrapper .dataTables_filter input.form-control {
+    @apply h-8 rounded-md border border-border bg-surface-1 px-3 ml-2
+           text-small text-text-primary placeholder:text-text-tertiary
+           transition-colors duration-fast
+           focus:border-mobinspect-500 focus:outline-none focus:ring-2 focus:ring-mobinspect-500/30;
+  }
+  .dataTables_wrapper .dataTables_info {
+    @apply text-tiny text-text-tertiary;
+  }
+  .dataTables_wrapper .dataTables_paginate .pagination {
+    @apply flex items-center gap-1 flex-wrap;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    @apply list-none;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button .page-link {
+    @apply inline-flex items-center justify-center min-w-[2rem] h-8 px-2.5 rounded-md
+           text-tiny font-medium text-text-secondary border border-transparent
+           cursor-pointer select-none transition-colors duration-fast
+           hover:bg-surface-2 hover:text-text-primary
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mobinspect-500;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current .page-link,
+  .dataTables_wrapper .dataTables_paginate .paginate_button.active .page-link {
+    @apply bg-mobinspect-500 text-white hover:bg-mobinspect-600 hover:text-white;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button.disabled .page-link {
+    @apply text-text-tertiary opacity-40 cursor-not-allowed pointer-events-none hover:bg-transparent;
+  }
+
   /* Cards */
   .card {
     @apply rounded-lg border border-border-subtle bg-surface-1 shadow-elevation-1
