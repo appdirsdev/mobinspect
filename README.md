@@ -213,7 +213,7 @@ curl -s http://127.0.0.1:8001/readyz           # process up
 poetry run python manage.py audit_verify
 ```
 
-Async analysis (`MOBSF_ASYNC_ANALYSIS=1`) is **already the production default** via `deploy/systemd/mobinspect.service.d/avd.conf` — no edit needed. See `deploy/RUNBOOK.md` for the full operations / disaster-recovery guide.
+Async analysis (`MOBINSPECT_ASYNC_ANALYSIS=1`) is **already the production default** (both via `settings.py` and via `deploy/systemd/mobinspect.service.d/avd.conf`) — no edit needed. See `deploy/RUNBOOK.md` for the full operations / disaster-recovery guide.
 
 ---
 

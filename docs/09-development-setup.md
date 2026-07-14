@@ -68,7 +68,7 @@ MOBINSPECT_DEV=1 MOBSF_DEBUG=1 poetry run python manage.py runserver
 | `MOBSF_DISABLE_AUTHENTICATION=1` | — | Skip login (for quick UI iteration) |
 | `MOBINSPECT_DEV=1` | — | Allow `runserver`, enable `/playground/` route |
 | `POSTGRES_*` | — | Use Postgres instead of SQLite |
-| `MOBSF_ASYNC_ANALYSIS=1` | — | Use the `django-q2` worker (run `qcluster` separately) |
+| `MOBINSPECT_ASYNC_ANALYSIS=0` | — | ON by default; set to `0` to force synchronous in-request scans instead of the `django-q2` worker |
 
 ## Useful commands
 

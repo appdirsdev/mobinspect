@@ -82,7 +82,7 @@ These are added before the rebrand; once Phase 3 lands, all `mobsf.*` paths beco
    - Static analyzer views (Android / iOS / Windows)
    - Dynamic analyzer views (Android / iOS Corellium / iOS device)
    - REST API views (`api/api_static_analysis.py`, `api/api_android_dynamic_analysis.py`, ...)
-5. **View** — runs synchronously or enqueues a `django-q2` task for async scans (`MOBSF_ASYNC_ANALYSIS=1`).
+5. **View** — enqueues a `django-q2` task for async scans by default (`MOBINSPECT_ASYNC_ANALYSIS`, default `1`) or runs synchronously if disabled.
 6. **Template** — server-rendered Django template under `mobsf/templates/`. After Phase 2, all templates use the new `base/app.html` layout.
 7. **Response** — full HTML page or HTMX fragment for partial updates.
 

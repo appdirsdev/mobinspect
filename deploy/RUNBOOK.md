@@ -19,7 +19,7 @@ After the C1–C7 / H1–H17 audit pass, the following are **on by default** in 
 | Secure session/CSRF cookies + HSTS + `X-Frame-Options=DENY` + CSP, gated on `MOBINSPECT_BEHIND_TLS=1` | `mobsf/MobSF/settings.py:200` | `curl -sI https://<host>/ \| grep -iE 'strict-transport\|x-frame\|set-cookie.*secure'` |
 | `MIDDLEWARE` tuple includes `SecurityMiddleware`, `CommonMiddleware`, `XFrameOptionsMiddleware`, ratelimit middleware | `mobsf/MobSF/settings.py` MIDDLEWARE | `poetry run python manage.py check --deploy` returns 0 warnings on the headers checks |
 | SQLite **WAL + `busy_timeout=20000`** | `mobsf/MobSF/settings.py` DATABASES OPTIONS | `sqlite3 ~/.MobInspect/db.sqlite3 'PRAGMA journal_mode;'` → `wal` |
-| `MOBSF_ASYNC_ANALYSIS=1` on the web drop-in + gunicorn `--workers=2 --max-requests=200 --timeout=180` | `deploy/systemd/mobinspect.service.d/avd.conf`, `mobinspect.service` `ExecStart` | `systemctl show mobinspect.service -p Environment \| grep ASYNC` |
+| `MOBINSPECT_ASYNC_ANALYSIS=1` (also the settings.py default) on the web drop-in + gunicorn `--workers=2 --max-requests=200 --timeout=180` | `deploy/systemd/mobinspect.service.d/avd.conf`, `mobinspect.service` `ExecStart` | `systemctl show mobinspect.service -p Environment \| grep ASYNC` |
 | `/healthz` + `/readyz` reachable, unauthenticated | `mobsf/MobSF/views/healthz.py` | `curl -s http://127.0.0.1:8001/healthz \| jq .status` returns `ok`/`degraded`/`failed` |
 | Hourly SQLite backups + 14-day retention | `mobinspect-backup.{service,timer}` | `systemctl list-timers mobinspect-backup.timer` + `ls /var/backups/mobinspect/` |
 | Audit signals on (login / logout / api auth fail / admin user.* / RBAC changes) | `mobsf/RBAC/signals.py`, `mobsf/RBAC/audit.py` | `poetry run python manage.py shell -c "from mobsf.RBAC.models import AuditEvent; print(AuditEvent.objects.count())"` after a few logins |
@@ -130,7 +130,7 @@ The `mobinspect-avd.service` `ExecStart` flags:
 [Service]
 Environment=ANALYZER_IDENTIFIER=emulator-5554
 Environment=MOBSF_ADB_BINARY=/home/ubuntu/android-sdk/platform-tools/adb
-Environment=MOBSF_ASYNC_ANALYSIS=1
+Environment=MOBINSPECT_ASYNC_ANALYSIS=1
 ```
 
 `MOBSF_ADB_BINARY` is read by `mobsf.MobSF.settings:488`. Without it, `get_adb()` falls into a `find_process_by('adb')` proc-scan that hits PermissionError on other-uid `/proc/*/exe` reads, returns `None`, and the "Prepare runtime" UI shows:
@@ -139,7 +139,7 @@ Environment=MOBSF_ASYNC_ANALYSIS=1
 argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'
 ```
 
-`MOBSF_ASYNC_ANALYSIS=1` makes the web service hand scans off to the django-q2 broker instead of running them inside the gunicorn worker. **This is the production default** — without it, a single static scan can pin a gunicorn worker for minutes and the UI stops responding to anyone else. The `mobinspect-worker.service` unit already sets the same flag; both sides must agree, otherwise tasks queue up but nothing drains them. The worker is therefore **required** for any non-trivial scan (APK static analysis, dynamic analysis, source-zip scans). If you stop the worker, the UI will queue tasks and show "Scanning…" indefinitely.
+`MOBINSPECT_ASYNC_ANALYSIS=1` (the settings.py default — this line is belt-and-braces) makes the web service hand scans off to the django-q2 broker instead of running them inside the gunicorn worker. **This is the production default** — without it, a single static scan can pin a gunicorn worker for minutes and the UI stops responding to anyone else. The `mobinspect-worker.service` unit already sets the same flag; both sides must agree, otherwise tasks queue up but nothing drains them. The worker is therefore **required** for any non-trivial scan (APK static analysis, dynamic analysis, source-zip scans). If you stop the worker, the UI will queue tasks and show "Scanning…" indefinitely.
 
 ### 6. Resource limits and systemd sandboxing
 

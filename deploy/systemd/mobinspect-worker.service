@@ -12,10 +12,12 @@ Group=ubuntu
 WorkingDirectory=/home/ubuntu/MobInspect
 Environment=HOME=/home/ubuntu
 Environment=PATH=/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-# Async analysis is opt-in. Both this worker and the main service must set
-# MOBSF_ASYNC_ANALYSIS=1 for queued tasks to flow end-to-end; leave the worker
-# enabled even when disabled so it picks up tasks the moment you flip the flag.
-Environment=MOBSF_ASYNC_ANALYSIS=1
+# Async analysis is ON by default now (settings.py), but set it explicitly
+# here too. Both this worker and the main service must agree on
+# MOBINSPECT_ASYNC_ANALYSIS for queued tasks to flow end-to-end; leave the
+# worker enabled even when disabled so it picks up tasks the moment you flip
+# the flag.
+Environment=MOBINSPECT_ASYNC_ANALYSIS=1
 ExecStart=/home/ubuntu/.local/bin/poetry run python manage.py qcluster
 Restart=on-failure
 RestartSec=10

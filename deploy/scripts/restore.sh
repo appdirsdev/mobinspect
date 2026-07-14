@@ -96,7 +96,7 @@ chown -R "$OWNER" /home/ubuntu/.MobInspect
 
 echo "[5/5] Restarting $SERVICE + $WORKER …"
 # PartOf= only propagates stop/restart, never start — start the worker explicitly
-# or async scans (MOBSF_ASYNC_ANALYSIS=1 is the prod default) will queue forever.
+# or async scans (MOBINSPECT_ASYNC_ANALYSIS=1 is the prod default) will queue forever.
 systemctl start "$SERVICE" "$WORKER"
 
 echo

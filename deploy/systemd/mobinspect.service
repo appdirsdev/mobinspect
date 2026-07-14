@@ -21,7 +21,7 @@ Environment=PATH=/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbi
 #                                  (sqlite, adb, subprocess), threads beat sync.
 #   --threads 4                  : 4 in-flight requests per worker (8 total) is
 #                                  more than enough now that long scans run on
-#                                  the django-q2 worker (MOBSF_ASYNC_ANALYSIS=1).
+#                                  the django-q2 worker (MOBINSPECT_ASYNC_ANALYSIS=1).
 #   --max-requests 200
 #   --max-requests-jitter 50     : cycle each worker every ~200 reqs (±50) to
 #                                  defuse slow memory creep from PDF/report libs.

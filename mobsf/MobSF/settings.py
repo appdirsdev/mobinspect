@@ -441,14 +441,17 @@ LOGGING = {
         },
     },
 }
-ASYNC_ANALYSIS = bool(os.getenv('MOBSF_ASYNC_ANALYSIS', '0') == '1')
-ASYNC_ANALYSIS_TIMEOUT = int(os.getenv('MOBSF_ASYNC_ANALYSIS_TIMEOUT', '60'))
+# Background scanning is ON by default (queues large/slow scans onto the
+# django-q worker instead of running them in-request) — set
+# MOBINSPECT_ASYNC_ANALYSIS=0 to force the old in-request behavior.
+ASYNC_ANALYSIS = bool(os.getenv('MOBINSPECT_ASYNC_ANALYSIS', '1') == '1')
+ASYNC_ANALYSIS_TIMEOUT = int(os.getenv('MOBINSPECT_ASYNC_ANALYSIS_TIMEOUT', '60'))
 Q_CLUSTER = {
     'name': 'scan_queue',
     # One static-analysis process at a time by default: a single worker
     # serializes scans so concurrent (esp. large) APKs cannot exhaust the host.
-    # Override with MOBSF_ASYNC_WORKERS if the host has ample CPU/RAM.
-    'workers': int(os.getenv('MOBSF_ASYNC_WORKERS', '1')),
+    # Override with MOBINSPECT_ASYNC_WORKERS if the host has ample CPU/RAM.
+    'workers': int(os.getenv('MOBINSPECT_ASYNC_WORKERS', '1')),
     'recycle': 100,
     'timeout': ASYNC_ANALYSIS_TIMEOUT * 60,
     'retry': (ASYNC_ANALYSIS_TIMEOUT * 60) + 100,

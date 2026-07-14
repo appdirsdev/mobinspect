@@ -50,7 +50,7 @@ mobsf.MalwareAnalyzer   →  mobinspect.MalwareAnalyzer
 | `MOBSF_DISABLE_AUTHENTICATION` | `MOBINSPECT_DISABLE_AUTHENTICATION` |
 | `MOBSF_PLATFORM` | `MOBINSPECT_PLATFORM` |
 | `MOBSF_USER` | `MOBINSPECT_USER` |
-| `MOBSF_ASYNC_*` | `MOBINSPECT_ASYNC_*` |
+| ~~`MOBSF_ASYNC_*`~~ → `MOBINSPECT_ASYNC_*` | done — no shim (new vars, nothing deployed depends on the old name yet) |
 | `MOBSF_RATELIMIT` | `MOBINSPECT_RATELIMIT` |
 | `MOBSF_IDP_*` | `MOBINSPECT_IDP_*` |
 | `MOBSF_SP_*` | `MOBINSPECT_SP_*` |
