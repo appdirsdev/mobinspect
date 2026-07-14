@@ -13,7 +13,9 @@ Covers the CyberGuard-mirror redesign (per mobsf/templates/general/home.html):
 
 All tests run against the REAL running server / REAL data (no mocks).
 Non-destructive: never fills #uploadFile, never submits #upload_form,
-never deletes/creates scans.
+never deletes/creates scans — EXCEPT test_upload_redirects_to_recent_scans
+below, which is the one deliberate exception (it exercises the real upload
+flow end to end) and cleans up the scan it creates via /delete_scan/.
 """
 import os
 import re
@@ -25,6 +27,7 @@ NUMBER_RE = re.compile(r'^\d+$')
 BASE = os.environ.get('MOBINSPECT_UI_BASE', 'http://127.0.0.1:8000').rstrip('/')
 USER = os.environ.get('MOBINSPECT_ADMIN_USERNAME', 'admin')
 PWD = os.environ.get('MOBINSPECT_ADMIN_PASSWORD', 'admin')
+TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), '..', 'test_files')
 
 
 def _tile_number(page, label_text):
@@ -146,10 +149,20 @@ def test_command_row_charts_and_gauge_render(admin_page):
                 ' return c && c.getBoundingClientRect().width > 10'
                 ' && c.getBoundingClientRect().height > 10; }',
                 arg=cid, timeout=6000)
-        # The semicircle gauge SVG renders with its readout number.
+        # The semicircle gauge SVG renders with its readout number, and the
+        # readout must sit INSIDE the gauge's own box, not spill outside it
+        # (regression guard: the readout previously had no positioning CSS
+        # at all and fell into normal document flow below/outside the arc).
         gauge = page.locator('.mi-semi')
         expect(gauge).to_be_visible()
-        expect(gauge.locator('.mi-semi-num')).to_be_visible()
+        readout = gauge.locator('.mi-semi-num')
+        expect(readout).to_be_visible()
+        svg_box = gauge.locator('svg').bounding_box()
+        num_box = readout.bounding_box()
+        assert svg_box and num_box
+        assert num_box['x'] >= svg_box['x'] - 2
+        assert num_box['x'] + num_box['width'] <= svg_box['x'] + svg_box['width'] + 2
+        assert num_box['y'] <= svg_box['y'] + svg_box['height'] + 2
     else:
         # Honest empty states, no charts.
         expect(page.get_by_text('Scan activity will chart here.')).to_be_visible()
@@ -276,3 +289,39 @@ def test_greeting_shows_once_then_security_tip(browser):
     assert len(tip_text) > 20
 
     ctx.close()
+
+
+def test_upload_redirects_to_recent_scans(admin_page):
+    """A real upload lands the browser on Recent scans, not the report page
+    — the report URL is still fetched in the background (that's what
+    actually triggers analysis server-side), just not navigated to.
+
+    Uses android.so — the smallest real sample (no manifest/decompile tree
+    to speak of), so this stays fast and doesn't bloat disk usage the way
+    a full APK/XAPK decompile would. Cleans up the scan it creates."""
+    page = admin_page
+    page.goto('/', wait_until='domcontentloaded')
+
+    with page.expect_response(
+            lambda r: r.url.endswith('/upload/') and r.status == 200,
+            timeout=30000):
+        page.set_input_files(
+            '#uploadFile', os.path.join(TEST_FILES_DIR, 'android.so'))
+
+    page.wait_for_url(re.compile(r'/recent_scans/'), timeout=30000)
+    expect(page).to_have_url(re.compile(r'/recent_scans/'))
+    assert 'Traceback (most recent call last)' not in page.content()
+
+    # Clean up: find the just-created row (top of Recent scans, matches by
+    # file name) and delete it via the real endpoint, real CSRF token.
+    row = page.locator('table tbody tr', has_text='android.so').first
+    if row.count():
+        href = row.locator('a').first.get_attribute('href') or ''
+        md5 = next((p for p in href.strip('/').split('/') if len(p) == 32), None)
+        if md5:
+            csrf = page.evaluate(
+                "document.cookie.match(/csrftoken=([^;]+)/)?.[1]")
+            page.request.post(
+                f'{BASE}/delete_scan/',
+                data={'md5': md5},
+                headers={'X-CSRFToken': csrf} if csrf else {})

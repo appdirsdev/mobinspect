@@ -85,6 +85,19 @@ class HomeViewsRealTests(TestCase):
         self.assertNotIn('|', resp.context['upload_accept'])
 
     # ---------------------------------------------------------------- uploads
+    def test_upload_size_limit_defaults_to_500mb(self):
+        # Guards the real (non-overridden) configured limit — the oversize
+        # tests below deliberately override this down to 10 bytes to stay
+        # fast, so nothing else asserts the actual production default.
+        self.assertEqual(settings.MOBINSPECT_MAX_UPLOAD_SIZE_MB, 500)
+        self.assertEqual(settings.MOBINSPECT_MAX_UPLOAD_SIZE, 500 * 1024 * 1024)
+        # The Django-level hard backstop must stay ABOVE the app-level limit,
+        # or an upload between the two would hit Django's raw
+        # RequestDataTooBig error instead of our friendly size message.
+        self.assertGreater(
+            settings.DATA_UPLOAD_MAX_MEMORY_SIZE,
+            settings.MOBINSPECT_MAX_UPLOAD_SIZE)
+
     def test_upload_unsupported_file_format(self):
         bad = SimpleUploadedFile(
             'notreal.txt', b'this is plain text, not an app',

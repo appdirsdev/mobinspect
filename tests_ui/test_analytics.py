@@ -197,7 +197,17 @@ def test_severity_mix_chart_and_score_gauge_render(admin_page):
     expect(score_card).to_be_visible()
     gauge = score_card.locator('.mi-semi')
     if gauge.count():
-        expect(gauge.locator('.mi-semi-num')).to_be_visible()
+        readout = gauge.locator('.mi-semi-num')
+        expect(readout).to_be_visible()
+        # Regression guard: the readout must render inside the gauge's own
+        # SVG box, not spill outside it (it previously had no positioning
+        # CSS and fell into normal document flow below/outside the arc).
+        svg_box = gauge.locator('svg').bounding_box()
+        num_box = readout.bounding_box()
+        assert svg_box and num_box
+        assert num_box['x'] >= svg_box['x'] - 2
+        assert num_box['x'] + num_box['width'] <= svg_box['x'] + svg_box['width'] + 2
+        assert num_box['y'] <= svg_box['y'] + svg_box['height'] + 2
 
     _assert_no_traceback(page)
 

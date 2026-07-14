@@ -16,12 +16,19 @@ Covers three pages for the same pre-scanned Android app (MD5 below):
 
 NON-DESTRUCTIVE: every test is read-only navigation/clicks. No rescan, no
 delete, no file upload — the harness's pre-existing scan MD5 is reused as-is.
+
+Fixture is Diva (test_files/android.apk) — deliberately NOT one of the large
+real-world samples (e.g. TikTok/CapCut XAPKs), whose full decompile output
+runs into multiple GB on disk; Diva is small, has a real (non-trivial)
+manifest/permissions surface, a low security score (plenty of findings to
+assert against), and already has AI enrichment run for the AI Dashboard
+tests below.
 """
 import re
 
 from playwright.sync_api import expect
 
-MD5 = 'fbf9ce22889852de75aa365979e1bdbf'
+MD5 = '82ab8b2193b3cfb1c737e3a786be363a'
 
 
 def _assert_no_traceback(page):
@@ -40,7 +47,7 @@ def test_android_report_renders_core_sections(admin_page):
     # App identity in the ambient hero header
     heading = admin_page.locator('h1').first
     expect(heading).to_be_visible()
-    expect(heading).to_contain_text('TikTok')
+    expect(heading).to_contain_text('Diva')
     expect(admin_page.get_by_text(MD5).first).to_be_visible()
 
     # "App scores" card carries the arc-gauge security score (animated
@@ -135,7 +142,7 @@ def test_appsec_dashboard_score_and_severity_render(admin_page):
     admin_page.emulate_media(reduced_motion='reduce')
     admin_page.goto(f'/appsec_dashboard/{MD5}/', wait_until='domcontentloaded')
 
-    expect(admin_page.locator('h1').first).to_contain_text('TikTok')
+    expect(admin_page.locator('h1').first).to_contain_text('Diva')
 
     # Score card: the security-score gauge readout is a real 0-100 number.
     score_card = admin_page.locator('div.card', has_text='Security score').first
