@@ -218,12 +218,16 @@ class ApiStaticValidationTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
 
-@override_settings(RATELIMIT_ENABLE=False, DISABLE_AUTHENTICATION=None)
+@override_settings(
+    RATELIMIT_ENABLE=False, DISABLE_AUTHENTICATION=None, ASYNC_ANALYSIS=False)
 class ApiStaticScannedTests(TestCase):
     """Success branches driven by a REAL upload + static analysis.
 
     A single real scan of ``android.apk`` is performed in setUpTestData;
-    every test in this class reads the resulting real DB rows.
+    every test in this class reads the resulting real DB rows. Forced
+    synchronous (ASYNC_ANALYSIS=False) regardless of the environment/default,
+    since these tests need the scan to be complete before they run, not
+    merely queued.
     """
 
     @classmethod
@@ -242,7 +246,6 @@ class ApiStaticScannedTests(TestCase):
         up = client.post('/api/v1/upload', {'file': upload}, **auth)
         assert up.status_code == 200, up.content
         cls.md5 = up.json()['hash']
-        # Real synchronous static analysis (ASYNC_ANALYSIS off by default).
         sc = client.post('/api/v1/scan', {'hash': cls.md5}, **auth)
         cls.scan_status = sc.status_code
 
