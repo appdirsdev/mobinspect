@@ -21,8 +21,8 @@
                  gauge is on a page (default "1").
     size_class — width classes for the svg (default a responsive max-width).
 {% endcomment %}
-<div class="mi-semi" style="color: {{ color|default:'#FE4A23' }}">
-  <svg viewBox="0 0 240 148" class="{{ size_class|default:'w-full max-w-[300px]' }}" aria-hidden="true">
+<div class="mi-semi relative inline-flex flex-col items-center" style="color: {{ color|default:'#FE4A23' }}">
+  <svg viewBox="0 0 240 148" class="{{ size_class|default:'w-full max-w-[300px]' }} block" aria-hidden="true">
     <defs>
       <linearGradient id="miSemiGrad{{ uid|default:'1' }}" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0"   stop-color="currentColor" stop-opacity=".55"/>
@@ -72,7 +72,13 @@
     </g>
   </svg>
 
-  <div class="mi-semi-readout">
+  {% comment %}
+    Centered in the arc's open lower band (viewBox: arc closes at y=120 of
+    148 total, so that band's vertical middle sits ~9% up from the bottom —
+    absolute + inset-x-0 so it's anchored to the SVG, not document flow,
+    regardless of the surrounding card's width.
+  {% endcomment %}
+  <div class="mi-semi-readout absolute inset-x-0 bottom-[9%] flex flex-col items-center">
     <span class="mi-semi-num text-display font-bold tabular leading-none">{{ value }}{{ unit }}</span>
     {% if sub_label %}<span class="text-tiny text-text-tertiary mt-1">{{ sub_label }}</span>{% endif %}
   </div>
