@@ -1,7 +1,6 @@
 # -*- coding: utf_8 -*-
 """SAST engine."""
 import logging
-import platform
 
 from libsast import Scanner
 from libsast.core_matcher.pattern_matcher import PatternMatcher
@@ -22,12 +21,14 @@ def get_multiprocessing_strategy():
     if settings.MULTIPROCESSING:
         # Settings take precedence
         mp = settings.MULTIPROCESSING
-    elif platform.system() == 'Windows' and settings.ASYNC_ANALYSIS:
-        # Set to thread on Windows for async analysis
-        mp = 'thread'
     elif settings.ASYNC_ANALYSIS:
-        # Set to billiard for async analysis
-        mp = 'billiard'
+        # billiard forks a new process pool; forking from inside the
+        # already-threaded django-q worker can deadlock mid SAST scan
+        # (fork-inherited locks never release from the parent's other
+        # threads). Use the threaded strategy for async analysis on every
+        # platform, not just Windows (which never supported billiard's fork
+        # in the first place).
+        mp = 'thread'
     else:
         # Defaults to processpoolexecutor for sync analysis
         mp = 'default'

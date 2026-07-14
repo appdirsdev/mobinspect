@@ -69,6 +69,7 @@ DEFAULT_PATHS=(
   mobsf/StaticAnalyzer/views/common/test_cov_shared_func.py
   mobsf/StaticAnalyzer/views/common/test_cov_shared_func2.py
   mobsf/StaticAnalyzer/views/test_cov_comparer.py
+  mobsf/StaticAnalyzer/views/test_cov_sast_engine.py
 )
 
 echo "[tests] Running: $PYTEST ${*:-<deterministic suite>}"

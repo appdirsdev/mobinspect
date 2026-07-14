@@ -14,7 +14,7 @@ import os
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 
 from mobsf.RBAC.models import ApiKey
 
@@ -41,8 +41,13 @@ SAMPLES = [
 ]
 
 
+@override_settings(ASYNC_ANALYSIS=False)
 class StaticPipelineE2E(TestCase):
-    """Upload + scan + report every sample type in one process."""
+    """Upload + scan + report every sample type in one process.
+
+    Forced synchronous: every scan below must be complete before the
+    following report/scorecard/render calls run, not merely queued.
+    """
 
     @classmethod
     def setUpTestData(cls):
@@ -84,7 +89,7 @@ class StaticPipelineE2E(TestCase):
 
         for obj in uploaded:
             h = obj['hash']
-            # Static analysis (synchronous; ASYNC_ANALYSIS off by default).
+            # Static analysis (forced synchronous by the class decorator).
             self.client.post('/api/v1/scan', {'hash': h}, **self.auth)
             # Report + scorecard + JSON views exercise formatters/serializers.
             self.client.post('/api/v1/report_json', {'hash': h}, **self.auth)

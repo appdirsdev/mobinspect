@@ -142,7 +142,7 @@ class ExtractAndCheckIpaTests(TestCase):
 # ipa_analysis_task exception branch (bad path) + Permission denied branch
 # without any real scan (fast).
 # --------------------------------------------------------------------------
-@override_settings(DISABLE_AUTHENTICATION=None)
+@override_settings(DISABLE_AUTHENTICATION=None, ASYNC_ANALYSIS=False)
 class IpaFastBranchTests(TestCase):
 
     def test_task_exception_branch_returns_err(self):
@@ -200,7 +200,8 @@ class IpaFastBranchTests(TestCase):
 # --------------------------------------------------------------------------
 # FULL real IPA scan + report/dynamic-context branches.
 # --------------------------------------------------------------------------
-@override_settings(RATELIMIT_ENABLE=False, DISABLE_AUTHENTICATION=None)
+@override_settings(
+    RATELIMIT_ENABLE=False, DISABLE_AUTHENTICATION=None, ASYNC_ANALYSIS=False)
 class IpaRealScanTests(TestCase):
 
     @classmethod
@@ -335,7 +336,8 @@ class IpaRealScanTests(TestCase):
 # --------------------------------------------------------------------------
 # FULL real iOS SOURCE (zip) scan + ios_analysis branches.
 # --------------------------------------------------------------------------
-@override_settings(RATELIMIT_ENABLE=False, DISABLE_AUTHENTICATION=None)
+@override_settings(
+    RATELIMIT_ENABLE=False, DISABLE_AUTHENTICATION=None, ASYNC_ANALYSIS=False)
 class IosSourceScanTests(TestCase):
 
     @classmethod
