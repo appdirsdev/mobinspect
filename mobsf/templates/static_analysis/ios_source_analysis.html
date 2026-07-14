@@ -151,33 +151,31 @@
   <div class="card mi-glass card-hover lg:col-span-3" data-reveal>
     <div class="card-header"><h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "shield-check" size=14 %}</span> App scores</h2></div>
     <div class="card-body">
-      <div class="flex flex-col sm:flex-row items-center gap-6">
-        {# Security score — the visual anchor, rendered as the shared arc gauge #}
-        {% if appsec.security_score is not None %}
-        <div class="flex-shrink-0 flex flex-col items-center gap-1.5">
-          {% include "components/gauge_arc.html" with value=appsec.security_score color=appsec.security_score|score_color sub_label="/ 100" size_class="w-32 h-32" animate=True %}
-          <span class="text-tiny uppercase text-text-tertiary">Security score</span>
+      {# Security score — same gauge used everywhere else in the app #}
+      {% if appsec.security_score is not None %}
+      <div class="flex flex-col items-center">
+        {% include "components/gauge_semi.html" with value=appsec.security_score color=appsec.security_score|score_color unit="" sub_label="/ 100" size_class="w-full max-w-[220px]" uid="appscores-src-ios" %}
+        <span class="text-tiny uppercase text-text-tertiary tracking-wide -mt-1">Security score</span>
+      </div>
+      {% endif %}
+      {# Secondary scores #}
+      <div class="{% if appsec.security_score is not None %}mt-4 pt-4 border-t border-border-subtle {% endif %}space-y-3 text-small">
+        {% if average_cvss %}
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "activity" size=14 %} Average CVSS</span>
+          <span class="font-semibold tabular text-text-primary">{{ average_cvss }}</span>
         </div>
         {% endif %}
-        {# Secondary scores #}
-        <div class="flex-1 min-w-0 w-full space-y-3 text-small">
-          {% if average_cvss %}
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "activity" size=14 %} Average CVSS</span>
-            <span class="font-semibold tabular text-text-primary">{{ average_cvss }}</span>
-          </div>
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "eye" size=14 %} Trackers</span>
+          {% if trackers.detected_trackers > 0 %}
+            <span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
+          {% else %}
+            <span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
           {% endif %}
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "eye" size=14 %} Trackers</span>
-            {% if trackers.detected_trackers > 0 %}
-              <span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
-            {% else %}
-              <span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
-            {% endif %}
-          </div>
-          <div class="pt-1">
-            <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-secondary btn-sm w-full justify-center">{% icon "shield" size=14 %} MobInspect Scorecard</a>
-          </div>
+        </div>
+        <div class="pt-1">
+          <a href="{% url 'appsec_dashboard' checksum=md5 %}" class="btn btn-secondary btn-sm w-full justify-center">{% icon "shield" size=14 %} MobInspect Scorecard</a>
         </div>
       </div>
     </div>

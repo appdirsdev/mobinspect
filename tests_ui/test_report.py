@@ -50,15 +50,25 @@ def test_android_report_renders_core_sections(admin_page):
     expect(heading).to_contain_text('Diva')
     expect(admin_page.get_by_text(MD5).first).to_be_visible()
 
-    # "App scores" card carries the arc-gauge security score (animated
-    # number + "/ 100" sub-label as separate nodes; see components/gauge_arc.html)
+    # "App scores" card carries the semicircle gauge (components/gauge_semi.html
+    # — same component used on Home/Analytics/Scorecard for a consistent look)
+    # with a real 0-100 security score, and the readout sits inside the gauge's
+    # own SVG bounds (regression guard: an earlier arc-gauge version made the
+    # number look cramped/overlapping against the ring at this card width).
     scores_card = admin_page.locator('.card', has_text='App scores').first
     expect(scores_card).to_be_visible()
     expect(scores_card).to_contain_text('Security score')
-    gauge_value = scores_card.locator('span[x-text="shown"]').first
+    gauge = scores_card.locator('.mi-semi')
+    expect(gauge).to_be_visible()
+    gauge_value = gauge.locator('.mi-semi-num')
     expect(gauge_value).to_be_visible()
     expect(gauge_value).to_have_text(re.compile(r'^\d{1,3}$'))
-    expect(scores_card.get_by_text('/ 100')).to_be_visible()
+    expect(gauge.get_by_text('/ 100')).to_be_visible()
+    svg_box = gauge.locator('svg').bounding_box()
+    num_box = gauge_value.bounding_box()
+    assert svg_box and num_box
+    assert num_box['x'] >= svg_box['x'] - 2
+    assert num_box['x'] + num_box['width'] <= svg_box['x'] + svg_box['width'] + 2
 
     # Every major section header is present with its real anchor id
     for section_id, heading_text in [

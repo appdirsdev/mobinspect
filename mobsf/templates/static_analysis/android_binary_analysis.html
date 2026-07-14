@@ -235,35 +235,33 @@
     <div class="card mi-glass card-hover" data-reveal>
       <div class="card-header"><h2 class="text-h4 flex items-center gap-3"><span class="mi-icon-chip">{% icon "gauge" size=16 %}</span> App scores</h2></div>
       <div class="card-body">
-        <div class="flex items-center gap-5">
-          {# Security score — the visual anchor, rendered as the shared arc gauge #}
-          {% if appsec.security_score is not None %}
-          <div class="flex-shrink-0 flex flex-col items-center gap-1.5">
-            {% include "components/gauge_arc.html" with value=appsec.security_score color=appsec.security_score|score_color sub_label="/ 100" size_class="w-28 h-28" animate=True %}
-            <span class="text-tiny uppercase text-text-tertiary">Security score</span>
+        {# Security score — same gauge used everywhere else in the app #}
+        {% if appsec.security_score is not None %}
+        <div class="flex flex-col items-center">
+          {% include "components/gauge_semi.html" with value=appsec.security_score color=appsec.security_score|score_color unit="" sub_label="/ 100" size_class="w-full max-w-[220px]" uid="appscores-bin-android" %}
+          <span class="text-tiny uppercase text-text-tertiary tracking-wide -mt-1">Security score</span>
+        </div>
+        {% endif %}
+        {# Secondary scores #}
+        <div class="{% if appsec.security_score is not None %}mt-4 pt-4 border-t border-border-subtle {% endif %}space-y-2.5 text-small">
+          {% if average_cvss %}
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "activity" size=13 %} Avg CVSS</span>
+            <span class="text-text-primary font-medium tabular">{{ average_cvss }}</span>
           </div>
           {% endif %}
-          {# Secondary scores #}
-          <div class="flex-1 min-w-0 space-y-2.5 text-small">
-            {% if average_cvss %}
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "activity" size=13 %} Avg CVSS</span>
-              <span class="text-text-primary font-medium tabular">{{ average_cvss }}</span>
-            </div>
-            {% endif %}
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "eye" size=13 %} Trackers</span>
-              {% if trackers.detected_trackers > 0 %}<span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
-              {% else %}<span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>{% endif %}
-            </div>
-            {% if virus_total and virus_total.items|length > 9 %}
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "shield-check" size=13 %} VirusTotal</span>
-              {% if virus_total.positives > 0 %}<span class="badge badge-critical">{{ virus_total.positives }}/{{ virus_total.total }}</span>
-              {% else %}<span class="badge badge-passed">{{ virus_total.positives }}/{{ virus_total.total }}</span>{% endif %}
-            </div>
-            {% endif %}
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "eye" size=13 %} Trackers</span>
+            {% if trackers.detected_trackers > 0 %}<span class="badge badge-medium">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>
+            {% else %}<span class="badge badge-passed">{{ trackers.detected_trackers }}/{{ trackers.total_trackers }}</span>{% endif %}
           </div>
+          {% if virus_total and virus_total.items|length > 9 %}
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-tertiary inline-flex items-center gap-1.5">{% icon "shield-check" size=13 %} VirusTotal</span>
+            {% if virus_total.positives > 0 %}<span class="badge badge-critical">{{ virus_total.positives }}/{{ virus_total.total }}</span>
+            {% else %}<span class="badge badge-passed">{{ virus_total.positives }}/{{ virus_total.total }}</span>{% endif %}
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
