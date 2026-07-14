@@ -274,6 +274,12 @@ MIDDLEWARE = (
     'django_ratelimit.middleware.RatelimitMiddleware',
     # MobInspect RBAC: populate request.mi_permissions / request.mi_roles.
     'mobsf.RBAC.middleware.RBACMiddleware',
+    # Every dynamic page carries a session-bound CSRF token — prevent the
+    # browser (bfcache in particular) from ever serving a stale cached copy
+    # of one, which is the classic cause of a false "CSRF verification
+    # failed" after login/logout. Static assets are unaffected (whitenoise
+    # already sets its own Cache-Control on those).
+    'mobsf.MobSF.cache_middleware.NoStoreCacheMiddleware',
 )
 ROOT_URLCONF = 'mobsf.MobSF.urls'
 WSGI_APPLICATION = 'mobsf.MobSF.wsgi.application'
