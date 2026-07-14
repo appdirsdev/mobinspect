@@ -314,15 +314,15 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 # to the prebuilt-index path so the same code path serves dev and prod.
 WHITENOISE_AUTOREFRESH = False
 WHITENOISE_USE_FINDERS = False
-# 256MB limit for file uploads (hard Django-level backstop; kept above
+# Hard Django-level backstop for file uploads — kept above
 # MOBINSPECT_MAX_UPLOAD_SIZE below so an oversized upload hits our own
-# friendly size check first, not Django's raw RequestDataTooBig error).
-DATA_UPLOAD_MAX_MEMORY_SIZE = 256 * 1024 * 1024
+# friendly size check first, not Django's raw RequestDataTooBig error.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 550 * 1024 * 1024
 # App-level upload size guardrail, mirrored at the nginx layer
 # (client_max_body_size). Enforced explicitly in Upload.upload_html/
 # upload_api so oversized files are rejected with a clear message.
 MOBINSPECT_MAX_UPLOAD_SIZE_MB = int(
-    os.getenv('MOBINSPECT_MAX_UPLOAD_SIZE_MB', '200'))
+    os.getenv('MOBINSPECT_MAX_UPLOAD_SIZE_MB', '500'))
 MOBINSPECT_MAX_UPLOAD_SIZE = MOBINSPECT_MAX_UPLOAD_SIZE_MB * 1024 * 1024
 # 400MB per file limit for uncompressed files
 ZIP_MAX_UNCOMPRESSED_FILE_SIZE = 400 * 1024 * 1024

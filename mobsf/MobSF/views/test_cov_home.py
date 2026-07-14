@@ -127,7 +127,7 @@ class HomeViewsRealTests(TestCase):
     def test_upload_html_rejects_oversize_file(self):
         # Real file, real size check — MOBINSPECT_MAX_UPLOAD_SIZE lowered to
         # 10 bytes so a tiny upload exercises the real oversize branch
-        # without allocating anything close to the real 200MB default.
+        # without allocating anything close to the real 500MB default.
         big = SimpleUploadedFile(
             'big.apk', b'x' * 100, content_type='application/octet-stream')
         resp = self.client.post('/upload/', {'file': big})
