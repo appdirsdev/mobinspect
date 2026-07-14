@@ -224,6 +224,52 @@ def test_probe_connects_over_loopback():
     assert 'granite4:3b' in models and 'nomic-embed-text' in models
 
 
+# ══════════════════ 4a · real probe · model-name verification ═══════════════
+# Regression coverage for a real, user-reported gap: the probe used to only
+# check the HOST was reachable, never whether the typed model actually
+# existed there — so a typo'd/unpulled model name showed "Connected" on both
+# Test and Save, and enrichment would only fail later, silently.
+
+def test_probe_rejects_model_not_present_on_host():
+    with mock_ollama('127.0.0.1') as (host, port):
+        status, msg, models = _probe_model_endpoint(
+            f'http://{host}:{port}', 'totally-made-up-200b-model')
+    assert status == ModelIntegration.STATUS_FAILED
+    assert 'not available' in msg.lower()
+    assert 'totally-made-up-200b-model' in msg
+    # The real available models are still surfaced so the message is
+    # actionable, not just "no".
+    assert 'granite4:3b' in msg or 'nomic-embed-text' in msg
+    # The host WAS reachable — models_list still reflects what's really there.
+    assert models == ['granite4:3b', 'nomic-embed-text']
+
+
+def test_probe_accepts_model_present_on_host():
+    with mock_ollama('127.0.0.1') as (host, port):
+        status, msg, models = _probe_model_endpoint(
+            f'http://{host}:{port}', 'granite4:3b')
+    assert status == ModelIntegration.STATUS_CONNECTED, msg
+
+
+def test_probe_accepts_bare_name_matching_a_tagged_model():
+    # _TagsHandler only serves "granite4:3b" (tagged) — a bare "granite4"
+    # (no tag) should still be accepted, matching Ollama's own "any tag of
+    # this name counts" pull semantics, not rejected as a false negative.
+    with mock_ollama('127.0.0.1') as (host, port):
+        status, msg, models = _probe_model_endpoint(
+            f'http://{host}:{port}', 'granite4')
+    assert status == ModelIntegration.STATUS_CONNECTED, msg
+
+
+def test_probe_with_no_model_name_keeps_old_host_only_behavior():
+    # Backward-compatible default: omitting model_name entirely (as the
+    # bare _probe_model_endpoint(url) call sites still do) must not
+    # suddenly start failing — only an explicitly-checked name can fail.
+    with mock_ollama('127.0.0.1') as (host, port):
+        status, msg, models = _probe_model_endpoint(f'http://{host}:{port}')
+    assert status == ModelIntegration.STATUS_CONNECTED, msg
+
+
 # ══════════════════════════ 4b · real probe · different (LAN) IP ════════════
 def test_probe_connects_over_private_lan_ip(reachable_lan_ip):
     with mock_ollama(reachable_lan_ip) as (host, port):
@@ -288,9 +334,11 @@ def test_model_save_and_test_over_loopback(su_client):
 def test_model_save_over_private_lan_ip(su_client, reachable_lan_ip):
     with mock_ollama(reachable_lan_ip) as (host, port):
         url = f'http://{host}:{port}'
+        # Must match a model _TagsHandler.MODELS actually serves — Test/Save
+        # now verify the model is present, not just that the host answers.
         su_client.post(
             reverse('rbac:model_save', args=['classify']),
-            {'base_url': url, 'model_name': 'granite4.1:3b'})
+            {'base_url': url, 'model_name': 'granite4:3b'})
     integ = ModelIntegration.objects.get(role='classify')
     assert integ.base_url == url
     assert integ.last_status == ModelIntegration.STATUS_CONNECTED
@@ -384,6 +432,27 @@ def test_model_test_and_save_agree_on_same_value(su_client):
         saved = ModelIntegration.objects.get(role='classify')
     assert tested['success'] is True and tested['status'] == 'connected'
     assert saved.last_status == ModelIntegration.STATUS_CONNECTED  # they agree
+
+
+@pytest.mark.django_db
+def test_model_test_and_save_reject_model_not_on_host(su_client):
+    """Exact user-reported scenario: a reachable host + a model name that
+    doesn't actually exist there (typo, or never pulled) must show FAILED
+    on both Test and Save — not "Connected" just because the host answers.
+    """
+    with mock_ollama('127.0.0.1') as (host, port):
+        url = f'http://{host}:{port}'
+        tested = su_client.post(
+            reverse('rbac:model_test', args=['generate']),
+            {'base_url': url, 'model_name': 'granite4:200b'}).json()
+        su_client.post(
+            reverse('rbac:model_save', args=['generate']),
+            {'base_url': url, 'model_name': 'granite4:200b'})
+        saved = ModelIntegration.objects.get(role='generate')
+    assert tested['success'] is False
+    assert tested['status'] == ModelIntegration.STATUS_FAILED
+    assert 'not available' in tested['message'].lower()
+    assert saved.last_status == ModelIntegration.STATUS_FAILED
 
 
 @pytest.mark.django_db

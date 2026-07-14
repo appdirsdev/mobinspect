@@ -679,10 +679,11 @@ def model_test_key(request, role):
                 'success': False, 'status': 'failed',
                 'message': 'Provide a model name (e.g. granite4:3b).',
                 'last_status_at': timezone.now().isoformat(), 'models_list': []})
-        status, message, models = _probe_model_endpoint(posted)
+        status, message, models = _probe_model_endpoint(posted, model_name)
         audit.record(
             request, 'integration.model.test', target_type='model_integration',
-            metadata={'role': role, 'base_url': posted, 'result': status})
+            metadata={'role': role, 'base_url': posted, 'model': model_name,
+                      'result': status})
         return JsonResponse({
             'success': status == ModelIntegration.STATUS_CONNECTED,
             'status': status, 'message': message,
@@ -705,8 +706,36 @@ def model_test_key(request, role):
 
 
 # ─────────────────────────────────────────────── AI model integrations
-def _probe_model_endpoint(base_url):
+def _model_is_available(model_name, available_models):
+    """True if `model_name` actually exists on the host's model list.
+
+    Ollama tags are "name:tag" (e.g. "granite4.1:8b"); a bare name with no
+    tag implicitly means "latest" when pulling/running. Accept an exact
+    match, an implicit ":latest" match, or a bare name matching any tagged
+    variant (typing "granite4.1" should find "granite4.1:8b").
+    """
+    if not model_name:
+        return True  # nothing to check against
+    name = model_name.strip()
+    if name in available_models:
+        return True
+    if ':' not in name:
+        if f'{name}:latest' in available_models:
+            return True
+        if any(m.split(':', 1)[0] == name for m in available_models):
+            return True
+    return False
+
+
+def _probe_model_endpoint(base_url, model_name=None):
     """Probe an AI model endpoint (Ollama /api/tags). Enclave-only, bounded.
+
+    When `model_name` is given, the host being reachable is NOT enough to
+    report CONNECTED — the model must actually be present in its /api/tags
+    response, or enrichment will silently fail later with a host that
+    "tests fine" (a real, previously-reported gap: a typo'd/unpulled model
+    name showed green on Test/Save because only host reachability was
+    checked).
 
     Returns (status, message, detected_models_list). Never raises.
     """
@@ -727,6 +756,13 @@ def _probe_model_endpoint(base_url):
             return ModelIntegration.STATUS_FAILED, f'HTTP {resp.status_code}', []
         models = [m.get('name') for m in (resp.json().get('models') or [])
                   if m.get('name')]
+        if model_name and not _model_is_available(model_name, models):
+            avail = ', '.join(models[:8]) + ('…' if len(models) > 8 else '')
+            msg = (f'Host reachable, but "{model_name}" is not available '
+                   f'there. Available: {avail}' if models else
+                   f'Host reachable, but "{model_name}" is not available '
+                   f'there (host has no models pulled).')
+            return ModelIntegration.STATUS_FAILED, msg, models
         return (ModelIntegration.STATUS_CONNECTED,
                 f'{len(models)} model(s) available', models)
     except requests.exceptions.Timeout:
@@ -736,7 +772,8 @@ def _probe_model_endpoint(base_url):
 
 
 def _apply_model_probe(integ):
-    status, message, models = _probe_model_endpoint(integ.base_url)
+    status, message, models = _probe_model_endpoint(
+        integ.base_url, integ.model_name)
     integ.last_status = status
     integ.last_status_message = message[:2000]
     integ.last_status_at = timezone.now()

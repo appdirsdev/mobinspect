@@ -278,7 +278,7 @@ def test_model_save_generate_happy_path(su_client, monkeypatch):
     assert integ.is_active is True
     assert integ.last_status == ModelIntegration.STATUS_CONNECTED
     assert integ.detected_models == 'granite4:3b'
-    probe.assert_called_once_with(LOOPBACK_URL)
+    probe.assert_called_once_with(LOOPBACK_URL, 'granite4:3b')
     ev = AuditEvent.objects.filter(action='integration.model.save').first()
     assert ev is not None
     assert ev.metadata['role'] == 'generate'
