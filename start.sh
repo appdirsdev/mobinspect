@@ -6,7 +6,7 @@
 #                        (brew on macOS, systemd on Linux). A running server
 #                        is left exactly as-is — never restarted.
 #   2. Android AVD     — macOS only, for Dynamic Analysis (--no-emulator skips).
-#                        On Linux, point MOBSF_ANALYZER_IDENTIFIER at a remote AVD.
+#                        On Linux, point MOBINSPECT_ANALYZER_IDENTIFIER at a remote AVD.
 #   3. django-q qcluster — background worker for scans/analysis.
 #   4. MobInspect web server (gunicorn, foreground → http://HOST:PORT).
 #
@@ -62,9 +62,9 @@ PORT="${PORT:-8000}"
 
 # wkhtmltopdf for PDF export (both platforms).
 if [[ -x "$HOME/.local/wkhtmltox/bin/wkhtmltopdf" ]]; then
-  export MOBSF_WKHTMLTOPDF_BINARY="$HOME/.local/wkhtmltox/bin/wkhtmltopdf"
+  export MOBINSPECT_WKHTMLTOPDF_BINARY="$HOME/.local/wkhtmltox/bin/wkhtmltopdf"
 elif command -v wkhtmltopdf >/dev/null 2>&1; then
-  export MOBSF_WKHTMLTOPDF_BINARY="$(command -v wkhtmltopdf)"
+  export MOBINSPECT_WKHTMLTOPDF_BINARY="$(command -v wkhtmltopdf)"
 fi
 
 # ---- how we invoke Django / gunicorn ---------------------------------------
@@ -80,7 +80,7 @@ fi
 # shellcheck disable=SC1091
 source ./scripts/start-common.sh
 
-# Load PostgreSQL env (switches the app from SQLite to Postgres).
+# Load PostgreSQL env (required — no SQLite fallback).
 load_postgres_env
 
 # ---- Dynamic Analysis target (macOS local emulator) ------------------------
@@ -90,7 +90,7 @@ AVD="${AVD:-MobInspect_API30}"
 # (MobInspect connects that way), so target the emulator's TCP adb port.
 EMU_TCP="127.0.0.1:5555"
 if [[ "$START_EMULATOR" == "1" ]]; then
-  export MOBSF_ANALYZER_IDENTIFIER="${MOBSF_ANALYZER_IDENTIFIER:-$EMU_TCP}"
+  export MOBINSPECT_ANALYZER_IDENTIFIER="${MOBINSPECT_ANALYZER_IDENTIFIER:-$EMU_TCP}"
 fi
 
 cleanup_extra() {
@@ -134,7 +134,7 @@ if [[ "$START_EMULATOR" == "1" ]]; then
 elif [[ "$OS" == "Darwin" ]]; then
   warn "Skipping emulator (--no-emulator). Dynamic Analysis will be unavailable."
 else
-  warn "Linux: no local emulator. Set MOBSF_ANALYZER_IDENTIFIER=<avd-host>:5555 for Dynamic Analysis."
+  warn "Linux: no local emulator. Set MOBINSPECT_ANALYZER_IDENTIFIER=<avd-host>:5555 for Dynamic Analysis."
 fi
 
 # ---- 4. django-q qcluster (background scan worker) -------------------------

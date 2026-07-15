@@ -43,6 +43,7 @@ _ENV_KEYS = [
     'MOBINSPECT_HOME_DIR', 'MOBSF_HOME_DIR',
     'MOBINSPECT_ADMIN_USERNAME', 'MOBINSPECT_ADMIN_PASSWORD',
     'MI_ENV_TEST_NEW', 'MI_ENV_TEST_OLD',
+    'MOBINSPECT_ADB_BINARY', 'MOBSF_ADB_BINARY',
 ]
 
 
@@ -230,6 +231,23 @@ def test_create_user_conf_bad_base_dir_is_swallowed(tmp_path):
     # base_dir with no MobSF/settings.py -> exception caught, no raise.
     create_user_conf(tmp_path, tmp_path)
     assert not (tmp_path / 'config.py').exists()
+
+
+def test_create_user_conf_extracted_block_loads_and_honors_env_shim(tmp_path):
+    # The extracted block is a raw text splice into a standalone file loaded
+    # via load_source — it must be syntactically valid on its own (needs its
+    # own `env` import) and every MOBSF_* var in it must go through the
+    # rebrand shim (MOBINSPECT_* wins, MOBSF_* still works as a fallback).
+    create_user_conf(tmp_path, BASE_DIR)
+    config_path = tmp_path / 'config.py'
+
+    os.environ['MOBSF_ADB_BINARY'] = '/legacy/adb'
+    mod_legacy = load_source('user_settings_legacy', str(config_path))
+    assert mod_legacy.ADB_BINARY == '/legacy/adb'
+
+    os.environ['MOBINSPECT_ADB_BINARY'] = '/new/adb'
+    mod_new = load_source('user_settings_new', str(config_path))
+    assert mod_new.ADB_BINARY == '/new/adb'
 
 
 # --------------------------- django ops (package bail-out) ---------------------------

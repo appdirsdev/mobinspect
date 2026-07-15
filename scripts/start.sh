@@ -71,5 +71,5 @@ log "Admin: set MOBINSPECT_ADMIN_PASSWORD before first run, or check"
 log "       ~/.MobInspect/initial-admin-password.txt for the generated one."
 # --nostatic disables runserver's WSGI-level static handler so WhiteNoise
 # middleware (which serves STATIC_ROOT directly) gets the /static/* requests.
-exec env MOBINSPECT_DEV=1 MOBSF_DEBUG=1 \
+exec env MOBINSPECT_DEV=1 MOBINSPECT_DEBUG=1 \
   poetry run python manage.py runserver --nostatic "$BIND:$PORT"

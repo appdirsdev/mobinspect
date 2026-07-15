@@ -38,7 +38,7 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from mobsf.StaticAnalyzer.models import RecentScansDB
-from mobsf.MobSF. init import api_key
+from mobsf.MobSF. init import api_key, env
 
 from . import settings
 
@@ -391,7 +391,7 @@ def docker_translate_localhost(identifier):
     """Convert localhost to host.docker.internal."""
     if not identifier:
         return identifier
-    if not os.getenv('MOBSF_PLATFORM') == 'docker':
+    if not env('MOBINSPECT_PLATFORM', 'MOBSF_PLATFORM') == 'docker':
         return identifier
     try:
         identifier = identifier.strip()
@@ -413,7 +413,7 @@ def docker_translate_localhost(identifier):
 
 def docker_translate_proxy_ip(ip):
     """Convert localhost proxy ip to host.docker.internal."""
-    if not os.getenv('MOBSF_PLATFORM') == 'docker':
+    if not env('MOBINSPECT_PLATFORM', 'MOBSF_PLATFORM') == 'docker':
         return ip
     if ip and ip.strip() in ('127.0.0.1', 'localhost'):
         return 'host.docker.internal'

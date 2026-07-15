@@ -11,6 +11,7 @@ import os
 from django.core.exceptions import ImproperlyConfigured
 
 from mobsf.MobSF.init import (
+    env,
     first_run,
     get_mobsf_home,
     get_mobsf_version,
@@ -124,7 +125,7 @@ WINDOWS_EXTS = ('appx',)
 # REST API only mode
 # Set MOBSF_API_ONLY to 1 to enable REST API only mode
 # In this mode, web UI related urls are disabled.
-API_ONLY = os.getenv('MOBSF_API_ONLY', '0')
+API_ONLY = env('MOBINSPECT_API_ONLY', 'MOBSF_API_ONLY', '0')
 
 # -----External URLS--------------------------
 MALWARE_DB_URL = 'https://www.malwaredomainlist.com/mdlcsv.php'
@@ -145,7 +146,7 @@ FRIDA_SERVER = 'https://api.github.com/repos/frida/frida/releases/tags/'
 # DynamicAnalyzer/views/common/frida/server_update.py to enable real
 # verification. Defined here (outside the user-config block) so it is always
 # present even when a CONFIG_HOME user config is loaded.
-FRIDA_VERIFY = os.getenv('MOBSF_FRIDA_VERIFY', '0') == '1'
+FRIDA_VERIFY = env('MOBINSPECT_FRIDA_VERIFY', 'MOBSF_FRIDA_VERIFY', '0') == '1'
 GOOGLE = 'https://www.google.com'
 PLAYSTORE = 'https://play.google.com'
 BAIDU = 'https://www.baidu.com/'
@@ -185,7 +186,7 @@ DATABASES = {
 }
 # ===============================================
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
-DEBUG = bool(os.getenv('MOBSF_DEBUG', '0') == '1')
+DEBUG = bool(env('MOBINSPECT_DEBUG', 'MOBSF_DEBUG', '0') == '1')
 DJANGO_LOG_LEVEL = DEBUG
 TEMPLATE_DEBUG = DEBUG
 # ALLOWED_HOSTS: read from env (comma-separated). Never default to '*' — that
@@ -516,16 +517,16 @@ def _mobinspect_ai_url_ok(url):
 if MOBINSPECT_AI_ENABLED and not _mobinspect_ai_url_ok(MOBINSPECT_AI_BASE_URL):
     MOBINSPECT_AI_ENABLED = False
 
-MULTIPROCESSING = os.getenv('MOBSF_MULTIPROCESSING')
-JADX_TIMEOUT = int(os.getenv('MOBSF_JADX_TIMEOUT', 1000))
-SAST_TIMEOUT = int(os.getenv('MOBSF_SAST_TIMEOUT', 1000))
-BINARY_ANALYSIS_TIMEOUT = int(os.getenv('MOBSF_BINARY_ANALYSIS_TIMEOUT', 600))
-DISABLE_AUTHENTICATION = os.getenv('MOBSF_DISABLE_AUTHENTICATION')
-RATELIMIT = os.getenv('MOBSF_RATELIMIT', '7/m')
+MULTIPROCESSING = env('MOBINSPECT_MULTIPROCESSING', 'MOBSF_MULTIPROCESSING')
+JADX_TIMEOUT = int(env('MOBINSPECT_JADX_TIMEOUT', 'MOBSF_JADX_TIMEOUT', 1000))
+SAST_TIMEOUT = int(env('MOBINSPECT_SAST_TIMEOUT', 'MOBSF_SAST_TIMEOUT', 1000))
+BINARY_ANALYSIS_TIMEOUT = int(env('MOBINSPECT_BINARY_ANALYSIS_TIMEOUT', 'MOBSF_BINARY_ANALYSIS_TIMEOUT', 600))
+DISABLE_AUTHENTICATION = env('MOBINSPECT_DISABLE_AUTHENTICATION', 'MOBSF_DISABLE_AUTHENTICATION')
+RATELIMIT = env('MOBINSPECT_RATELIMIT', 'MOBSF_RATELIMIT', '7/m')
 USE_X_FORWARDED_HOST = bool(
-    os.getenv('MOBSF_USE_X_FORWARDED_HOST', '1') == '1')
+    env('MOBINSPECT_USE_X_FORWARDED_HOST', 'MOBSF_USE_X_FORWARDED_HOST', '1') == '1')
 USE_X_FORWARDED_PORT = bool(
-    os.getenv('MOBSF_USE_X_FORWARDED_PORT', '1') == '1')
+    env('MOBINSPECT_USE_X_FORWARDED_PORT', 'MOBSF_USE_X_FORWARDED_PORT', '1') == '1')
 # Trust the X-Forwarded-Proto header ONLY when explicitly told we sit behind
 # a reverse proxy that strips/sets it. Otherwise a client can spoof the
 # header and trick Django into thinking the request is HTTPS.
@@ -537,16 +538,16 @@ if _behind_proxy:
 EFR_01 = os.getenv('EFR_01', '0')
 # SAML SSO
 # IdP Configuration
-IDP_METADATA_URL = os.getenv('MOBSF_IDP_METADATA_URL')
-IDP_ENTITY_ID = os.getenv('MOBSF_IDP_ENTITY_ID')
-IDP_SSO_URL = os.getenv('MOBSF_IDP_SSO_URL')
-IDP_X509CERT = os.getenv('MOBSF_IDP_X509CERT')
-IDP_IS_ADFS = os.getenv('MOBSF_IDP_IS_ADFS', '0')
-IDP_MAINTAINER_GROUP = os.getenv('MOBSF_IDP_MAINTAINER_GROUP', 'Maintainer')
-IDP_VIEWER_GROUP = os.getenv('MOBSF_IDP_VIEWER_GROUP', 'Viewer')
+IDP_METADATA_URL = env('MOBINSPECT_IDP_METADATA_URL', 'MOBSF_IDP_METADATA_URL')
+IDP_ENTITY_ID = env('MOBINSPECT_IDP_ENTITY_ID', 'MOBSF_IDP_ENTITY_ID')
+IDP_SSO_URL = env('MOBINSPECT_IDP_SSO_URL', 'MOBSF_IDP_SSO_URL')
+IDP_X509CERT = env('MOBINSPECT_IDP_X509CERT', 'MOBSF_IDP_X509CERT')
+IDP_IS_ADFS = env('MOBINSPECT_IDP_IS_ADFS', 'MOBSF_IDP_IS_ADFS', '0')
+IDP_MAINTAINER_GROUP = env('MOBINSPECT_IDP_MAINTAINER_GROUP', 'MOBSF_IDP_MAINTAINER_GROUP', 'Maintainer')
+IDP_VIEWER_GROUP = env('MOBINSPECT_IDP_VIEWER_GROUP', 'MOBSF_IDP_VIEWER_GROUP', 'Viewer')
 # SP Configuration
-SP_HOST = os.getenv('MOBSF_SP_HOST')
-SP_ALLOW_PASSWORD = os.getenv('MOBSF_SP_ALLOW_PASSWORD', '0')
+SP_HOST = env('MOBINSPECT_SP_HOST', 'MOBSF_SP_HOST')
+SP_ALLOW_PASSWORD = env('MOBINSPECT_SP_ALLOW_PASSWORD', 'MOBSF_SP_ALLOW_PASSWORD', '0')
 # ===================
 # USER CONFIGURATION
 # ===================
@@ -572,6 +573,7 @@ else:
     # Common third party classes/paths that will be skipped
     # during static analysis
     import os
+    from mobsf.MobSF.init import env
     SKIP_CLASS_PATH = {
         'com/google/', 'androidx', 'okhttp2/', 'okhttp3/',
         'com/android/', 'com/squareup', 'okhttp/'
@@ -584,33 +586,34 @@ else:
         'kotlinx/', 'kotlin/',
     }
     # Disable CVSSV2 Score by default
-    CVSS_SCORE_ENABLED = bool(os.getenv('MOBSF_CVSS_SCORE_ENABLED', ''))
+    CVSS_SCORE_ENABLED = bool(env('MOBINSPECT_CVSS_SCORE_ENABLED', 'MOBSF_CVSS_SCORE_ENABLED', ''))
     # NIAP Scan
-    NIAP_ENABLED = os.getenv('MOBSF_NIAP_ENABLED', '')
+    NIAP_ENABLED = env('MOBINSPECT_NIAP_ENABLED', 'MOBSF_NIAP_ENABLED', '')
     # Permission to Code Mapping
-    PERM_MAPPING_ENABLED = os.getenv('MOBSF_PERM_MAPPING_ENABLED', '1')
+    PERM_MAPPING_ENABLED = env('MOBINSPECT_PERM_MAPPING_ENABLED', 'MOBSF_PERM_MAPPING_ENABLED', '1')
     # Dex 2 Smali Conversion
-    DEX2SMALI_ENABLED = os.getenv('MOBSF_DEX2SMALI_ENABLED', '1')
+    DEX2SMALI_ENABLED = env('MOBINSPECT_DEX2SMALI_ENABLED', 'MOBSF_DEX2SMALI_ENABLED', '1')
     # Android Shared Object Binary Analysis
-    SO_ANALYSIS_ENABLED = os.getenv('MOBSF_SO_ANALYSIS_ENABLED', '1')
+    SO_ANALYSIS_ENABLED = env('MOBINSPECT_SO_ANALYSIS_ENABLED', 'MOBSF_SO_ANALYSIS_ENABLED', '1')
     # iOS Dynamic Library Binary Analysis
-    DYLIB_ANALYSIS_ENABLED = os.getenv('MOBSF_DYLIB_ANALYSIS_ENABLED', '1')
+    DYLIB_ANALYSIS_ENABLED = env('MOBINSPECT_DYLIB_ANALYSIS_ENABLED', 'MOBSF_DYLIB_ANALYSIS_ENABLED', '1')
     # =================================================
     # --------------------------
     # MALWARE ANALYZER SETTINGS
     # --------------------------
 
-    DOMAIN_MALWARE_SCAN = os.getenv('MOBSF_DOMAIN_MALWARE_SCAN', '1')
-    APKID_ENABLED = os.getenv('MOBSF_APKID_ENABLED', '1')
+    DOMAIN_MALWARE_SCAN = env('MOBINSPECT_DOMAIN_MALWARE_SCAN', 'MOBSF_DOMAIN_MALWARE_SCAN', '1')
+    APKID_ENABLED = env('MOBINSPECT_APKID_ENABLED', 'MOBSF_APKID_ENABLED', '1')
     # ==================================================
     # ======WINDOWS STATIC ANALYSIS SETTINGS ===========
     # Private key
-    WINDOWS_VM_SECRET = os.getenv(
-        'MOBSF_WINDOWS_VM_SECRET', 'mobsf/MobSF/windows_vm_priv_key.asc')
+    WINDOWS_VM_SECRET = env(
+        'MOBINSPECT_WINDOWS_VM_SECRET', 'MOBSF_WINDOWS_VM_SECRET',
+        'mobsf/MobSF/windows_vm_priv_key.asc')
     # IP and Port of the MobSF Windows VM
     # example: WINDOWS_VM_IP = '127.0.0.1'   ;noqa E800
-    WINDOWS_VM_IP = os.getenv('MOBSF_WINDOWS_VM_IP')
-    WINDOWS_VM_PORT = os.getenv('MOBSF_WINDOWS_VM_PORT', '8000')
+    WINDOWS_VM_IP = env('MOBINSPECT_WINDOWS_VM_IP', 'MOBSF_WINDOWS_VM_IP')
+    WINDOWS_VM_PORT = env('MOBINSPECT_WINDOWS_VM_PORT', 'MOBSF_WINDOWS_VM_PORT', '8000')
     # ==================================================
 
     # ==============3rd Party Tools=====================
@@ -621,24 +624,24 @@ else:
     """
 
     # Android 3P Tools
-    BUNDLE_TOOL = os.getenv('MOBSF_BUNDLE_TOOL', '')
-    JADX_BINARY = os.getenv('MOBSF_JADX_BINARY', '')
-    BACKSMALI_BINARY = os.getenv('MOBSF_BACKSMALI_BINARY', '')
-    VD2SVG_BINARY = os.getenv('MOBSF_VD2SVG_BINARY', '')
-    APKTOOL_BINARY = os.getenv('MOBSF_APKTOOL_BINARY', '')
-    ADB_BINARY = os.getenv('MOBSF_ADB_BINARY', '')
-    AAPT2_BINARY = os.getenv('MOBSF_AAPT2_BINARY', '')
-    AAPT_BINARY = os.getenv('MOBSF_AAPT_BINARY', '')
+    BUNDLE_TOOL = env('MOBINSPECT_BUNDLE_TOOL', 'MOBSF_BUNDLE_TOOL', '')
+    JADX_BINARY = env('MOBINSPECT_JADX_BINARY', 'MOBSF_JADX_BINARY', '')
+    BACKSMALI_BINARY = env('MOBINSPECT_BACKSMALI_BINARY', 'MOBSF_BACKSMALI_BINARY', '')
+    VD2SVG_BINARY = env('MOBINSPECT_VD2SVG_BINARY', 'MOBSF_VD2SVG_BINARY', '')
+    APKTOOL_BINARY = env('MOBINSPECT_APKTOOL_BINARY', 'MOBSF_APKTOOL_BINARY', '')
+    ADB_BINARY = env('MOBINSPECT_ADB_BINARY', 'MOBSF_ADB_BINARY', '')
+    AAPT2_BINARY = env('MOBINSPECT_AAPT2_BINARY', 'MOBSF_AAPT2_BINARY', '')
+    AAPT_BINARY = env('MOBINSPECT_AAPT_BINARY', 'MOBSF_AAPT_BINARY', '')
 
     # iOS 3P Tools
-    JTOOL_BINARY = os.getenv('MOBSF_JTOOL_BINARY', '')
-    CLASSDUMP_BINARY = os.getenv('MOBSF_CLASSDUMP_BINARY', '')
-    CLASSDUMP_SWIFT_BINARY = os.getenv('MOBSF_CLASSDUMP_SWIFT_BINARY', '')
+    JTOOL_BINARY = env('MOBINSPECT_JTOOL_BINARY', 'MOBSF_JTOOL_BINARY', '')
+    CLASSDUMP_BINARY = env('MOBINSPECT_CLASSDUMP_BINARY', 'MOBSF_CLASSDUMP_BINARY', '')
+    CLASSDUMP_SWIFT_BINARY = env('MOBINSPECT_CLASSDUMP_SWIFT_BINARY', 'MOBSF_CLASSDUMP_SWIFT_BINARY', '')
 
     # COMMON
-    JAVA_DIRECTORY = os.getenv('MOBSF_JAVA_DIRECTORY', '')
+    JAVA_DIRECTORY = env('MOBINSPECT_JAVA_DIRECTORY', 'MOBSF_JAVA_DIRECTORY', '')
     # PDF report generation (wkhtmltopdf). If empty, pdfkit relies on PATH.
-    WKHTMLTOPDF_BINARY = os.getenv('MOBSF_WKHTMLTOPDF_BINARY', '')
+    WKHTMLTOPDF_BINARY = env('MOBINSPECT_WKHTMLTOPDF_BINARY', 'MOBSF_WKHTMLTOPDF_BINARY', '')
 
     """
     Examples:
@@ -653,36 +656,36 @@ else:
     # -------------------------
 
     # =======ANDROID DYNAMIC ANALYSIS SETTINGS===========
-    ANALYZER_IDENTIFIER = os.getenv('MOBSF_ANALYZER_IDENTIFIER', '')
-    FRIDA_TIMEOUT = int(os.getenv('MOBSF_FRIDA_TIMEOUT', '4'))
-    ACTIVITY_TESTER_SLEEP = int(os.getenv('MOBSF_ACTIVITY_TESTER_SLEEP', '4'))
+    ANALYZER_IDENTIFIER = env('MOBINSPECT_ANALYZER_IDENTIFIER', 'MOBSF_ANALYZER_IDENTIFIER', '')
+    FRIDA_TIMEOUT = int(env('MOBINSPECT_FRIDA_TIMEOUT', 'MOBSF_FRIDA_TIMEOUT', '4'))
+    ACTIVITY_TESTER_SLEEP = int(env('MOBINSPECT_ACTIVITY_TESTER_SLEEP', 'MOBSF_ACTIVITY_TESTER_SLEEP', '4'))
     # ==============================================
 
     # ================HTTPS PROXY ===============
-    PROXY_IP = os.getenv('MOBSF_PROXY_IP', '127.0.0.1')
-    PROXY_PORT = int(os.getenv('MOBSF_PROXY_PORT', '1337'))
+    PROXY_IP = env('MOBINSPECT_PROXY_IP', 'MOBSF_PROXY_IP', '127.0.0.1')
+    PROXY_PORT = int(env('MOBINSPECT_PROXY_PORT', 'MOBSF_PROXY_PORT', '1337'))
     # ===================================================
 
     # ========UPSTREAM PROXY SETTINGS ==============
     # If you are behind a Proxy
-    UPSTREAM_PROXY_ENABLED = bool(os.getenv(
-        'MOBSF_UPSTREAM_PROXY_ENABLED', ''))
-    UPSTREAM_PROXY_SSL_VERIFY = os.getenv(
-        'MOBSF_UPSTREAM_PROXY_SSL_VERIFY', '1')
-    UPSTREAM_PROXY_TYPE = os.getenv('MOBSF_UPSTREAM_PROXY_TYPE', 'http')
-    UPSTREAM_PROXY_IP = os.getenv('MOBSF_UPSTREAM_PROXY_IP', '127.0.0.1')
-    UPSTREAM_PROXY_PORT = int(os.getenv('MOBSF_UPSTREAM_PROXY_PORT', '3128'))
-    UPSTREAM_PROXY_USERNAME = os.getenv('MOBSF_UPSTREAM_PROXY_USERNAME', '')
-    UPSTREAM_PROXY_PASSWORD = os.getenv('MOBSF_UPSTREAM_PROXY_PASSWORD', '')
+    UPSTREAM_PROXY_ENABLED = bool(env(
+        'MOBINSPECT_UPSTREAM_PROXY_ENABLED', 'MOBSF_UPSTREAM_PROXY_ENABLED', ''))
+    UPSTREAM_PROXY_SSL_VERIFY = env(
+        'MOBINSPECT_UPSTREAM_PROXY_SSL_VERIFY', 'MOBSF_UPSTREAM_PROXY_SSL_VERIFY', '1')
+    UPSTREAM_PROXY_TYPE = env('MOBINSPECT_UPSTREAM_PROXY_TYPE', 'MOBSF_UPSTREAM_PROXY_TYPE', 'http')
+    UPSTREAM_PROXY_IP = env('MOBINSPECT_UPSTREAM_PROXY_IP', 'MOBSF_UPSTREAM_PROXY_IP', '127.0.0.1')
+    UPSTREAM_PROXY_PORT = int(env('MOBINSPECT_UPSTREAM_PROXY_PORT', 'MOBSF_UPSTREAM_PROXY_PORT', '3128'))
+    UPSTREAM_PROXY_USERNAME = env('MOBINSPECT_UPSTREAM_PROXY_USERNAME', 'MOBSF_UPSTREAM_PROXY_USERNAME', '')
+    UPSTREAM_PROXY_PASSWORD = env('MOBINSPECT_UPSTREAM_PROXY_PASSWORD', 'MOBSF_UPSTREAM_PROXY_PASSWORD', '')
     # ==============================================
 
     # ========DISABLED BY DEFAULT COMPONENTS=========
     # Get AppMonsta API from https://appmonsta.com/dashboard/get_api_key/
-    APPMONSTA_API = os.getenv('MOBSF_APPMONSTA_API', '')
+    APPMONSTA_API = env('MOBINSPECT_APPMONSTA_API', 'MOBSF_APPMONSTA_API', '')
     # ----------VirusTotal--------------------------
-    VT_ENABLED = bool(os.getenv('MOBSF_VT_ENABLED', ''))
-    VT_API_KEY = os.getenv('MOBSF_VT_API_KEY', '')
-    VT_UPLOAD = bool(os.getenv('MOBSF_VT_UPLOAD', ''))
+    VT_ENABLED = bool(env('MOBINSPECT_VT_ENABLED', 'MOBSF_VT_ENABLED', ''))
+    VT_API_KEY = env('MOBINSPECT_VT_API_KEY', 'MOBSF_VT_API_KEY', '')
+    VT_UPLOAD = bool(env('MOBINSPECT_VT_UPLOAD', 'MOBSF_VT_UPLOAD', ''))
     # Before setting VT_ENABLED to True,
     # Make sure VT_API_KEY is set to your VirusTotal API key
     # register at: https://www.virustotal.com/#/join-us
@@ -694,17 +697,17 @@ else:
     # =======IOS DYNAMIC ANALYSIS SETTINGS===========
     # Should be SSH IP:PORT, example: 192.168.1.100:22
     # Field also supports multiple devices, example: 192.168.1.100:22,192.168.1.101:22
-    IOS_ANALYZER_IDENTIFIERS = os.getenv('MOBSF_IOS_ANALYZER_IDENTIFIERS', '')
+    IOS_ANALYZER_IDENTIFIERS = env('MOBINSPECT_IOS_ANALYZER_IDENTIFIERS', 'MOBSF_IOS_ANALYZER_IDENTIFIERS', '')
     # SSH credentials for jailbroken iOS device (USB or WiFi path)
     # Defaults match the standard jailbreak SSH default (root/alpine)
-    IOS_SSH_USER = os.getenv('MOBSF_IOS_SSH_USER', 'root')
-    IOS_SSH_PASSWORD = os.getenv('MOBSF_IOS_SSH_PASSWORD', 'alpine')
+    IOS_SSH_USER = env('MOBINSPECT_IOS_SSH_USER', 'MOBSF_IOS_SSH_USER', 'root')
+    IOS_SSH_PASSWORD = env('MOBINSPECT_IOS_SSH_PASSWORD', 'MOBSF_IOS_SSH_PASSWORD', 'alpine')
     # ==============================================
 
     # =======IOS DYNAMIC ANALYSIS CORELLIUM SETTINGS===========
-    CORELLIUM_API_DOMAIN = os.getenv('MOBSF_CORELLIUM_API_DOMAIN', '')
-    CORELLIUM_API_KEY = os.getenv('MOBSF_CORELLIUM_API_KEY', '')
-    CORELLIUM_PROJECT_ID = os.getenv('MOBSF_CORELLIUM_PROJECT_ID', '')
+    CORELLIUM_API_DOMAIN = env('MOBINSPECT_CORELLIUM_API_DOMAIN', 'MOBSF_CORELLIUM_API_DOMAIN', '')
+    CORELLIUM_API_KEY = env('MOBINSPECT_CORELLIUM_API_KEY', 'MOBSF_CORELLIUM_API_KEY', '')
+    CORELLIUM_PROJECT_ID = env('MOBINSPECT_CORELLIUM_PROJECT_ID', 'MOBSF_CORELLIUM_PROJECT_ID', '')
     # CORELLIUM_PROJECT_ID is optional, MobSF will use any available project id
     # ===============================================
     # ^CONFIG-END^: Do not edit this line

@@ -7,6 +7,7 @@ from pathlib import Path
 from django.conf import settings
 from django.shortcuts import render
 
+from mobsf.MobSF.init import env
 from mobsf.MobSF.utils import (
     common_check,
     get_md5,
@@ -121,7 +122,7 @@ def setup_ssh_keys(c):
     location = Path(settings.UPLD_DIR).parent
     _prv, pub = generate_keypair_if_not_exists(location)
     add_keys = False
-    is_docker = os.getenv('MOBSF_PLATFORM') == 'docker'
+    is_docker = env('MOBINSPECT_PLATFORM', 'MOBSF_PLATFORM') == 'docker'
     if not pkeys:
         # No SSH Keys associated with the project
         # let's add one

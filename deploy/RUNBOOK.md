@@ -27,7 +27,7 @@ After the C1–C7 / H1–H17 audit pass, the following are **on by default** in 
 | systemd hardening: `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem`, `MemoryMax`, `TimeoutStopSec=600` on all three units | `deploy/systemd/*.service` | `systemd-analyze security mobinspect.service` exposure score ≤ 5.0 |
 | Default `mobsf/mobsf` superuser **removed** — initial admin via `manage.py bootstrap_admin` | `mobsf/MobSF/management/commands/bootstrap_admin.py` | `User.objects.filter(username='mobsf').exists() == False` after bootstrap |
 | Frida server **SHA256-verified** before push to device; spawn retry bounded | `mobsf/DynamicAnalyzer/views/common/frida/server_update.py`, `frida_core.py` | journal: `frida-server hash matches`; no infinite `Failed to spawn` loop |
-| `wkhtmltopdf` installed (PDF report export) | system package; optional `MOBSF_WKHTMLTOPDF_BINARY` override | `which wkhtmltopdf`; clicking *PDF* on a report returns a PDF, not a 503 |
+| `wkhtmltopdf` installed (PDF report export) | system package; optional `MOBINSPECT_WKHTMLTOPDF_BINARY` override | `which wkhtmltopdf`; clicking *PDF* on a report returns a PDF, not a 503 |
 
 If any row above doesn't pass, **don't expose the host outside the LAN** until it does.
 
@@ -57,7 +57,7 @@ point MobInspect at it explicitly via the drop-in:
 
 ```ini
 [Service]
-Environment=MOBSF_WKHTMLTOPDF_BINARY=/opt/wkhtmltox/bin/wkhtmltopdf
+Environment=MOBINSPECT_WKHTMLTOPDF_BINARY=/opt/wkhtmltox/bin/wkhtmltopdf
 ```
 
 This is read into `settings.WKHTMLTOPDF_BINARY` and passed to
@@ -129,11 +129,11 @@ The `mobinspect-avd.service` `ExecStart` flags:
 ```ini
 [Service]
 Environment=ANALYZER_IDENTIFIER=emulator-5554
-Environment=MOBSF_ADB_BINARY=/home/ubuntu/android-sdk/platform-tools/adb
+Environment=MOBINSPECT_ADB_BINARY=/home/ubuntu/android-sdk/platform-tools/adb
 Environment=MOBINSPECT_ASYNC_ANALYSIS=1
 ```
 
-`MOBSF_ADB_BINARY` is read by `mobsf.MobSF.settings:488`. Without it, `get_adb()` falls into a `find_process_by('adb')` proc-scan that hits PermissionError on other-uid `/proc/*/exe` reads, returns `None`, and the "Prepare runtime" UI shows:
+`MOBINSPECT_ADB_BINARY` (or the legacy `MOBSF_ADB_BINARY`) is read by `mobsf.MobSF.settings`. Without it, `get_adb()` falls into a `find_process_by('adb')` proc-scan that hits PermissionError on other-uid `/proc/*/exe` reads, returns `None`, and the "Prepare runtime" UI shows:
 
 ```
 argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'

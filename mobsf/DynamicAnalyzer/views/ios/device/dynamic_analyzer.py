@@ -13,6 +13,7 @@ from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
 
+from mobsf.MobSF.init import env
 from mobsf.MobSF.utils import (
     IOS_DEVICE_ID_REGEX,
     SSH_DEVICE_ID_REGEX,
@@ -63,7 +64,7 @@ def dynamic_analysis_device(request, api=False):
         scan_apps = get_local_ipa_list()
         connector = IOSConnector()
         wifi_devices = get_ios_devices_over_wifi()
-        if os.getenv('MOBSF_PLATFORM') == 'docker':
+        if env('MOBINSPECT_PLATFORM', 'MOBSF_PLATFORM') == 'docker':
             devices = []
         else:
             devices = connector.get_usb_devices()
@@ -454,8 +455,10 @@ def get_ios_devices_over_wifi():
     devices = []
     connect_strings = None
     connect_strings_settings = getattr(settings, 'IOS_ANALYZER_IDENTIFIERS', '')
-    if os.getenv('MOBSF_IOS_ANALYZER_IDENTIFIERS'):
-        connect_strings = os.getenv('MOBSF_IOS_ANALYZER_IDENTIFIERS')
+    connect_strings_env = env(
+        'MOBINSPECT_IOS_ANALYZER_IDENTIFIERS', 'MOBSF_IOS_ANALYZER_IDENTIFIERS')
+    if connect_strings_env:
+        connect_strings = connect_strings_env
     elif connect_strings_settings:
         connect_strings = connect_strings_settings
     try:

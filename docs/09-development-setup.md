@@ -57,15 +57,15 @@ Two terminals:
 ./scripts/tailwind-watch.sh
 
 # Terminal 2: Django dev server with auto-reload
-MOBINSPECT_DEV=1 MOBSF_DEBUG=1 poetry run python manage.py runserver
+MOBINSPECT_DEV=1 MOBINSPECT_DEBUG=1 poetry run python manage.py runserver
 ```
 
 ## Useful environment variables (dev)
 
 | Var | Value | Effect |
 |-----|-------|--------|
-| `MOBSF_DEBUG=1` | — | Django DEBUG mode, full tracebacks |
-| `MOBSF_DISABLE_AUTHENTICATION=1` | — | Skip login (for quick UI iteration) |
+| `MOBINSPECT_DEBUG=1` | — | Django DEBUG mode, full tracebacks |
+| `MOBINSPECT_DISABLE_AUTHENTICATION=1` | — | Skip login (for quick UI iteration) |
 | `MOBINSPECT_DEV=1` | — | Allow `runserver`, enable `/playground/` route |
 | `POSTGRES_*` | — | Use Postgres instead of SQLite |
 | `MOBINSPECT_ASYNC_ANALYSIS=0` | — | ON by default; set to `0` to force synchronous in-request scans instead of the `django-q2` worker |

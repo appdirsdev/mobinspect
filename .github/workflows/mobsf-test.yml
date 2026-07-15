@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  MOBSF_DISABLE_AUTHENTICATION: "1"
+  MOBINSPECT_DISABLE_AUTHENTICATION: "1"
 
 jobs:
   build:

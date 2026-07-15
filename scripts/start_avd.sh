@@ -95,7 +95,7 @@ if [ "$SOCAT_AVAILABLE" = true ]; then
   socat TCP-LISTEN:$LISTEN_PORT,fork,reuseaddr TCP:localhost:$TARGET_PORT &
   
   echo "socat listener started on port $LISTEN_PORT forwarding to $TARGET_PORT in the host."
-  echo "$(tput bold)Docker users please set the environment variable MOBSF_ANALYZER_IDENTIFIER=host.docker.internal:$LISTEN_PORT for adb connectivity.$(tput sgr0)"
+  echo "$(tput bold)Docker users please set the environment variable MOBINSPECT_ANALYZER_IDENTIFIER=host.docker.internal:$LISTEN_PORT for adb connectivity.$(tput sgr0)"
 fi
 
 # Install Play Store if open_gapps.zip is provided

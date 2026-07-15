@@ -26,17 +26,26 @@ logger = logging.getLogger(__name__)
 
 def standalone_upstream_proxy():
     """Set upstream Proxy for urllib - standalone."""
-    upstream_proxy_enabled = bool(os.getenv('MOBSF_UPSTREAM_PROXY_ENABLED', ''))
+    # Deferred import: mobsf.MobSF.init imports this module (for
+    # install_jadx), so a top-level import here would be circular.
+    from mobsf.MobSF.init import env
+    upstream_proxy_enabled = bool(
+        env('MOBINSPECT_UPSTREAM_PROXY_ENABLED', 'MOBSF_UPSTREAM_PROXY_ENABLED', ''))
 
     if upstream_proxy_enabled:
-        upstream_proxy_username = os.getenv('MOBSF_UPSTREAM_PROXY_USERNAME', '')
-        upstream_proxy_password = os.getenv('MOBSF_UPSTREAM_PROXY_PASSWORD', '')
-        upstream_proxy_type = os.getenv('MOBSF_UPSTREAM_PROXY_TYPE', 'http')
-        upstream_proxy_ip = os.getenv('MOBSF_UPSTREAM_PROXY_IP', '127.0.0.1')
-        upstream_proxy_port = int(os.getenv('MOBSF_UPSTREAM_PROXY_PORT', '3128'))
+        upstream_proxy_username = env(
+            'MOBINSPECT_UPSTREAM_PROXY_USERNAME', 'MOBSF_UPSTREAM_PROXY_USERNAME', '')
+        upstream_proxy_password = env(
+            'MOBINSPECT_UPSTREAM_PROXY_PASSWORD', 'MOBSF_UPSTREAM_PROXY_PASSWORD', '')
+        upstream_proxy_type = env(
+            'MOBINSPECT_UPSTREAM_PROXY_TYPE', 'MOBSF_UPSTREAM_PROXY_TYPE', 'http')
+        upstream_proxy_ip = env(
+            'MOBINSPECT_UPSTREAM_PROXY_IP', 'MOBSF_UPSTREAM_PROXY_IP', '127.0.0.1')
+        upstream_proxy_port = int(env(
+            'MOBINSPECT_UPSTREAM_PROXY_PORT', 'MOBSF_UPSTREAM_PROXY_PORT', '3128'))
 
         # Handle Docker proxy IP translation
-        if os.getenv('MOBSF_PLATFORM') == 'docker':
+        if env('MOBINSPECT_PLATFORM', 'MOBSF_PLATFORM') == 'docker':
             if (upstream_proxy_ip and upstream_proxy_ip.strip() in
                     ('127.0.0.1', 'localhost')):
                 upstream_proxy_ip = 'host.docker.internal'
@@ -58,12 +67,15 @@ def standalone_upstream_proxy():
     else:
         proxies = {}
 
-    upstream_proxy_ssl_verify = os.getenv('MOBSF_UPSTREAM_PROXY_SSL_VERIFY', '1')
+    upstream_proxy_ssl_verify = env(
+        'MOBINSPECT_UPSTREAM_PROXY_SSL_VERIFY', 'MOBSF_UPSTREAM_PROXY_SSL_VERIFY', '1')
     verify = upstream_proxy_ssl_verify in ('1', '"1"')
     return proxies, verify
 
 
 def download_file(url, file_path):
+    # Deferred import: see standalone_upstream_proxy() above.
+    from mobsf.MobSF.init import env
     req = Request(url)
 
     # Check for system proxies first (http_proxy, https_proxy env vars)
@@ -75,7 +87,8 @@ def download_file(url, file_path):
         logger.info('Using system proxies (SSL verify: %s)', verify)
     else:
         # Check if MobSF upstream proxy is explicitly configured
-        upstream_proxy_enabled = bool(os.getenv('MOBSF_UPSTREAM_PROXY_ENABLED', ''))
+        upstream_proxy_enabled = bool(
+            env('MOBINSPECT_UPSTREAM_PROXY_ENABLED', 'MOBSF_UPSTREAM_PROXY_ENABLED', ''))
 
         if upstream_proxy_enabled:
             proxies, verify = standalone_upstream_proxy()

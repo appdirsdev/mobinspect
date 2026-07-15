@@ -9,6 +9,7 @@ from django.conf import settings
 
 import requests
 
+from mobsf.MobSF.init import env
 from mobsf.MobSF.utils import (
     is_number,
     upstream_proxy,
@@ -120,7 +121,7 @@ class CorelliumAPI(CorelliumInit):
         """Add SSH public key to the Project."""
         logger.info('Adding SSH public key to Corellium project')
         extras = ''
-        if os.getenv('MOBSF_PLATFORM') == 'docker':
+        if env('MOBINSPECT_PLATFORM', 'MOBSF_PLATFORM') == 'docker':
             extras = ' - (docker)'
         data = {
             'kind': 'ssh',

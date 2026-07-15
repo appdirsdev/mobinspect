@@ -12,7 +12,7 @@ WorkingDirectory=/home/ubuntu/MobInspect
 Environment=HOME=/home/ubuntu
 Environment=PATH=/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Bind on all interfaces — the LAN reaches the UI at http://<host>:8001/.
-# DEBUG defaults to False (safe for LAN exposure). Toggle MOBSF_DEBUG=1 if you
+# DEBUG defaults to False (safe for LAN exposure). Toggle MOBINSPECT_DEBUG=1 if you
 # need traceback pages while iterating.
 # Gunicorn tuning (see deploy/RUNBOOK.md for rationale):
 #   --workers 2                  : two processes so one stuck request can't take

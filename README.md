@@ -111,7 +111,7 @@ Launcher environment variables:
 |----------|---------|--------|
 | `MOBINSPECT_PORT` | `8001` | UI port |
 | `MOBINSPECT_BIND` | `127.0.0.1` | Bind address (`0.0.0.0` to expose on LAN) |
-| `MOBSF_DEBUG` | `0` | `1` enables Django DEBUG (full tracebacks) |
+| `MOBINSPECT_DEBUG` | `0` | `1` enables Django DEBUG (full tracebacks) |
 | `MOBINSPECT_DEV` | `0` | `1` unblocks `runserver` for dev — never set in production |
 | `MOBINSPECT_ALLOWED_HOSTS` | `127.0.0.1,localhost` | comma-separated Django `ALLOWED_HOSTS`; never wildcard in prod |
 | `MOBINSPECT_BEHIND_TLS` | `0` | `1` turns on `Secure` cookies + HSTS — requires an actual TLS terminator in front |
