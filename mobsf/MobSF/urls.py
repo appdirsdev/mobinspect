@@ -255,6 +255,8 @@ if settings.API_ONLY == '0':
         re_path(r'^delete_scan/$', home.delete_scan, name='delete_scan'),
         re_path(r'^search$', home.search),
         re_path(r'^status/$', home.scan_status, name='status'),
+        re_path(fr'^scan_row_status/{checksum_regex}/$',
+                home.scan_row_status, name='scan_row_status'),
         re_path(r'^error/$', home.error, name='error'),
         re_path(r'^zip_format/$', home.zip_format),
         re_path(r'^robots.txt$', home.robots_txt),

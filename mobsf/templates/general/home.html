@@ -364,6 +364,8 @@
               <td class="px-5 py-2.5">
                 {% if r.security_score is not None and r.security_score|score_tier %}
                   <span class="badge" style="background: rgb(var(--score-{{ r.security_score|score_tier }}) / .15); color: {{ r.security_score|score_color }}">{{ r.security_score }}</span>
+                {% elif not r.APP_NAME and not r.PACKAGE_NAME %}
+                  {% include "general/_scan_row_status.html" with checksum=r.MD5 label="Checking status…" failed=False delay="200ms" %}
                 {% else %}
                   <span class="text-text-tertiary">—</span>
                 {% endif %}

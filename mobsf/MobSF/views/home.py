@@ -31,6 +31,7 @@ from mobsf.MobSF.forms import FormUtil, UploadFileForm
 from mobsf.MobSF.utils import (
     MD5_REGEX,
     get_md5,
+    get_scan_logs,
     is_dir_exists,
     is_file_exists,
     is_md5,
@@ -38,6 +39,7 @@ from mobsf.MobSF.utils import (
     key,
     print_n_send_error_response,
     python_dict,
+    python_list,
 )
 from mobsf.MobSF.init import api_key
 from mobsf.MobSF.security import sanitize_filename, sanitize_svg
@@ -727,6 +729,79 @@ def scan_status(request, api=False):
         logger.exception('Fetching Scan Status')
         data = {'status': 'failed', 'message': str(exp)}
     return send_response(data, api)
+
+
+def _scan_row_status(checksum):
+    """Live status for a scan row that has no APP_NAME/PACKAGE_NAME yet.
+
+    Best-effort: never raises. Returns a dict:
+      done   - real app data now exists; caller should stop polling and
+               refresh to reveal it.
+      failed - the task is done (or dead) but no app data ever landed.
+      label  - the live status text to show.
+    """
+    try:
+        recent = (RecentScansDB.objects
+                  .filter(MD5=checksum)
+                  .only('APP_NAME', 'PACKAGE_NAME', 'SCAN_LOGS')
+                  .first())
+        if not recent:
+            return {'done': False, 'failed': True, 'label': 'Not found'}
+        if recent.APP_NAME or recent.PACKAGE_NAME:
+            return {'done': True, 'failed': False, 'label': 'Done'}
+
+        logs = python_list(recent.SCAN_LOGS)
+        latest = logs[-1]['status'] if logs else None
+
+        enq = (EnqueuedTask.objects
+               .filter(checksum=checksum).order_by('-created_at').first())
+        if enq and not enq.completed_at:
+            if latest:
+                return {'done': False, 'failed': False, 'label': latest}
+            if not enq.started_at:
+                ahead = EnqueuedTask.objects.filter(
+                    completed_at__isnull=True,
+                    created_at__lt=enq.created_at).count()
+                label = ('Queued — next up' if ahead == 0 else
+                         f'Queued — {ahead} scan{"s" if ahead != 1 else ""} ahead')
+                return {'done': False, 'failed': False, 'label': label}
+            return {'done': False, 'failed': False, 'label': 'Starting…'}
+
+        if enq and enq.completed_at:
+            # Task finished (success or failure) but no app data ever
+            # landed in RecentScansDB — a real failure, not just "still
+            # working".
+            return {'done': False, 'failed': True,
+                     'label': latest or enq.status or 'Scan failed'}
+
+        if latest:
+            return {'done': False, 'failed': False, 'label': latest}
+        return {'done': False, 'failed': True, 'label': 'Scan incomplete'}
+    except Exception:
+        logger.exception('Computing live scan status for %s', checksum)
+        return {'done': False, 'failed': True, 'label': 'Status unavailable'}
+
+
+@login_required
+def scan_row_status(request, checksum):
+    """HTMX polling partial: live status badge for one Recent Scans row.
+
+    Keeps polling until the scan finishes, then tells the browser to do a
+    full refresh (HX-Refresh) so the row picks up the real app data and
+    action buttons, instead of trying to patch one row's markup in place.
+    """
+    if not is_md5(checksum):
+        return HttpResponse(status=204)
+    status = _scan_row_status(checksum)
+    if status['done']:
+        resp = HttpResponse(status=204)
+        resp['HX-Refresh'] = 'true'
+        return resp
+    return render(request, 'general/_scan_row_status.html', {
+        'checksum': checksum,
+        'label': status['label'],
+        'failed': status['failed'],
+    })
 
 
 def file_download(dwd_file, filename, content_type):

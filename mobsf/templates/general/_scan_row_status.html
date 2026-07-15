@@ -1,0 +1,13 @@
+{% load static %}
+<span id="scan-status-{{ checksum }}"
+      class="badge {% if failed %}badge-high{% else %}badge-medium{% endif %} inline-flex items-center gap-1.5 max-w-[220px]"
+      {% if not failed %}
+      hx-get="{% url 'scan_row_status' checksum=checksum %}"
+      hx-trigger="load delay:{{ delay|default:'3s' }}"
+      hx-swap="outerHTML"
+      {% endif %}>
+  {% if not failed %}
+    <span class="w-1.5 h-1.5 rounded-full bg-current animate-pulse flex-shrink-0" aria-hidden="true"></span>
+  {% endif %}
+  <span class="truncate" title="{{ label }}">{{ label }}</span>
+</span>

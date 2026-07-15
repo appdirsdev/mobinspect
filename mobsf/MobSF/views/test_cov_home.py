@@ -3,7 +3,7 @@
 
 Every branch below is exercised by driving the REAL Django views/functions
 with a REAL superuser, REAL DB rows (RecentScansDB / StaticAnalyzer* via the
-Django ORM against the isolated SQLite test DB) and REAL files on disk. No
+Django ORM against the isolated Postgres test DB) and REAL files on disk. No
 mocks, no monkeypatching, no fake returns.
 """
 import json
@@ -17,6 +17,7 @@ from django.test import TestCase, Client, RequestFactory, override_settings
 
 from mobsf.MobSF.views import home
 from mobsf.StaticAnalyzer.models import (
+    EnqueuedTask,
     RecentScansDB,
     StaticAnalyzerAndroid,
     StaticAnalyzerIOS,
@@ -541,3 +542,172 @@ class HomeViewsRealTests(TestCase):
         row = RecentScansDB.objects.get(MD5=md5)
         # update_scan_timestamp writes a fresh tz-aware timezone.now().
         self.assertGreaterEqual(row.TIMESTAMP, before)
+
+
+class ScanRowStatusTests(TestCase):
+    """_scan_row_status / scan_row_status: live status for an in-progress
+    or failed scan row, replacing the old static 'Scan incomplete' badge."""
+
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.admin = User.objects.create_superuser(
+            'rowstatus_admin', 'rowstatus_admin@example.com', 'pw')
+
+    def setUp(self):
+        self.client = Client()
+        self.client.force_login(self.admin)
+
+    def _mk_incomplete(self, md5, logs='[]'):
+        return _mk_recent(
+            md5, APP_NAME='', PACKAGE_NAME='', SCAN_LOGS=logs)
+
+    def test_no_row_is_failed_not_found(self):
+        status = home._scan_row_status('a' * 32)
+        self.assertEqual(status, {
+            'done': False, 'failed': True, 'label': 'Not found'})
+
+    def test_app_name_present_is_done(self):
+        md5 = 'b' * 32
+        _mk_recent(md5, APP_NAME='Real App', PACKAGE_NAME='')
+        status = home._scan_row_status(md5)
+        self.assertTrue(status['done'])
+        self.assertFalse(status['failed'])
+
+    def test_package_name_present_is_done(self):
+        md5 = 'c' * 32
+        _mk_recent(md5, APP_NAME='', PACKAGE_NAME='com.example.only')
+        status = home._scan_row_status(md5)
+        self.assertTrue(status['done'])
+
+    def test_empty_row_no_task_no_logs_is_failed(self):
+        md5 = 'd' * 32
+        self._mk_incomplete(md5)
+        status = home._scan_row_status(md5)
+        self.assertFalse(status['done'])
+        self.assertTrue(status['failed'])
+        self.assertEqual(status['label'], 'Scan incomplete')
+
+    def test_queued_next_up_when_nothing_ahead(self):
+        md5 = 'e' * 32
+        self._mk_incomplete(md5)
+        EnqueuedTask.objects.create(
+            task_id='t1', checksum=md5, file_name='a.apk')
+        status = home._scan_row_status(md5)
+        self.assertFalse(status['done'])
+        self.assertFalse(status['failed'])
+        self.assertEqual(status['label'], 'Queued — next up')
+
+    def test_queued_shows_count_ahead(self):
+        from django.utils import timezone
+        import datetime
+        now = timezone.now()
+        # Two earlier, still-incomplete tasks -> both count as "ahead".
+        EnqueuedTask.objects.create(
+            task_id='ahead1', checksum='1' * 32, file_name='x.apk',
+            created_at=now - datetime.timedelta(minutes=5))
+        EnqueuedTask.objects.create(
+            task_id='ahead2', checksum='2' * 32, file_name='y.apk',
+            created_at=now - datetime.timedelta(minutes=3))
+        md5 = 'f' * 32
+        self._mk_incomplete(md5)
+        EnqueuedTask.objects.create(
+            task_id='mine', checksum=md5, file_name='z.apk',
+            created_at=now)
+        status = home._scan_row_status(md5)
+        self.assertEqual(status['label'], 'Queued — 2 scans ahead')
+
+    def test_started_no_logs_yet_shows_starting(self):
+        from django.utils import timezone
+        md5 = 'a1' * 16
+        self._mk_incomplete(md5)
+        EnqueuedTask.objects.create(
+            task_id='t2', checksum=md5, file_name='a.apk',
+            started_at=timezone.now())
+        status = home._scan_row_status(md5)
+        self.assertFalse(status['done'])
+        self.assertFalse(status['failed'])
+        self.assertEqual(status['label'], 'Starting…')
+
+    def test_running_shows_latest_log_message(self):
+        from django.utils import timezone
+        md5 = 'a2' * 16
+        self._mk_incomplete(md5, logs=str([
+            {'timestamp': 'x', 'status': 'Unzipping', 'exception': None},
+            {'timestamp': 'y', 'status': 'Code Analysis Started on - java_source',
+             'exception': None},
+        ]))
+        EnqueuedTask.objects.create(
+            task_id='t3', checksum=md5, file_name='a.apk',
+            started_at=timezone.now())
+        status = home._scan_row_status(md5)
+        self.assertFalse(status['done'])
+        self.assertFalse(status['failed'])
+        self.assertEqual(
+            status['label'], 'Code Analysis Started on - java_source')
+
+    def test_completed_task_but_no_app_data_is_failed(self):
+        from django.utils import timezone
+        md5 = 'a3' * 16
+        self._mk_incomplete(md5)
+        EnqueuedTask.objects.create(
+            task_id='t4', checksum=md5, file_name='a.apk',
+            started_at=timezone.now(), completed_at=timezone.now(),
+            status='Failed')
+        status = home._scan_row_status(md5)
+        self.assertFalse(status['done'])
+        self.assertTrue(status['failed'])
+        self.assertEqual(status['label'], 'Failed')
+
+    def test_never_raises_on_unexpected_error(self):
+        md5 = 'a4' * 16
+        self._mk_incomplete(md5)
+        orig = RecentScansDB.objects.filter
+
+        def _boom(*a, **kw):
+            raise RuntimeError('boom')
+
+        RecentScansDB.objects.filter = _boom
+        try:
+            status = home._scan_row_status(md5)
+        finally:
+            RecentScansDB.objects.filter = orig
+        self.assertEqual(status, {
+            'done': False, 'failed': True, 'label': 'Status unavailable'})
+
+    # --------------------------------------------------- scan_row_status view
+    def test_view_anonymous_redirects_to_login(self):
+        anon = Client()
+        resp = anon.get(f'/scan_row_status/{"a8" * 16}/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp['Location'])
+
+    def test_view_invalid_checksum_is_204(self):
+        resp = self.client.get('/scan_row_status/not-a-real-checksum/')
+        self.assertEqual(resp.status_code, 404)  # URL regex rejects it
+
+    def test_view_done_returns_204_with_hx_refresh(self):
+        md5 = 'a5' * 16
+        _mk_recent(md5, APP_NAME='Finished App')
+        resp = self.client.get(f'/scan_row_status/{md5}/')
+        self.assertEqual(resp.status_code, 204)
+        self.assertEqual(resp['HX-Refresh'], 'true')
+
+    def test_view_in_progress_renders_partial_with_label(self):
+        md5 = 'a6' * 16
+        self._mk_incomplete(md5)
+        EnqueuedTask.objects.create(
+            task_id='t5', checksum=md5, file_name='a.apk')
+        resp = self.client.get(f'/scan_row_status/{md5}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b'Queued', resp.content)
+        # Still-polling state carries its own hx-get for the next poll.
+        self.assertIn(b'hx-get', resp.content)
+
+    def test_view_failed_renders_without_further_polling(self):
+        md5 = 'a7' * 16
+        self._mk_incomplete(md5)
+        resp = self.client.get(f'/scan_row_status/{md5}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b'Scan incomplete', resp.content)
+        self.assertNotIn(b'hx-get', resp.content)

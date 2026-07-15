@@ -207,7 +207,7 @@
                         <p class="text-tiny text-text-tertiary truncate font-mono">{{ e.PACKAGE_NAME }}</p>
                       {% endif %}
                     {% else %}
-                      <span class="badge badge-medium">Scan incomplete</span>
+                      {% include "general/_scan_row_status.html" with checksum=e.MD5 label="Checking status…" failed=False delay="200ms" %}
                     {% endif %}
                   </div>
                   {% if e.DYNAMIC_REPORT_EXISTS %}
