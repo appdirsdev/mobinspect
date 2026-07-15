@@ -8,6 +8,8 @@ MobSF and Django settings
 import logging
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
 from mobsf.MobSF.init import (
     first_run,
     get_mobsf_home,
@@ -34,8 +36,6 @@ DWD_DIR = os.path.join(MOBSF_HOME, 'downloads/')
 SCREEN_DIR = os.path.join(MOBSF_HOME, 'downloads/screen/')
 # Upload Directory
 UPLD_DIR = os.path.join(MOBSF_HOME, 'uploads/')
-# Database Directory
-DB_DIR = os.path.join(MOBSF_HOME, 'db.sqlite3')
 # Signatures used by modules
 SIGNATURE_DIR = os.path.join(MOBSF_HOME, 'signatures/')
 # Tools Directory
@@ -159,36 +159,29 @@ APKPLZ = 'https://apkplz.net/download-app/'
 
 # Database
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
-if (os.environ.get('POSTGRES_USER')
-        and (os.environ.get('POSTGRES_PASSWORD')
-             or os.environ.get('POSTGRES_PASSWORD_FILE'))
-        and os.environ.get('POSTGRES_HOST')):
-    # Postgres support
-    default = {
+# PostgreSQL is required — MobInspect never falls back to SQLite. Fail fast
+# and loudly if the required env vars are missing, rather than silently
+# running against a throwaway local file that diverges from production.
+_missing_pg_vars = [v for v in ('POSTGRES_USER', 'POSTGRES_HOST')
+                     if not os.environ.get(v)]
+if not (os.environ.get('POSTGRES_PASSWORD')
+        or os.environ.get('POSTGRES_PASSWORD_FILE')):
+    _missing_pg_vars.append('POSTGRES_PASSWORD (or POSTGRES_PASSWORD_FILE)')
+if _missing_pg_vars:
+    raise ImproperlyConfigured(
+        'PostgreSQL is required for MobInspect — missing: '
+        + ', '.join(_missing_pg_vars)
+        + '. Set them in .env.postgres (see .env.postgres.example).')
+
+DATABASES = {
+    'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.getenv('POSTGRES_DB', 'mobsf'),
+        'NAME': os.getenv('POSTGRES_DB', 'mobinspect'),
         'USER': os.environ['POSTGRES_USER'],
         'PASSWORD': get_secret_from_file_or_env('POSTGRES_PASSWORD'),
         'HOST': os.environ['POSTGRES_HOST'],
         'PORT': int(os.getenv('POSTGRES_PORT', 5432)),
-    }
-else:
-    # Sqlite3 support
-    default = {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': DB_DIR,
-        'OPTIONS': {
-            'timeout': 20,
-            'init_command': (
-                'PRAGMA journal_mode=WAL; '
-                'PRAGMA synchronous=NORMAL; '
-                'PRAGMA foreign_keys=ON; '
-                'PRAGMA busy_timeout=20000;'
-            ),
-        },
-    }
-DATABASES = {
-    'default': default,
+    },
 }
 # ===============================================
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'

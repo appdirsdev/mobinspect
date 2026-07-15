@@ -14,7 +14,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=mobsf
+      - POSTGRES_DB=mobinspect
     networks:
       - mobsf_network
 
@@ -49,7 +49,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=mobsf
+      - POSTGRES_DB=mobinspect
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
     depends_on:
@@ -69,7 +69,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=mobsf
+      - POSTGRES_DB=mobinspect
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - MOBINSPECT_ASYNC_ANALYSIS=1

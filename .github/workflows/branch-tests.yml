@@ -39,7 +39,7 @@ jobs:
         env:
           POSTGRES_USER: mobsf
           POSTGRES_PASSWORD: mobsf
-          POSTGRES_DB: mobsf
+          POSTGRES_DB: mobinspect
         ports:
           - 5432:5432
         options: >-
@@ -49,13 +49,14 @@ jobs:
           --health-retries 5
 
     env:
-      # settings.py switches to Postgres only when these are all set. Leaving
-      # MOBSF_DISABLE_AUTHENTICATION unset keeps RBAC enforcement active.
+      # settings.py requires these — PostgreSQL is mandatory, no SQLite
+      # fallback. Leaving MOBSF_DISABLE_AUTHENTICATION unset keeps RBAC
+      # enforcement active.
       POSTGRES_USER: mobsf
       POSTGRES_PASSWORD: mobsf
       POSTGRES_HOST: 127.0.0.1
       POSTGRES_PORT: 5432
-      POSTGRES_DB: mobsf
+      POSTGRES_DB: mobinspect
 
     steps:
       - uses: actions/checkout@v4

@@ -63,7 +63,7 @@ mobsf.MalwareAnalyzer   →  mobinspect.MalwareAnalyzer
 | `MOBSF_BINARY_ANALYSIS_TIMEOUT` | `MOBINSPECT_BINARY_ANALYSIS_TIMEOUT` |
 | `MOBSF_*_BINARY` (paths to JADX, apktool, etc.) | `MOBINSPECT_*_BINARY` |
 | Default home dir `~/.MobSF/` | `~/.MobInspect/` |
-| Database default name `mobsf` (Postgres) | `mobinspect` |
+| ~~Database default name `mobsf` (Postgres)~~ → `mobinspect` | done — also dropped the SQLite fallback entirely; Postgres is now required |
 | `MOBSF_DOMAIN_MALWARE_SCAN`, `MOBSF_APKID_ENABLED`, etc. | `MOBINSPECT_*` |
 
 ### Backwards compatibility shim
