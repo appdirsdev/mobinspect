@@ -6,8 +6,8 @@ keywords = ["mobinspect", "mobsf", "mobile security framework", "mobile security
 authors = ["MobInspect contributors", "Ajin Abraham <ajin@opensecurity.in>"]
 license = "GPL-3.0-only"
 readme = "README.md"
-repository = "https://github.com/MobSF/Mobile-Security-Framework-MobSF"
-documentation = "https://mobsf.github.io/docs/"
+repository = "https://github.com/appdirsdev/mobinspect"
+documentation = "https://github.com/appdirsdev/mobinspect"
 packages = [{ include = "mobsf", format = ["sdist", "wheel"]}]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -17,7 +17,7 @@ classifiers = [
 ]
 
 [tool.poetry.urls]
-"Bug Tracker" = "https://github.com/MobSF/Mobile-Security-Framework-MobSF/issues"
+"Bug Tracker" = "https://github.com/appdirsdev/mobinspect/issues"
 
 [tool.poetry.scripts]
 # Both names invoke the same entrypoint. `mobsf` is kept for backward

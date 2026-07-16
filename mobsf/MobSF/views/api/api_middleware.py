@@ -33,7 +33,8 @@ def _decorate_api_headers(resp):
     """Add the standard CORS / content headers used by every API response."""
     resp['Access-Control-Allow-Origin'] = '*'
     resp['Access-Control-Allow-Methods'] = 'POST'
-    resp['Access-Control-Allow-Headers'] = 'Authorization, X-Mobsf-Api-Key'
+    resp['Access-Control-Allow-Headers'] = (
+        'Authorization, X-MobInspect-Api-Key, X-Mobsf-Api-Key')
     resp['Content-Type'] = 'application/json; charset=utf-8'
     return resp
 
@@ -58,8 +59,14 @@ def make_api_response(data, status=OK):
 
 
 def _extract_key(meta):
-    """Pull the candidate API key string from request headers."""
-    return meta.get('HTTP_X_MOBSF_API_KEY') or meta.get('HTTP_AUTHORIZATION') or ''
+    """Pull the candidate API key string from request headers.
+
+    ``X-MobInspect-Api-Key`` is the current header; ``X-Mobsf-Api-Key`` stays
+    accepted so existing/legacy API clients keep working.
+    """
+    return (meta.get('HTTP_X_MOBINSPECT_API_KEY')
+            or meta.get('HTTP_X_MOBSF_API_KEY')
+            or meta.get('HTTP_AUTHORIZATION') or '')
 
 
 def _global_key_matches(presented):

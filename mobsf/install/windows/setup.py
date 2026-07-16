@@ -27,13 +27,13 @@ logger = logging.getLogger(__name__)
 
 # Only static URL, let's hope this never changes..
 CONFIG_URL = (
-    'https://raw.githubusercontent.com/MobSF/'
-    'Mobile-Security-Framework-MobSF/master/'
+    'https://raw.githubusercontent.com/appdirsdev/'
+    'mobinspect/main/'
     'mobsf/install/windows/config.txt'
 )
 
 # Static path to config file as a starting point
-CONFIG_PATH = expanduser('~') + '\\MobSF\\Config\\'
+CONFIG_PATH = expanduser('~') + '\\MobInspect\\Config\\'
 CONFIG_FILE = 'config.txt'
 
 # Static path to autostart
@@ -310,9 +310,8 @@ def generate_secret():
     print((
         '[!] Please move the private key file\n'
         '\t{}\n'
-        '\tto MobSF to the path specified in {}\n'
-        '\t(default: Mobile-Security-Framework-MobSF/'
-        'mobsf/MobSF/windows_vm_priv_key.asc)'
+        '\tto the path specified in {}\n'
+        '\t(default: mobsf/MobSF/windows_vm_priv_key.asc)'
         .format(CONFIG['MobSF']['priv_key'], config_path)
     ))
     sinput('Please press any key when done..')
