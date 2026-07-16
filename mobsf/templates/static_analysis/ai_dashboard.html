@@ -1,5 +1,6 @@
 {% extends "base/app.html" %}
 {% load mi_icons %}
+{% load ai_tags %}
 
 {% block page_title %}AI Dashboard — {{ checksum }}{% endblock %}
 
@@ -96,9 +97,9 @@
   .mi-score-ring::before { content:''; position:absolute; inset:0; border-radius:50%;
     background: conic-gradient(var(--sc) calc(var(--score,0) * 1%), rgb(var(--surface-3)) 0); }
   .mi-score-ring::after { content:''; position:absolute; inset:11px; border-radius:50%; background: rgb(var(--surface-1)); }
-  .mi-score-val { position:absolute; inset:0; z-index:1; display:flex; align-items:baseline; justify-content:center; }
-  .mi-score-num { font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: rgb(var(--text-primary)); font-variant-numeric: tabular-nums; }
-  .mi-score-den { font-size: 13px; color: rgb(var(--text-tertiary)); margin-left: 1px; }
+  .mi-score-val { position:absolute; inset:0; z-index:1; display:flex; align-items:center; justify-content:center; line-height:1; }
+  .mi-score-num { font-size: 31px; font-weight: 700; line-height:1; letter-spacing: -.02em; color: rgb(var(--text-primary)); font-variant-numeric: tabular-nums; }
+  .mi-score-den { font-size: 12px; line-height:1; color: rgb(var(--text-tertiary)); margin-left: 2px; align-self: flex-end; padding-bottom: 5px; }
   .mi-score-passed{--sc:#16A34A} .mi-score-low{--sc:#2563EB} .mi-score-medium{--sc:#D97706}
   .mi-score-high{--sc:#EA580C} .mi-score-critical{--sc:#DC2626} .mi-score-neutral{--sc:#64748B}
   :root[data-theme="dark"] .mi-score-passed{--sc:#4ADE80} :root[data-theme="dark"] .mi-score-low{--sc:#60A5FA}
@@ -119,6 +120,18 @@
   :root[data-theme="dark"] .mi-risk-high     { background:#FB923C; }
   :root[data-theme="dark"] .mi-risk-critical { background:#F87171; }
   :root[data-theme="dark"] .mi-risk-neutral  { background:#94A3B8; }
+
+  /* AI prose — safe formatted model output (bold, lists, inline code). */
+  .ai-prose p { margin: 0 0 .55em; }
+  .ai-prose > :last-child { margin-bottom: 0; }
+  .ai-prose strong { font-weight: 650; color: rgb(var(--text-primary)); }
+  .ai-prose code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+    background: rgb(var(--surface-3)); padding: .05em .35em; border-radius: 4px; word-break: break-word; }
+  .ai-prose ul { margin: .35em 0 .6em; padding-left: 1.15em; list-style: disc; }
+  .ai-prose li { margin: .2em 0; }
+  .ai-prose li::marker { color: rgb(var(--text-tertiary)); }
+  .ai-prose p.ai-h { margin: .7em 0 .3em; }
+  .ai-prose p.ai-h:first-child { margin-top: 0; }
 
   @media (prefers-reduced-motion: reduce) {
     .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
@@ -169,7 +182,7 @@
             </div>
           </div>
         </div>
-        <a href="/static_analyzer/{{ checksum }}/" class="btn btn-secondary btn-md flex-shrink-0">
+        <a href="/static_analyzer/{{ checksum }}/" class="btn btn-secondary btn-md flex-shrink-0 relative z-10">
           {% icon "chevron-left" size=14 %} Back to report
         </a>
       </div>
@@ -282,7 +295,7 @@
             <span class="badge badge-medium text-tiny">AI-generated · unverified</span>
           </div>
           <div class="p-5">
-            <p class="text-small text-text-secondary" style="white-space:pre-wrap; word-wrap:break-word;">{{ ai_summary }}</p>
+            <div class="ai-prose text-small text-text-secondary" style="word-wrap:break-word;">{{ ai_summary|ai_richtext }}</div>
           </div>
         </section>
         {% endif %}

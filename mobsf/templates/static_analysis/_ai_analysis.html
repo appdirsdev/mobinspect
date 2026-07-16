@@ -5,7 +5,11 @@
   SECURITY: every ai_* value is model output derived from UNTRUSTED app content.
   NEVER use |safe / mark_safe here. All values render as autoescaped TEXT NODES
   only (never into an attribute, href, style, or Alpine-evaluated region).
+  The ai_richtext/ai_inline filters are the ONE exception: they html-escape the
+  ENTIRE value first, then inject only a fixed whitelist of tags (strong/code/
+  ul/li/p/br), so no model/app content can become live markup (see ai_tags.py).
 {% endcomment %}
+{% load ai_tags %}
 <section id="ai-analysis"
          class="card border border-dashed border-border-strong bg-surface-1"
          data-ai-untrusted>
@@ -68,8 +72,8 @@
           <div class="space-y-3">
             {% for a in ai_anomalies %}
               <div class="border-l-2 border-border-strong pl-4">
-                <p class="text-small text-text-primary" style="white-space:pre-wrap; word-wrap:break-word;">{{ a.anomaly }}</p>
-                <p class="text-tiny text-text-secondary mt-1" style="white-space:pre-wrap; word-wrap:break-word;"><span class="font-semibold uppercase tracking-wide text-text-tertiary">Fix</span> · {{ a.suggestion }}</p>
+                <p class="text-small text-text-primary" style="white-space:pre-wrap; word-wrap:break-word;">{{ a.anomaly|ai_inline }}</p>
+                <p class="text-tiny text-text-secondary mt-1" style="white-space:pre-wrap; word-wrap:break-word;"><span class="font-semibold uppercase tracking-wide text-text-tertiary">Fix</span> · {{ a.suggestion|ai_inline }}</p>
               </div>
             {% endfor %}
           </div>
@@ -81,7 +85,7 @@
           <h3 class="text-small font-semibold uppercase tracking-wide text-text-primary mb-1">
             {{ s.heading }}
           </h3>
-          <p class="ai-prose text-small text-text-secondary" style="white-space:pre-wrap; word-wrap:break-word;">{{ s.body }}</p>
+          <div class="ai-prose text-small text-text-secondary" style="word-wrap:break-word;">{{ s.body|ai_richtext }}</div>
         </div>
       {% empty %}
         <p class="text-small text-text-tertiary">No AI analysis was produced for this scan.</p>
@@ -93,7 +97,7 @@
             Secrets triage
             <span class="badge badge-neutral text-tiny ml-1">classification model</span>
           </h3>
-          <p class="ai-prose text-small text-text-secondary" style="white-space:pre-wrap; word-wrap:break-word;">{{ ai_secrets }}</p>
+          <div class="ai-prose text-small text-text-secondary" style="word-wrap:break-word;">{{ ai_secrets|ai_richtext }}</div>
         </div>
       {% endif %}
     {% endif %}
