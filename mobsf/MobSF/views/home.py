@@ -44,7 +44,7 @@ from mobsf.MobSF.utils import (
 from mobsf.MobSF.init import api_key
 from mobsf.MobSF.security import sanitize_filename, sanitize_svg
 from mobsf.MobSF.views.helpers import FileType
-from mobsf.MobSF.views.scanning import Scanning
+from mobsf.MobSF.views.scanning import Scanning, scan_report_url
 from mobsf.MobSF.views.apk_downloader import apk_download
 from mobsf.StaticAnalyzer.models import (
     EnqueuedTask,
@@ -77,6 +77,7 @@ from mobsf.MobSF.views.authorization import (
 
 LINUX_PLATFORM = ['Darwin', 'Linux']
 HTTP_BAD_REQUEST = 400
+HTTP_CONFLICT = 409
 HTTP_STATUS_404 = 404
 HTTP_SERVER_ERROR = 500
 logger = logging.getLogger(__name__)
@@ -433,6 +434,12 @@ class Upload(object):
             api_response['error'] = 'File format not Supported!'
             return api_response, HTTP_BAD_REQUEST
         api_response = self.upload()
+        if api_response.get('duplicate'):
+            # A prior scan of the same app already exists — reject as 409
+            # Conflict, but keep the full upload envelope (status / hash /
+            # scan_type / existing_* / error) so existing REST clients that
+            # read `hash` still reach the prior scan.
+            return api_response, HTTP_CONFLICT
         return api_response, 200
 
     def oversize_message(self):
@@ -687,7 +694,7 @@ def search(request, api=False):
     if checksum and re.match(MD5_REGEX, checksum):
         db_obj = RecentScansDB.objects.filter(MD5=checksum).first()
         if db_obj:
-            url = f'/{db_obj.ANALYZER}/{db_obj.MD5}/'
+            url = scan_report_url(db_obj.ANALYZER, db_obj.MD5)
             if api:
                 return {'checksum': db_obj.MD5}
             else:

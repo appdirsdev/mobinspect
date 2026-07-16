@@ -183,6 +183,8 @@
             <span class="text-text-secondary tabular" x-text="`${progress}%`"></span>
           </div>
           <p class="text-small text-text-secondary mt-2" x-text="status"></p>
+          <a x-show="existingUrl" x-cloak :href="existingUrl"
+             class="btn btn-secondary btn-md mt-3">View existing report →</a>
         </div>
       </form>
     </div>
@@ -432,12 +434,12 @@
   // (POST /, returns JSON {status, hash, analyzer, [description]}).
   function upload() {
     return {
-      dragging: false, uploading: false, progress: 0, status: '',
+      dragging: false, uploading: false, progress: 0, status: '', existingUrl: '',
       onPick(ev) { const f = ev.target.files; if (f && f.length) this.send(f[0]); },
       onDrop(ev) { this.dragging = false; const f = ev.dataTransfer.files; if (f && f.length) this.send(f[0]); },
       send(file) {
         if (this.uploading) return;
-        this.uploading = true; this.progress = 0;
+        this.uploading = true; this.progress = 0; this.existingUrl = '';
         this.status = 'Uploading ' + file.name + '…';
         const fd = new FormData(); fd.append('file', file);
         const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
@@ -457,7 +459,7 @@
             fetch('/' + res.analyzer + '/' + res.hash + '/', {credentials: 'same-origin'})
               .then(() => { window.location.href = '{% url "recent" %}'; })
               .catch(() => { window.location.href = '{% url "recent" %}'; });
-          } else { this.status = res.description || 'Upload failed.'; this.uploading = false; }
+          } else { this.status = res.description || 'Upload failed.'; this.existingUrl = res.existing_url || ''; this.uploading = false; }
         });
         xhr.addEventListener('error', () => { this.status = 'Network error during upload.'; this.uploading = false; });
         xhr.open('POST', '{% url "upload" %}', true);
