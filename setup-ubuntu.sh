@@ -61,8 +61,12 @@ sudo apt-get install -y --no-install-recommends \
   libssl-dev libffi-dev zlib1g-dev libjpeg-dev libxml2-dev libxslt1-dev \
   fontconfig libxrender1 libxext6 xfonts-75dpi xfonts-base \
   android-tools-adb
-export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+export JAVA_HOME
 log "JAVA_HOME=$JAVA_HOME"
+# aapt/aapt2 assist Android resource extraction (androguard covers most cases);
+# best-effort so a minimal image without the package doesn't abort the install.
+sudo apt-get install -y aapt 2>/dev/null || warn "aapt not in apt — resource extraction falls back to androguard."
 
 # ---- 2. Python 3.13 ---------------------------------------------------------
 PYBIN=""
@@ -76,6 +80,11 @@ if [[ -z "$PYBIN" ]]; then
   sudo apt-get install -y "${PYVER_SERIES}" "${PYVER_SERIES}-venv" "${PYVER_SERIES}-dev"
   PYBIN="$(command -v "$PYVER_SERIES")"
 fi
+# Ensure the chosen interpreter has venv + dev headers. Ubuntu 24.04 ships
+# python3.12 but NOT python3.12-venv, so `python -m venv` would otherwise abort.
+PYPKG="$(basename "$PYBIN")"
+sudo apt-get install -y "${PYPKG}-venv" "${PYPKG}-dev" 2>/dev/null \
+  || sudo apt-get install -y python3-venv python3-dev
 log "Using Python: $PYBIN ($("$PYBIN" --version 2>&1))"
 
 # ---- 3. Node (for the Tailwind CSS build) -----------------------------------
@@ -109,6 +118,11 @@ command -v wkhtmltopdf >/dev/null 2>&1 && log "wkhtmltopdf: $(command -v wkhtmlt
 # ---- 5. PostgreSQL role + database ------------------------------------------
 log "Configuring PostgreSQL (db=$PG_DB user=$PG_USER)…"
 sudo systemctl enable --now postgresql
+# Reuse the password already recorded in .env.postgres on a re-run so the live
+# role and the env file can never diverge (keeps the installer idempotent).
+if [[ -z "${POSTGRES_PASSWORD:-}" && -f .env.postgres ]]; then
+  POSTGRES_PASSWORD="$(sed -n 's/^export POSTGRES_PASSWORD=//p' .env.postgres | head -1)"
+fi
 : "${POSTGRES_PASSWORD:=$(openssl rand -hex 16)}"
 PG_PASS="$POSTGRES_PASSWORD"
 sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$PG_USER'" | grep -q 1 \
@@ -175,8 +189,9 @@ log "Applying migrations and seeding RBAC…"
 .venv/bin/python manage.py bootstrap_admin
 .venv/bin/python manage.py collectstatic --noinput >/dev/null 2>&1 || true
 
-# Ensure the bootstrapped admin holds the Administrator role (superuser status
-# alone does NOT satisfy the RBAC layer — every gated view would 403).
+# Belt-and-suspenders: also give the bootstrapped admin the Administrator role.
+# A superuser already passes the RBAC checks, but an explicit assignment makes
+# the account appear and be manageable in the RBAC UI. Harmless if it no-ops.
 .venv/bin/python manage.py shell <<'PY' 2>/dev/null || warn "Could not auto-assign the Administrator role — assign it in the UI."
 from django.contrib.auth import get_user_model
 try:
@@ -200,9 +215,11 @@ $(printf '\033[1;32m')==========================================================
 ============================================================$(printf '\033[0m')
 
   Start it (static + malware analysis, no emulator):
-      ./start.sh --no-emulator
+      PY=$REPO_DIR/.venv/bin/python ./start.sh --no-emulator
   or bind on all interfaces:
-      HOST=0.0.0.0 PORT=8000 ./start.sh --no-emulator
+      HOST=0.0.0.0 PORT=8000 PY=$REPO_DIR/.venv/bin/python ./start.sh --no-emulator
+  (start.sh's default interpreter path assumes ~/MobInspect; the PY= override
+   points it at THIS clone's virtualenv.)
 
   Web UI:   http://${DETECTED_IP:-127.0.0.1}:8000/
   Login:    admin / (see MOBINSPECT_ADMIN_PASSWORD in .env.postgres,
