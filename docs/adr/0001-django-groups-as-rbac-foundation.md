@@ -12,7 +12,7 @@ MobInspect needs dynamic, industry-standard RBAC. The candidate approaches are:
 3. **`django-guardian`** — object-level permissions on top of Django auth.
 4. **External authz** — OPA, Casbin, etc.
 
-Upstream MobSF already uses option 1 in a minimal form (`mobsf/MobSF/views/authorization.py:38-50`).
+Upstream MobInspect already uses option 1 in a minimal form (`mobinspect/MobInspect/views/authorization.py:38-50`).
 
 ## Decision
 

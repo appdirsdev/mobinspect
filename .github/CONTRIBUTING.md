@@ -15,8 +15,8 @@ The issue tracker is the preferred channel for [bug reports](#bugs),
 [features requests](#features) and [submitting pull
 requests](#pull-requests), but please respect the following restrictions:
 
-* Please **do not** use the issue tracker for personal support requests (use [MobSF Slack channel](https://join.slack.com/t/mobsf/shared_invite/zt-3ephptj6c-OuDMatJ9z9MT0T_Vb~l2pg) or 
-  [Stack Overflow](https://stackoverflow.com/search?q=mobsf)).
+* Please **do not** use the issue tracker for personal support requests (use [MobInspect Slack channel](https://join.slack.com/t/mobinspect/shared_invite/zt-3ephptj6c-OuDMatJ9z9MT0T_Vb~l2pg) or 
+  [Stack Overflow](https://stackoverflow.com/search?q=mobinspect)).
 
 * Please **do not** derail or troll issues. Keep the discussion on topic and
   respect the opinions of others.
@@ -39,14 +39,14 @@ Guidelines for bug reports:
 3. **Isolate the problem** &mdash; create a [reduced test
    case](http://css-tricks.com/reduced-test-cases/) and a live example.
 
-4. **Add Log file** &mdash; Please add the log file `mobsf/debug.log` while opening bugs.
+4. **Add Log file** &mdash; Please add the log file `mobinspect/debug.log` while opening bugs.
 
 5. **Timely Response** &mdash; Once you open a bug, you should also provide additional information if requested. Failure to do so in 10 days will result in closure of the bug without further communication. 
 
 A good bug report shouldn't leave others needing to chase you up for more
 information. Please try to be as detailed as possible in your report. What is
 your environment? What steps will reproduce the issue? What browser(s) and OS
-experience the problem? Are you using MobSF shipped VM or a different one?
+experience the problem? Are you using MobInspect shipped VM or a different one?
 What would you expect to be the outcome? All these details will help people
 to fix any potential bugs.
 
@@ -60,7 +60,7 @@ Example:
 > 1. This is the first step
 > 2. This is the second step
 > 3. Further steps, etc.
-> 4. Log information from `mobsf/debug.log`
+> 4. Log information from `mobinspect/debug.log`
 > 
 > `<url>` - a link to the reduced test case
 >
@@ -69,7 +69,7 @@ Example:
 > causing the bug, and potential solutions (and your opinions on their
 > merits).
 
-[Open Bugs here](https://github.com/MobSF/Mobile-Security-Framework-MobSF/issues)
+[Open Bugs here](https://github.com/MobInspect/mobinspect/issues)
 
 <a name="features"></a>
 ## Feature requests
@@ -103,11 +103,11 @@ project:
 
    ```bash
    # Clone your fork of the repo into the current directory
-   git clone https://github.com/MobSF/Mobile-Security-Framework-MobSF.git
+   git clone https://github.com/MobInspect/mobinspect.git
    # Navigate to the newly cloned directory
-   cd Mobile-Security-Framework-MobSF
+   cd mobinspect
    # Assign the original repo to a remote called "upstream"
-   git remote add upstream https://github.com/MobSF/Mobile-Security-Framework-MobSF.git
+   git remote add upstream https://github.com/MobInspect/mobinspect.git
    ```
 
 2. If you cloned a while ago, get the latest changes from upstream:

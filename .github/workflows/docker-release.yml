@@ -30,7 +30,7 @@ jobs:
             name: Get Release Tag
             id: release
             run: |
-              DOCKER_IMAGE=opensecurity/mobile-security-framework-mobsf
+              DOCKER_IMAGE=appdirsdev/mobinspect
               if [[ $GITHUB_REF == refs/tags/* ]]; then
                 VERSION=${GITHUB_REF#refs/tags/v}
                 TAG="${DOCKER_IMAGE}:v${VERSION}"

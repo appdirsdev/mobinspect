@@ -1,0 +1,1107 @@
+
+{% extends "base/legacy_app.html" %}
+{% load static %}{% load mi_icons %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static "others/css/terminal.css" %}" type="text/css">
+<link rel="stylesheet" href="{% static "codemirror/codemirror.css" %}" type="text/css">
+<link rel="stylesheet" href="{% static "enlighterjs/enlighterjs.min.css" %}" />
+<link rel="stylesheet" href="{% static "codemirror/lint.css" %}" type="text/css">
+<link rel="stylesheet" href="{% static "others/css/spinner.css" %}">
+<link href="{% static "adminlte/plugins/sweetalert2/sweetalert2.min.css" %}" rel="stylesheet">
+<style>
+    [x-cloak] { display: none !important; }
+
+    /* Status console */
+    #stat {
+        width: 100%;
+        height: 170px;
+        border-radius: 0.5rem;
+        background: rgb(var(--surface-2));
+        border: 1px solid rgb(var(--border-subtle));
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12) inset;
+        color: rgb(var(--text-secondary));
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.8rem;
+        line-height: 1.4em;
+        padding: 8px 10px;
+        resize: vertical;
+        transition: border-color 0.15s ease;
+    }
+    #stat:focus {
+        outline: 2px solid rgb(var(--text-brand) / 0.4);
+        outline-offset: -1px;
+        border-color: rgb(var(--text-brand));
+    }
+    .highlight { outline: 2px solid rgb(var(--text-brand)); border-radius: 0.375rem; }
+
+    /* Frida code editor — clean modern chrome (no coordinate-shifting CSS
+       transforms, which previously misaligned CodeMirror's mouse hit-testing). */
+    #code-editor{
+      width: 100%;
+      height: auto;
+      overflow: auto;
+      max-height: 600px;
+      border: 1px solid rgb(var(--border-subtle));
+      border-radius: 0.5rem;
+      background: rgb(var(--surface-2));
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* Internet Explorer 10+ */
+    }
+    #code-editor::-webkit-scrollbar {
+      display: none; /* Chrome, Safari, Opera */
+    }
+    .CodeMirror {
+        height: 560px;
+        font-size: 12px;
+        border-radius: 0.5rem;
+      }
+
+    .form-group { position: relative; }
+    .frida-pre {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #start_activity{ margin-top: 5px; }
+    #start_activity_form{ margin-top: 10px; }
+
+    /* ── Section header icon chip (amber/violet duotone — non-semantic UI accent) ── */
+    .hdr-chip {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 2rem; height: 2rem; border-radius: 0.5rem;
+      background: rgba(254, 74, 35, 0.15); color: #FE4A23;
+      flex-shrink: 0;
+    }
+    .hdr-chip.hdr-chip-violet { background: rgba(141, 92, 252, 0.15); color: #8D5CFC; }
+
+    /* ── Ambient hero: floating brand-blobs + faint grid, theme-aware ── */
+    .mi-hero { position: relative; background: rgb(var(--surface-1)); }
+    .mi-hero-glow, .mi-hero-grid { position: absolute; inset: 0; pointer-events: none; }
+    .mi-hero-glow::before, .mi-hero-glow::after {
+      content: ''; position: absolute; border-radius: 9999px;
+      filter: blur(64px); opacity: .5;
+    }
+    .mi-hero-glow::before {
+      width: 320px; height: 320px; top: -120px; right: -60px;
+      background: radial-gradient(circle at center, rgb(var(--text-brand) / .5), transparent 70%);
+      animation: mi-float 16s ease-in-out infinite;
+    }
+    .mi-hero-glow::after {
+      width: 260px; height: 260px; bottom: -130px; left: -40px;
+      background: radial-gradient(circle at center, rgb(100 116 139 / .35), transparent 70%);
+      animation: mi-float 20s ease-in-out infinite reverse;
+    }
+    .mi-hero-grid {
+      background-image:
+        linear-gradient(rgb(var(--border-subtle)) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(var(--border-subtle)) 1px, transparent 1px);
+      background-size: 32px 32px; opacity: .45;
+      -webkit-mask-image: radial-gradient(ellipse 75% 75% at 85% 0%, #000 10%, transparent 72%);
+              mask-image: radial-gradient(ellipse 75% 75% at 85% 0%, #000 10%, transparent 72%);
+    }
+    :root[data-theme="dark"] .mi-hero-glow::before { opacity: .38; }
+    :root[data-theme="dark"] .mi-hero-glow::after  { opacity: .3; }
+
+    /* ── Copy-chip micro-interaction ── */
+    .mi-copy-chip { cursor: pointer; user-select: none; transition: border-color .15s ease, background-color .15s ease; }
+    .mi-copy-chip:hover { border-color: rgb(var(--text-brand) / .4); background: rgb(var(--text-brand) / .06); }
+
+    /* ── Live pulse dot (real-time indicators) ── */
+    .mi-pulse-dot { position: relative; width: 7px; height: 7px; border-radius: 9999px; background: currentColor; display: inline-block; flex-shrink: 0; }
+    .mi-pulse-dot::after {
+      content: ''; position: absolute; inset: -5px; border-radius: 9999px;
+      background: currentColor; opacity: .5; animation: mi-pulse 1.8s ease-out infinite;
+    }
+
+    /* ── Checkbox chip rows ── */
+    .mi-chk { transition: background-color .15s ease; }
+    .mi-chk:hover { background: rgb(var(--surface-2)); }
+    .mi-chk input[type="checkbox"] { accent-color: rgb(var(--text-brand)); width: 15px; height: 15px; }
+
+    /* ── Toolbar buttons: tinted lift on hover ── */
+    .mi-tool-btn { position: relative; transition: transform .15s ease, box-shadow .15s ease; }
+    .mi-tool-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgb(var(--text-brand) / .45); }
+
+    /* ── Terminal chrome dots ── */
+    .mi-term-dot { width: 0.65rem; height: 0.65rem; border-radius: 9999px; flex-shrink: 0; }
+
+    /* ── Loader: visual polish only — structure/toggle classes unchanged ── */
+    .loading { backdrop-filter: blur(2px); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mi-hero-glow::before, .mi-hero-glow::after, .mi-pulse-dot::after { animation: none; }
+      .mi-tool-btn, .mi-chk, .mi-copy-chip, #stat { transition: none; }
+    }
+    @keyframes mi-float {
+      0%, 100% { transform: translate3d(0,0,0); }
+      50%      { transform: translate3d(0,-22px,0); }
+    }
+    @keyframes mi-pulse {
+      0%   { transform: scale(.6); opacity: .55; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+</style>
+
+{% endblock %}
+{% block content %}
+
+<script src="{% static "adminlte/plugins/jquery.min.js" %}"></script>
+
+<div class="space-y-6">
+
+  {# ─────────────────── Ambient hero header ─────────────────── #}
+  <section class="mi-hero card mi-glass relative overflow-hidden p-0" data-reveal>
+    <div class="mi-hero-grid" aria-hidden="true"></div>
+    <div class="mi-hero-glow" aria-hidden="true"></div>
+
+    <div class="relative z-10 px-6 py-7 md:px-8 md:py-8">
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+        <div class="flex items-start gap-4 min-w-0">
+          <span class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-text-secondary/10 text-text-secondary flex-shrink-0 shadow-elevation-1">
+            {% icon "smartphone" size=26 %}
+          </span>
+          <div class="min-w-0" id="mobinspect_header">
+            <p class="text-tiny uppercase tracking-[0.14em] text-text-brand font-semibold mb-1.5 inline-flex items-center gap-1.5">
+              {% icon "shield-check" size=13 %} Dynamic &middot; iOS &middot; Jailbroken device
+            </p>
+            <h2 class="text-h1 md:text-display truncate" title="{{ bundle_id }}"><strong>{{ bundle_id }}</strong></h2>
+            <div class="flex flex-wrap items-center gap-2 mt-3">
+              <span class="badge badge-passed gap-1.5">
+                <span class="mi-pulse-dot"></span> Frida environment ready
+              </span>
+              <span
+                class="badge badge-unknown gap-1.5 font-mono mi-copy-chip"
+                x-data="{ copied: false }"
+                @click="navigator.clipboard && navigator.clipboard.writeText('{{ device_id }}'); copied = true; setTimeout(() => copied = false, 1400)"
+                title="Click to copy device ID"
+              >
+                <span x-show="!copied">{% icon "copy" size=12 %} {{ device_id }}</span>
+                <span x-show="copied" x-cloak>{% icon "check" size=12 %} Copied</span>
+              </span>
+              <span
+                class="badge badge-unknown gap-1.5 font-mono mi-copy-chip"
+                x-data="{ copied: false }"
+                @click="navigator.clipboard && navigator.clipboard.writeText('{{ checksum }}'); copied = true; setTimeout(() => copied = false, 1400)"
+                title="Click to copy scan checksum"
+              >
+                <span x-show="!copied">{% icon "copy" size=12 %} {{ checksum|slice:":12" }}&hellip;</span>
+                <span x-show="copied" x-cloak>{% icon "check" size=12 %} Copied</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div id="but" class="flex items-center gap-2 flex-wrap flex-shrink-0">
+          <a href="#" id="ss" class="btn btn-secondary btn-md mi-tool-btn" role="button"><i class="fa fa-camera"></i> Take a Screenshot</a>
+          <a href="{% url 'system_logs_device' %}?device_id={{device_id}}" target="_blank" id="system_logs" class="btn btn-secondary btn-md mi-tool-btn"><i class="fa fa-water"></i> System Logs</a>
+          <a href="{% url 'ios_api_monitor' %}?checksum={{ checksum }}&bundle_id={{ bundle_id }}" id="apimon" target="_blank" class="btn btn-secondary btn-md mi-tool-btn" style='display: none'><i class="fa fa-search"></i> Live API Monitor</a>
+          <a href="#" id="report" class="mi-pillbtn btn btn-md disabled" role="button"><i class="fa fa-file-alt"></i> Generate Report</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ─────────────────── Analyzer + Code editor ─────────────────── #}
+  <section class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+
+    {# ── Instrumentation controls ── #}
+    <div class="card mi-glass xl:col-span-5" data-reveal>
+      <div class="card-header p-0">
+        <ul class="nav nav-tabs flex w-full !mb-0" id="tabnav" role="tablist">
+          <li class="nav-item">
+            <a class="nav-link active px-4 py-3 text-small font-medium inline-flex items-center gap-1.5" id="dm-tab" data-toggle="pill" href="#dm" role="tab" aria-controls="dm" aria-selected="true">{% icon "zap" size=14 %} Dynamic Analyzer</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link px-4 py-3 text-small font-medium inline-flex items-center gap-1.5" id="errors-tab" data-toggle="pill" href="#errors" role="tab" aria-controls="errors" aria-selected="false">{% icon "info" size=14 %} Errors</a>
+          </li>
+        </ul>
+      </div>
+      <div class="card-body">
+        <div class="tab-content" id="tabs">
+          <div class="tab-pane fade active show" id="dm" role="tabpanel" aria-labelledby="dm-tab">
+            <textarea id="stat"></textarea>
+
+            <div id="frida_options" class="mt-4">
+              <form role="form">
+                <div class="form-group space-y-5">
+                  <div>
+                    <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "shield-check" size=12 %} Default Frida Scripts</h4>
+                    <div class="space-y-1 text-small text-text-secondary">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="default_hooks" type="checkbox" value="jailbreak_bypass" checked>
+                        Jailbreak Detection Bypass
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="default_hooks" type="checkbox" value="ssl_pinning" checked>
+                        SSL Pinning Bypass
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="pt-4 border-t border-border-subtle">
+                    <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "activity" size=12 %} Trace Frida Scripts</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-2 text-small text-text-secondary">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="network" checked>
+                        Network
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="crypto" checked>
+                        Crypto
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="cookies" checked>
+                        Cookies
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="file-access" checked>
+                        File Access
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="json" checked>
+                        Json Data
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="sqlite" checked>
+                        Sqlite Query
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="data-dir" checked>
+                        Data Directory
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="keychain" checked>
+                        Keychain
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="nslog" checked>
+                        NSLog
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="text-inputs" checked>
+                        Text Inputs
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="nsurlcredentialstorage" checked>
+                        URL Credential Storage
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="nsuserdefaults" checked>
+                        User Defaults
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="dump_hooks" type="checkbox" value="pasteboard" checked>
+                        Pasteboard
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="pt-4 border-t border-border-subtle">
+                    <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "search" size=12 %} Auxiliary Frida Scripts</h4>
+                    <div class="space-y-1.5 text-small text-text-secondary">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="auxiliary" type="checkbox" value="enum_class" id="enum_class">
+                        Enumerate Classes
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="auxiliary" type="checkbox" value="enum_class_methods" id="enum_class_methods">
+                        Enumerate Classes &amp; Methods
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="auxiliary" type="checkbox" value="string_capture" id="string_capture">
+                        Capture Strings
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input name="auxiliary" type="checkbox" value="string_compare" id="string_compare">
+                        Capture String Comparisons
+                      </label>
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="enum_methods" id="enum_methods">
+                        Enumerate Class Methods
+                      </label>
+                      <input type="text" class="input" id="class_name" placeholder="NSData">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_class" id="search_class">
+                        Search Class Pattern
+                      </label>
+                      <input type="text" class="input" id="class_search" placeholder="Jailbreak*">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input onclick="aux_click(this)" name="auxiliary" type="checkbox" value="search_method" id="search_method">
+                        Find all classes with Specific Method
+                      </label>
+                      <input type="text" class="input" id="method_search" placeholder="MethodName">
+                      <label class="mi-chk flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer">
+                        <input onclick="aux_click(this)" name="auxiliary" type="checkbox"  value="trace_class" id="trace_class">
+                        Trace Class Methods
+                      </label>
+                      <input type="text" class="input" id="class_trace" placeholder="NSURLConnection">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pt-4 mt-5 border-t border-border-subtle">
+                  <h4 class="text-tiny uppercase text-text-tertiary font-medium mb-2 inline-flex items-center gap-1.5">{% icon "zap" size=12 %} Instrumentation</h4>
+                  <div class="flex flex-wrap gap-2">
+                    <button id="frida_run" type="submit" class="btn btn-secondary btn-sm"><i class="fas fa-play"></i> Run</button>
+                    <button id="frida_spawn" type="submit" class="btn btn-primary btn-sm"><i class="far fa-play-circle"></i> Spawn &amp; Inject</button>
+                    <button id="frida_session" type="submit" class="btn btn-secondary btn-sm" disabled><i class="fas fa-redo"></i> Inject </button>
+                    <button id="frida_attach" type="submit" class="btn btn-secondary btn-sm"><i class="fas fa-bug"></i> Attach </button>
+                    <button id="frida_get" class="btn btn-ghost btn-sm" hidden><i class="fas fa-code"></i> Injected Code</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="errors" role="tabpanel" aria-labelledby="errors-tab">
+            <iframe sandbox frameborder="0" width="100%" height="650px" id="er" class="rounded-md border border-border-subtle bg-surface-0"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ── Frida code editor ── #}
+    <div class="card xl:col-span-7" id="codeedit" data-reveal>
+      <div class="card-header flex items-center justify-between gap-2">
+        <h3 class="card-title text-h3 flex items-center gap-2.5"><span class="hdr-chip"><i class="fa fa-code"></i></span> Frida Code Editor</h3>
+        <span class="text-tiny text-text-tertiary font-mono hidden sm:inline">JavaScript</span>
+      </div>
+      <div class="card-body">
+        <div id="code-editor">
+<textarea id="code-js" rows="100">
+  // Use send() for logging
+</textarea>
+        </div>
+        <div class="flex items-center justify-between gap-2 mt-3">
+          <span class="text-tiny text-text-tertiary">Available Scripts (Use CTRL to choose multiple)</span>
+          <button id="loadscript" type="submit" class="btn btn-secondary btn-sm">Load</button>
+        </div>
+        <select id="fd_scs" size="10" multiple="" class="input mt-2 w-full"></select>
+      </div>
+    </div>
+  </section>
+
+  {# ─────────────────── Shell access ─────────────────── #}
+  <section class="card" data-reveal>
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap">
+      <h3 class="card-title text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "upload" size=16 %}</span> Device Shell</h3>
+      <form style="display: flex; justify-content: flex-end">
+        <label for="id_file" class="btn btn-secondary btn-sm mi-tool-btn"><i class="fas fa-file-upload"></i> Upload to Device</label>
+        <input type="file" style="visibility:hidden; width: 0%;" name="file" required="" id="id_file" onchange="uploadFile()">
+      </form>
+    </div>
+    <div class="card-body p-0">
+      <div class="flex items-center gap-1.5 px-4 py-2.5 border-b border-border-subtle bg-surface-2/60">
+        <span class="mi-term-dot bg-text-tertiary/50"></span>
+        <span class="mi-term-dot bg-text-tertiary/35"></span>
+        <span class="mi-term-dot bg-text-tertiary/20"></span>
+        <span class="text-tiny text-text-tertiary ml-2 font-mono truncate">root@iPhone &mdash; ssh</span>
+      </div>
+      <div class="p-4">
+        <div id="shell">
+          <output></output>
+          <div id="input-line" class="input-line">
+            <div class="prompt"></div><div><input id="cmdinp" class="cmdline" autofocus /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ─────────────────── Frida logs ─────────────────── #}
+  <section class="card" data-reveal>
+    <div class="card-header flex items-center justify-between gap-2">
+      <h3 class="card-title text-h3 flex items-center gap-2.5"><span class="hdr-chip">{% icon "file-text" size=16 %}</span> Frida Logs</h3>
+      <span class="inline-flex items-center gap-2 rounded-md border border-border-subtle bg-surface-2 px-2.5 py-1 text-tiny uppercase tracking-wide text-text-secondary">
+        <span class="mi-pulse-dot text-severity-passed dark:text-severity-passed-dark"></span>
+        <span id="messages">Data refreshed in every 3 seconds.</span>
+      </span>
+    </div>
+    <div class="card-body">
+      <pre class="frida-pre" id="frida-logs"></pre>
+    </div>
+  </section>
+
+</div>
+
+<!--Loader-->
+<div class="hidden loading">
+  <div class='uil-ring-css' style='transform:scale(0.79);'>
+    <div></div>
+  </div>
+  </div>
+
+
+  <!-- Modal -->
+ <div class="modal fade" id="get_code_modal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title flex items-center gap-2.5"><span class="hdr-chip"><i class="fas fa-code"></i></span> Injected Frida Script</h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <div class="modal-body" id="injected_content">
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- Modal -->
+<div class="modal fade" id="frida_attach_mdl" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title flex items-center gap-2.5" id="exampleModalLabel"><span class="hdr-chip"><i class="fas fa-bug"></i></span> Attach to a Running Process</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form role="form">
+          <div class="form-group">
+            <select id="process_select" class="input w-full" aria-label="Select a process">
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button id="attach_to_pid" type="button" class="btn btn-primary"><i class="fas fa-bug"></i> Attach</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_scripts %}
+<script src="{% static "codemirror/codemirror.js" %}"></script>
+<script src="{% static "codemirror/javascript.js" %}"></script>
+<script src="{% static "codemirror/jshint.js" %}"></script>
+<script src="{% static "codemirror/lint.js" %}"></script>
+<script src="{% static "codemirror/javascript-lint.js" %}"></script>
+<script src="{% static "adminlte/plugins/sweetalert2/sweetalert2.min.js" %}"></script>
+<script src="{% static "enlighterjs/enlighterjs.min.js" %}"></script>
+<script>
+
+var appContainerPath;
+// Loading Spinner
+function dynamic_loader(){
+    var loadingOverlay = document.querySelector('.loading');
+    loadingOverlay.classList.remove('hidden');
+}
+function stop_loader(){
+    var loadingOverlay = document.querySelector('.loading');
+    loadingOverlay.classList.add('hidden');
+}
+
+// Hide Frida Logs on page load
+document.getElementById('frida-logs').style.display = 'none';
+
+// Frida Auxiliary actions
+function aux_click(cb) {
+  if (cb.checked && cb.value==='search_class')
+    $('#cls_search').addClass('highlight')
+  else if (!cb.checked && cb.value==='search_class')
+    $('#cls_search').removeClass('highlight')
+  else if(cb.checked && cb.value==='search_method')
+    $('#cls_method').addClass('highlight')
+  else if (!cb.checked && cb.value==='search_method')
+    $('#cls_method').removeClass('highlight')
+  else if (cb.checked && cb.value==='enum_methods')
+    $('#cls_name').addClass('highlight')
+  else if (!cb.checked && cb.value==='enum_methods')
+    $('#cls_name').removeClass('highlight')
+  else if (cb.checked && cb.value==='trace_class')
+    $('#cls_trace').addClass('highlight')
+  else if (!cb.checked && cb.value==='trace_class')
+    $('#cls_trace').removeClass('highlight')
+}
+
+//For All Ajax
+function action(url, data, on_success){
+  //Add CSRF
+  data.csrfmiddlewaretoken ='{{ csrf_token }}';
+  $.ajax({
+    url : url, 
+    type : "POST",
+    dataType: "json", 
+    data : data,
+    success : function(json){ on_success(json) },
+    error : function(xhr, ajaxOptions, thrownError) {
+      document.getElementById("er").srcdoc = xhr.responseText;
+    }
+  });
+}
+
+// Escape
+function escape(data_string) {
+    var encodedStr = data_string.replace(/[\u00A0-\u9999<>\&]/gim, function (i) {
+        return '&#' + i.charCodeAt(0) + ';';
+    });
+    return encodedStr;
+}
+
+// Escape HTML
+function escapeHtml(unsafe){
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Frida load other scripts
+function load_frida_others(){
+  action('{% url 'list_frida_scripts' %}', {device: 'ios'}, function(json) {
+    if (json.status == 'ok'){
+        json.files.forEach(function(script) {
+          $('<option>').val(script).text(script).appendTo('#fd_scs');
+        });
+      }
+  });
+}
+
+// Code Editor
+var editor = CodeMirror.fromTextArea(document.getElementById("code-js"), {
+    lineNumbers: true,
+    mode: "javascript",
+    gutters: ["CodeMirror-lint-markers"],
+    lint: true,
+    lineWrapping: true
+});
+
+// Restore saved content
+restore();
+
+//Restore Code
+function restore(){
+  var custom_code = window.sessionStorage.getItem("code");
+  if (custom_code !== null) {
+    setTimeout(function(){ editor.getDoc().setValue(custom_code); }, 2000);
+  }
+}
+
+// Terminal
+var util = util || {};
+util.toArray = function (list) {
+    return Array.prototype.slice.call(list || [], 0);
+};
+
+var Terminal = Terminal || function (cmdLineContainer, outputContainer) {
+    window.URL = window.URL || window.webkitURL;
+    window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
+
+    var cmdLine_ = document.querySelector(cmdLineContainer);
+    var output_ = document.querySelector(outputContainer);
+
+    const CMDS_ = [
+        'clear', 'date', 'help', 'app_path'
+    ];
+
+    var history_ = [];
+    var histpos_ = 0;
+    var histtemp_ = 0;
+    var intro = '<h3 style="letter-spacing: 2px">Shell Access</h3><p>' + new Date() + '</p>';
+    var shell = document.getElementById('shell');
+    shell.addEventListener('click', function (e) {
+        cmdLine_.focus();
+    }, false);
+
+    cmdLine_.addEventListener('click', inputTextClick_, false);
+    cmdLine_.addEventListener('keydown', historyHandler_, false);
+    cmdLine_.addEventListener('keydown', processNewCommand_, false);
+
+    function inputTextClick_(e) {
+        this.value = this.value;
+    }
+
+    function historyHandler_(e) {
+        if (history_.length) {
+            if (e.keyCode == 38 || e.keyCode == 40) {
+                if (history_[histpos_]) {
+                    history_[histpos_] = this.value;
+                } else {
+                    histtemp_ = this.value;
+                }
+            }
+
+            if (e.keyCode == 38) { // up
+                histpos_--;
+                if (histpos_ < 0) {
+                    histpos_ = 0;
+                }
+            } else if (e.keyCode == 40) { // down
+                histpos_++;
+                if (histpos_ > history_.length) {
+                    histpos_ = history_.length;
+                }
+            }
+
+            if (e.keyCode == 38 || e.keyCode == 40) {
+                this.value = history_[histpos_] ? history_[histpos_] : histtemp_;
+                setTimeout(() => {
+                    this.setSelectionRange(this.value.length, this.value.length);
+                }, 0); // Sets cursor to end of input.
+            }
+
+        }
+    }
+
+    function output(html, escape_=false, pre=false, error=false) {
+        if (escape_)
+            html = escape(html);
+        if (pre)
+         output_.insertAdjacentHTML('beforeEnd', '<pre class="clean-text">' + html + '</pre>');
+        else if (error)
+          output_.insertAdjacentHTML('beforeEnd', '<pre>' + html + '</pre>');
+        else
+         output_.insertAdjacentHTML('beforeEnd', '<p>' + html + '</p>');
+    }
+
+    function scrollToShellBottom(){
+      // Scroll to shell bottom and ensure shell is completely visible
+      var myElement = document.getElementById('shell');
+      
+      // Scroll the shell content to the bottom
+      myElement.scrollTop = myElement.scrollHeight;
+      
+      // Ensure the shell element is visible in the viewport
+      myElement.scrollIntoView({ 
+        block: 'end', 
+        behavior: 'smooth',
+        inline: 'nearest'
+      });
+      
+      // For dynamic content, we need to continuously monitor and scroll
+      // Set up a MutationObserver to watch for content changes
+      if (!window.shellObserver) {
+        window.shellObserver = new MutationObserver(function(mutations) {
+          // When content changes, scroll to keep shell visible
+          myElement.scrollTop = myElement.scrollHeight;
+          myElement.scrollIntoView({ 
+            block: 'end', 
+            behavior: 'smooth',
+            inline: 'nearest'
+          });
+        });
+        
+        // Start observing the shell for content changes
+        window.shellObserver.observe(myElement, {
+          childList: true,
+          subtree: true,
+          characterData: true
+        });
+      }
+    }
+  
+    var pwd = '/private/var/root';
+    var cd = '';
+    var cwd_string = '';
+    const cd_regex = /cd ([^\s;&]+)/gm;
+    function ssh_execute(exec_cmd){
+      // CWD logic
+      let m;
+      while ((m = cd_regex.exec(exec_cmd)) !== null) {
+          // This is necessary to avoid infinite loops with zero-width matches
+          if (m.index === cd_regex.lastIndex) {
+            cd_regex.lastIndex++;
+          }
+          
+          // The result can be accessed through the `m`-variable.
+          m.forEach((match, groupIndex) => {
+              if (groupIndex === 1) {
+                cwd_string = match;
+              }
+          });
+      }
+      new_cmd = `${cd}${exec_cmd}`;
+      console.log('New Command: ' + new_cmd);
+      action('{% url 'ssh_execute_device' %}', {device_id: '{{ device_id }}', cmd: new_cmd }, function(json) {
+          if (json.status==="ok")
+            output(json.message, true, true);
+
+          // Logic to handle change directory
+          if (exec_cmd.startsWith('cd')){
+            if (!json.message.includes('No such file or directory') && !json.message.includes('Not a directory')) {
+              console.log('Match: ' + cwd_string)
+              if (cwd_string.startsWith('/') || cwd_string.startsWith('~')){
+                // Absolute path
+                pwd = cwd_string;
+                cd = `cd ${cwd_string};`;
+              } else if(cwd_string ==='~' || cwd_string === '-'){
+                return;
+              } else {
+                // Relative path
+                var _cd;
+                if (pwd.endsWith('/')){
+                  _cd = `${pwd}${cwd_string}`;
+                } else {
+                  _cd = `${pwd}/${cwd_string}`;
+                }
+                pwd = _cd;
+                cd = `cd ${_cd};`;
+              }
+              console.log('CD: ' + cd);
+              console.log('PWD: ' + pwd);
+            }
+          }
+      });
+    }
+
+    function processNewCommand_(e) {
+        if (e.keyCode == 9) { // tab
+            e.preventDefault();
+            // Implement tab suggest.
+        } else if (e.keyCode == 13) { // enter
+            // Save shell history.
+            if (this.value) {
+                history_[history_.length] = this.value;
+                histpos_ = history_.length;
+            }
+
+            // Duplicate current input and append to output section.
+            var line = this.parentNode.parentNode.cloneNode(true);
+            line.removeAttribute('id')
+            line.classList.add('line');
+            var input = line.querySelector('input.cmdline');
+            input.autofocus = false;
+            input.readOnly = true;
+            output_.appendChild(line);
+
+            if (this.value && this.value.trim()) {
+                var args = this.value.split(' ').filter(function (val, i) {
+                    return val;
+                });
+                var cmd = args[0].toLowerCase();
+                var exec_cmd = args.join(' ');
+                args = args.splice(1); // Remove cmd from arg list.
+            }
+
+            switch (cmd) {
+                case 'clear':
+                    output_.innerHTML = '';
+                    this.value = '';
+                    output(intro);
+                    return;
+                case 'date':
+                    output(new Date());
+                    break;
+                case 'help':
+                    output('<div class="ls-files">' + CMDS_.join('<br>') + '</div>');
+                    break;    
+                case 'app_path':
+                    if (appContainerPath)
+                      output(appContainerPath);
+                    break;                  
+                default:
+                   if (exec_cmd.length > 0)
+                        ssh_execute(exec_cmd)
+            };
+            scrollToShellBottom();
+            this.value = ''; // Clear/setup line for next input.
+        }
+    }
+    return {
+        init: function () {
+            output(intro);
+        },
+        output: output
+    }
+};
+
+$(document).ready(function() {
+
+//Terminal
+$('.prompt').html('[root@iPhone] # ');
+var term = new Terminal('#input-line .cmdline', '#shell output');
+term.init();
+
+// Start up
+load_frida_others();
+
+
+print_status("Setting up MobInspect Dynamic Analysis environment...");
+print_status("Environment is ready for Dynamic Analysis.");
+
+// Frida Logs Tab
+setInterval( function () {
+  $.ajax({
+      url : '{% url 'frida_logs' %}?hash={{ checksum }}&stream=1', 
+      type : "GET",
+      dataType: "json", 
+      success : function(json){ 
+         if (json.status==="ok"){
+            $('#frida-logs').text(json.message);
+          } else {
+            $('#frida-logs').text('')
+          }
+      },
+      error : function(xhr, ajaxOptions, thrownError) {
+        console.log(xhr.responseText);
+      }
+    });
+}, 3000);
+
+// Get App Container path
+function getContainerPath(){
+  action('{% url 'get_container_path' %}', {bundle_id: '{{ bundle_id }}'}, function(json) {
+    if (json.status==="ok"){
+        appContainerPath = json.message;
+    }
+  });
+}
+
+function enableReportBtn(seconds){
+  // Enable Report button after instrumentation only
+  setTimeout(function() {
+    $('#report').removeClass('disabled');
+  }, seconds * 1000);
+}
+
+// Load Frida Scripts
+$("#loadscript").click(function() {
+   var scripts = $('#fd_scs').val();
+   action('{% url 'get_script' %}', {scripts: scripts, device: 'ios'}, function(json) {
+    if (json.status==="ok"){
+        editor.getDoc().setValue(json.content);
+    }
+  });
+  return false;  
+});
+
+// Frida Spawn, Session and Ps
+function frida_instrument(frida_action, pid=null, new_bundle_id=null){
+    // Save Frida Code to Session Storage
+    var code = editor.getDoc().getValue();
+    window.sessionStorage.setItem('code', code);
+    // Show Frida logs
+    document.getElementById('frida-logs').style.display = 'block';
+    // Show Frida inject button
+    document.getElementById('frida_get').hidden = false;
+    var screenshot_action = null;
+    var custom_code = editor.getDoc().getValue();
+    var default_hooks = [];
+    var dump_hooks = [];
+    var auxiliary_hooks = [];
+
+    $.each($("input[name='default_hooks']:checked"), function(){            
+        default_hooks.push($(this).val());
+    });
+    $.each($("input[name='dump_hooks']:checked"), function(){            
+        dump_hooks.push($(this).val());
+    });
+    if(dump_hooks.length > 0)
+      $('#apimon').show();
+    else
+      $('#apimon').hide();
+    $.each($("input[name='auxiliary']:checked"), function(){            
+        auxiliary_hooks.push($(this).val());
+    });
+    
+    if (frida_action === 'run'){
+      print_status("Running the application with Frida.");
+    } else if (frida_action === 'spawn'){
+      document.getElementById('frida_session').disabled = false;
+      print_status("Instrumenting the application with Frida.");
+    } else if (frida_action === 'session' && pid === null){
+      print_status("Injecting Frida script to existing session.");
+    } else if (pid){
+      print_status("Attaching to PID: " + parseInt(pid));
+    } else if (frida_action == 'ps'){
+      print_status("Enumerating running processes.");
+    } else if (frida_action == 'get'){
+      print_status("Getting injected frida script.");
+    } else if (frida_action == 'capture'){
+      print_status("Taking a screenshot.");
+      screenshot_action = 'capture';
+      default_hooks = [];
+      dump_hooks = [];
+      auxiliary_hooks = [];
+      custom_code = '';
+    }
+    action('{% url 'ios_instrument_device' %}', {
+      frida_action,
+      pid, // attach pid
+      new_bundle_id, // attach bundle id
+      screenshot_action,
+      bundle_id: '{{ bundle_id }}',
+      device_id: '{{ device_id}}',
+      default_hooks: default_hooks.join(","),
+      dump_hooks: dump_hooks.join(","),
+      auxiliary_hooks: auxiliary_hooks.join(","),
+      class_name: $('#class_name').val(),
+      class_search:  $('#class_search').val(),
+      method_search: $('#method_search').val(),
+      class_trace:  $('#class_trace').val(),
+      frida_code: custom_code,
+    }, function(json) {
+      if (json.status !== "ok")
+          print_status(json.message);
+      else {
+        if (!appContainerPath)
+          setTimeout(function(){ getContainerPath(); }, 5000);
+        // Attach to a running process
+        if (frida_action == 'ps' && json.message && json.message.length > 0 && Array.isArray(json.message)){
+          $("#process_select").empty();
+          json.message.forEach(function(p) {
+            $('<option>').val(p.pid.toString() + ',' + p.identifier.toString()).text(p.pid.toString() + ': ' + p.name.toString() + ' - ' + p.identifier.toString()).appendTo('#process_select');
+          });
+          $('#frida_attach_mdl').modal('toggle');
+        } else if (frida_action =='get'){
+          var injected = document.getElementById("injected_content");
+          injected.innerHTML = '<pre id="injected-pre"></pre>';
+          document.getElementById("injected-pre").textContent = json.message;
+          EnlighterJS.enlight( document.getElementById('injected-pre'), {
+            theme: 'enlighter',
+            linehover: false,
+            textOverflow: 'scroll',
+            language: 'javascript',
+          });
+          $('#get_code_modal').modal('toggle');
+        }
+      }
+  });
+}
+
+// App Run
+$("#frida_run").click(function() {
+  frida_instrument('run');
+  return false;  
+});
+
+// Screenshot
+$("#ss").click(function() {
+  frida_instrument('capture');
+  return false;
+});
+
+
+// Frida Spawn
+$("#frida_spawn").click(function() {
+  // start_network_capture();
+  frida_instrument('spawn');
+  enableReportBtn(5);
+  return false;  
+}); 
+
+// Frida Session
+$("#frida_session").click(function() {
+  var default_hooks = "input[name='default_hooks']";
+  var dump_hooks = "input[name='dump_hooks']";
+
+  if ($(default_hooks + ":checked").length == $(default_hooks).length && $(dump_hooks + ":checked").length == $(dump_hooks).length){
+    // If all default hooks and dump hooks are selected, uncheck all during injection
+    $( default_hooks + ":checkbox" ).prop( "checked", false );
+    $( dump_hooks + ":checkbox" ).prop( "checked", false );
+  }
+  
+
+  // start_network_capture();
+  frida_instrument('session');
+  enableReportBtn(2);
+  return false;  
+}); 
+
+
+// Frida Get Processes to attach
+$("#frida_attach").click(function() {
+  frida_instrument('ps');
+  return false;  
+});
+
+// Frida Attach to Pid
+$("#attach_to_pid").click(function() {
+  var values = $('#process_select').val();
+  var pid = values.split(',')[0];
+  var bundle_id = values.split(',')[1];
+  //start_network_capture();
+  frida_instrument('session', pid, bundle_id);
+  $('#frida_attach_mdl').modal('hide');
+  enableReportBtn(2);
+  return false;  
+});
+
+// Frida Get Injected Script
+$("#frida_get").click(function() {
+  frida_instrument('get');
+  return false;  
+});
+
+
+//Finish & Generate Report
+$("#report").one( "click", function() {
+  dynamic_loader();
+  // Download app data
+  print_status("Downloading application data.");
+  action('{% url 'download_data_device' bundle_id=bundle_id %}', {device_id: '{{ device_id }}'}, function(json) {
+    stop_loader();
+    if (json.status==="ok"){
+      // Generate Report
+      print_status("Generating report");
+      location.href = '{% url 'view_report_device' bundle_id=bundle_id %}?device_id={{ device_id }}';
+    } else {
+      print_status("Failed to download application data");
+    }
+  });
+});
+
+//end document.ready
+});
+
+
+// Upload file to device
+function uploadFile(){
+  try {
+    var file = id_file.files[0];
+    if (!file){
+      return;
+    }
+    var formdata = new FormData();
+    formdata.append("file", id_file.files[0]);
+    formdata.append("device_id", '{{ device_id }}');
+    dynamic_loader();
+    $.ajax({
+        url: '{% url 'upload_file_device' %}', 
+        type: "POST",
+        data: formdata,
+        contentType: false,
+        cache: false,
+        processData: false,
+        beforeSend: function(request) {
+          request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+          request.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+        },
+        success : function(json){
+          stop_loader();
+          if (json.status==="ok"){
+            print_status("File uploaded successfully.");
+            Swal.fire(
+                      'Uploaded!',
+                      'File uploaded to: <b>/tmp/' + escape(id_file.files[0].name) + '</b>',
+                      'success')
+          } else {
+            print_status("Failed to upload file.");
+          }
+        },
+        error : function(xhr, ajaxOptions, thrownError) {
+          stop_loader();
+          document.getElementById("er").srcdoc = xhr.responseText;
+        }
+      });
+  } catch (e) {
+      stop_loader();
+      print_status("Failed to upload file: " + e);
+  }
+}
+
+//Print Status
+function print_status(message){
+  $('#stat').append(message + '\n');
+  $('#stat').scrollTop($('#stat')[0].scrollHeight);
+}
+
+</script>
+{% endblock %}

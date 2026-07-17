@@ -46,7 +46,7 @@ for pd in permission_divs:
 
 # check the permissions we currently have in dvm_permissions.py
 DVM_PERMISSIONS = {}
-eval(compile(open('../mobsf/StaticAnalyzer/views/'
+eval(compile(open('../mobinspect/StaticAnalyzer/views/'
                   'android/kb/dvm_permissions.py').read(),
              '<string>',
              'exec'))

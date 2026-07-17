@@ -127,7 +127,7 @@ Every list view ships an empty state:
 | `general/apidocs.html` | — | `settings/api_docs.html` (kept as-is, restyled) | 2.3 |
 | `general/error.html` | — | `errors/generic.html` (with new `403/404/500`) | 2.3 |
 | `general/dynamic.html` | — | `dynamic/select.html` | 2.3 |
-| `general/donate.html` | — | **REMOVED** (upstream MobSF donations) |
+| `general/donate.html` | — | **REMOVED** (upstream MobInspect donations) |
 | `general/zip.html` | — | `scans/zip.html` | 2.3 |
 | `static_analysis/android_binary_analysis.html` | — | `reports/android/binary.html` | 2.2 |
 | `static_analysis/android_source_analysis.html` | — | `reports/android/source.html` | 2.2 |

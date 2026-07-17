@@ -1,7 +1,7 @@
 """UI spec for the Integrations page (`/rbac/integrations/adb/`).
 
 Covers the four fixed, self-contained integration cards defined in
-``mobsf/templates/rbac/adb_connections.html``:
+``mobinspect/templates/rbac/adb_connections.html``:
 
     1. Android device            (adb host:port)
     2. iOS device                (SSH host:port)

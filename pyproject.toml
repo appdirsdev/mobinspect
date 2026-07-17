@@ -1,14 +1,14 @@
 [tool.poetry]
 name = "mobinspect"
-version = "4.5.0"
-description = "MobInspect — Mobile Application Security Inspector. A fork of Mobile Security Framework (MobSF) with a modern UI, dynamic RBAC, and analytics on top of the original static, dynamic, and malware analyzers."
-keywords = ["mobinspect", "mobsf", "mobile security framework", "mobile security", "security tool", "static analysis", "dynamic analysis", "malware analysis", "rbac"]
-authors = ["MobInspect contributors", "Ajin Abraham <ajin@opensecurity.in>"]
+version = "5.1.0"
+description = "MobInspect — Mobile Application Security Inspector with a modern UI, dynamic RBAC, and analytics for static, dynamic, and malware analysis of mobile apps."
+keywords = ["mobinspect", "mobile security", "security tool", "static analysis", "dynamic analysis", "malware analysis", "rbac"]
+authors = ["MobInspect contributors"]
 license = "GPL-3.0-only"
 readme = "README.md"
 repository = "https://github.com/appdirsdev/mobinspect"
 documentation = "https://github.com/appdirsdev/mobinspect"
-packages = [{ include = "mobsf", format = ["sdist", "wheel"]}]
+packages = [{ include = "mobinspect", format = ["sdist", "wheel"]}]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -20,10 +20,7 @@ classifiers = [
 "Bug Tracker" = "https://github.com/appdirsdev/mobinspect/issues"
 
 [tool.poetry.scripts]
-# Both names invoke the same entrypoint. `mobsf` is kept for backward
-# compatibility; `mobinspect` is preferred going forward.
-mobinspect = "mobsf.__main__:main"
-mobsf = "mobsf.__main__:main"
+mobinspect = "mobinspect.__main__:main"
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -78,15 +75,15 @@ pytest-django = ">=4.8,<5"
 # Keep DJANGO_SETTINGS_MODULE here (rather than in a sibling pytest.ini)
 # so a single source of truth governs both `poetry run pytest` and any
 # IDE invocation.
-DJANGO_SETTINGS_MODULE = "mobsf.MobSF.settings"
+DJANGO_SETTINGS_MODULE = "mobinspect.MobInspect.settings"
 python_files = ["test_*.py", "tests.py"]
 # importlib mode lets same-named test modules (e.g. an android and an ios
 # test_cov_view_source.py) coexist without __init__.py packages.
 addopts = "--import-mode=importlib"
 # Default test discovery roots — the audit suite (H17) lives under
-# mobsf/RBAC/tests/ and mobsf/Analytics/tests/. Adding the bare module
+# mobinspect/RBAC/tests/ and mobinspect/Analytics/tests/. Adding the bare module
 # path lets `poetry run pytest` (no args) collect just the new suite.
-testpaths = ["mobsf/RBAC/tests", "mobsf/Analytics/tests"]
+testpaths = ["mobinspect/RBAC/tests", "mobinspect/Analytics/tests"]
 # Silence noisy third-party warnings that drown out real test signal.
 filterwarnings = [
     "ignore::DeprecationWarning",

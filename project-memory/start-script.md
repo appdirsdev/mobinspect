@@ -15,6 +15,6 @@ metadata:
 
 Flags: `./start.sh --no-emulator` (static only), `HOST=0.0.0.0 PORT=8080 ./start.sh`.
 
-Key env it exports: `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`, `MOBSF_ANALYZER_IDENTIFIER=127.0.0.1:5555`, plus sources `.env.postgres`.
+Key env it exports: `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES`, `MOBINSPECT_ANALYZER_IDENTIFIER=127.0.0.1:5555`, plus sources `.env.postgres`.
 
 Two non-obvious things baked in (see [[dynamic-analysis-fixes]]): MobInspect BLOCKS Django `runserver` → must use gunicorn (as run.sh does); macOS needs `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` or gunicorn workers crash-loop with `+[NSCharacterSet initialize] ... fork()` SIGKILL. There is also a convenience `run-mobinspect.sh` (emulator|server) from earlier. Toolchain in [[toolchain]].

@@ -13,7 +13,7 @@
 #
 # Usage:
 #   ./scripts/run-tests.sh                    # full deterministic suite
-#   ./scripts/run-tests.sh mobsf/RBAC -x      # custom pytest args/subset
+#   ./scripts/run-tests.sh mobinspect/RBAC -x      # custom pytest args/subset
 #   PYTEST="python -m pytest" ./scripts/run-tests.sh   # override the runner
 # =============================================================================
 set -euo pipefail
@@ -59,17 +59,17 @@ fi
 PYTEST="${PYTEST:-poetry run pytest}"
 
 DEFAULT_PATHS=(
-  mobsf/RBAC
-  mobsf/Analytics/tests
-  mobsf/MobSF/views/test_cov_authorization.py
-  mobsf/MobSF/views/test_cov_home.py
-  mobsf/MobSF/views/test_cov_saml2.py
-  mobsf/MobSF/views/api/test_cov_api_static_analysis.py
-  mobsf/StaticAnalyzer/views/common/test_cov_suppression.py
-  mobsf/StaticAnalyzer/views/common/test_cov_shared_func.py
-  mobsf/StaticAnalyzer/views/common/test_cov_shared_func2.py
-  mobsf/StaticAnalyzer/views/test_cov_comparer.py
-  mobsf/StaticAnalyzer/views/test_cov_sast_engine.py
+  mobinspect/RBAC
+  mobinspect/Analytics/tests
+  mobinspect/MobInspect/views/test_cov_authorization.py
+  mobinspect/MobInspect/views/test_cov_home.py
+  mobinspect/MobInspect/views/test_cov_saml2.py
+  mobinspect/MobInspect/views/api/test_cov_api_static_analysis.py
+  mobinspect/StaticAnalyzer/views/common/test_cov_suppression.py
+  mobinspect/StaticAnalyzer/views/common/test_cov_shared_func.py
+  mobinspect/StaticAnalyzer/views/common/test_cov_shared_func2.py
+  mobinspect/StaticAnalyzer/views/test_cov_comparer.py
+  mobinspect/StaticAnalyzer/views/test_cov_sast_engine.py
 )
 
 echo "[tests] Running: $PYTEST ${*:-<deterministic suite>}"

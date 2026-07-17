@@ -16,7 +16,7 @@ where python >nul 2>&1 && (
   echo %var%|findstr /R "[3].[1213]" >nul
   if errorlevel 1 (
       if "%var%"=="" goto redo
-      echo [ERROR] MobSF dependencies require Python 3.12-3.13. Your python points to %var%
+      echo [ERROR] MobInspect dependencies require Python 3.12-3.13. Your python points to %var%
       exit /b
   ) else (
       echo [INSTALL] Found %var%
@@ -64,8 +64,8 @@ where python >nul 2>&1 && (
   call scripts/clean.bat y
 
   echo [INSTALL] Migrating Database
-  set DJANGO_SUPERUSER_USERNAME=mobsf
-  set DJANGO_SUPERUSER_PASSWORD=mobsf
+  set DJANGO_SUPERUSER_USERNAME=mobinspect
+  set DJANGO_SUPERUSER_PASSWORD=mobinspect
   poetry run python manage.py makemigrations
   poetry run python manage.py makemigrations StaticAnalyzer
   poetry run python manage.py migrate

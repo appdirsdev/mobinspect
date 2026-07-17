@@ -5,7 +5,7 @@ WKH_FILE=wkhtmltox_0.12.6.1-3.bookworm_amd64.deb
 WKH_FILE_ARM=wkhtmltox_0.12.6.1-3.bookworm_arm64.deb
 
 # For apktool
-mkdir -p /home/mobsf/.local/share/apktool/framework
+mkdir -p /home/mobinspect/.local/share/apktool/framework
 
 if [ "$TARGETPLATFORM" == "linux/arm64" ]
 then
@@ -33,9 +33,9 @@ wget --quiet "${JDK_URL}" && \
     rm -f "${JDK_FILE}"
 
 # Install JADX into the MobInspect home directory inside the image.
-# (mobsf user keeps its name for backward compatibility with existing
+# (mobinspect user keeps its name for backward compatibility with existing
 # images and the WORKDIR; the home dir name is the rebranded one.)
-python3 tools_download.py /home/mobsf/.MobInspect
+python3 tools_download.py /home/mobinspect/.MobInspect
 rm tools_download.py
 
 # Delete script

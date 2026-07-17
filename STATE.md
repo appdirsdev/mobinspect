@@ -91,7 +91,7 @@ Both functional with real (not stubbed) data; each has one concrete shortfall ag
 Most important rows:
 - **WORKS** — Malware tracker detection (432 Exodus signatures loaded), domain/URL/email extraction, MalwareDomainCheck (maltrail 576K + malwaredomainlist 2.2K), IP geolocation + OFAC tagging, malware-permission matcher — all run **key-free** on every APK scan and populate web + JSON report.
 - **WORKS** — Analytics 7-day trends, platform breakdown, fleet health, recent activity — real Chart.js dashboard computed live from RecentScansDB.
-- **FIXED (2026-06-11)** — Analytics "severity distribution": `mobsf/Analytics/views.py` now computes the severity rollup and `templates/analytics/dashboard.html` renders the donut the docstring described. (Was: missing entirely while the docstring claimed it.)
+- **FIXED (2026-06-11)** — Analytics "severity distribution": `mobinspect/Analytics/views.py` now computes the severity rollup and `templates/analytics/dashboard.html` renders the donut the docstring described. (Was: missing entirely while the docstring claimed it.)
 - **PARTIAL** — VirusTotal: hard-gated behind `settings.VT_ENABLED` (default False, `apk.py:255`), no key configured. Inert no-op; the UI still renders a data-less "VirusTotal" section that could mislead.
 
 ### 5. Modern UI / UX — **WORKS WITH CAVEATS**
@@ -125,7 +125,7 @@ These are flows a real analyst can complete start-to-finish with no wall:
 
 2. **Authentication and session management.** Full login flow (GET CSRF → POST with Referer → 302 → authenticated nav showing the real user list). Wrong password re-renders cleanly with no 500 and no session leak. CSRF enforced on both missing and garbage tokens. Logout clears the cookie AND invalidates the session server-side. Security headers (X-Frame-Options DENY, nosniff, Referrer-Policy, COOP) present on every response including 404s. DEBUG off, no traceback leaks.
 
-3. **REST API for read/analysis.** scans, scorecard, report_json, scan_logs, search, compare, upload, synchronous scan all return correct 200 JSON with real findings via `X-Mobsf-Api-Key`. Auth is fail-closed (401 no/bad key). Per-user RBAC keys mint, authenticate, and revoke correctly. Per-IP brute-force throttling works.
+3. **REST API for read/analysis.** scans, scorecard, report_json, scan_logs, search, compare, upload, synchronous scan all return correct 200 JSON with real findings via `X-MobInspect-Api-Key`. Auth is fail-closed (401 no/bad key). Per-user RBAC keys mint, authenticate, and revoke correctly. Per-IP brute-force throttling works.
 
 4. **Malware / threat-intel enrichment.** On every APK scan, key-free: 432 Exodus tracker signatures matched, domain/URL/email extraction, 576K+ malicious-domain IOC checks, IP geolocation, OFAC sanctioned-country tagging, malware-permission matching. All populate both web report and REST JSON, with graceful offline fallback to bundled DBs.
 
@@ -166,9 +166,9 @@ Things that look done but aren't — including endpoints that return 200 but are
 ## What's missing / stubbed / untestable
 
 - **iOS dynamic analysis (Corellium)** — genuine, substantial code but gated behind an unset `CORELLIUM_API_KEY`; **no hardware or account available, completely untested.** Cannot be claimed to work.
-- **iOS IPA HTML report — KNOWN BUG, out of this pass's scope.** The iOS static engine runs and persists to the DB (verified on real DVIA-v2), but `GET /static_analyzer_ios/<hash>/` returns HTTP 500 from a stray `{% endif %}` at `mobsf/templates/static_analysis/ios_binary_analysis.html:318` (98 endif vs 97 if, introduced in `b2cca892`). This was surfaced by the static-ipa E2E flow but is NOT in any of this pass's 12 fix groups, so it is deliberately left for a follow-up one-line fix (delete the stray tag) rather than committed speculatively here. The JSON report path was not independently confirmed (hashed RBAC keys + host went offline).
+- **iOS IPA HTML report — KNOWN BUG, out of this pass's scope.** The iOS static engine runs and persists to the DB (verified on real DVIA-v2), but `GET /static_analyzer_ios/<hash>/` returns HTTP 500 from a stray `{% endif %}` at `mobinspect/templates/static_analysis/ios_binary_analysis.html:318` (98 endif vs 97 if, introduced in `b2cca892`). This was surfaced by the static-ipa E2E flow but is NOT in any of this pass's 12 fix groups, so it is deliberately left for a follow-up one-line fix (delete the stray tag) rather than committed speculatively here. The JSON report path was not independently confirmed (hashed RBAC keys + host went offline).
 - **Windows APPX static analysis** — code complete and routed but **never exercised against real input.** Historically needs a Windows VM (`WINDOWS_VM_IP`) that isn't configured. Unverified territory for a customer.
-- **VirusTotal** — hard-gated off, no key; inert no-op out of the box. Client code is complete and would work once `MOBSF_VT_ENABLED=1` + key are set. The empty UI section is misleading.
+- **VirusTotal** — hard-gated off, no key; inert no-op out of the box. Client code is complete and would work once `MOBINSPECT_VT_ENABLED=1` + key are set. The empty UI section is misleading.
 - **Analytics severity distribution** — decided but never implemented.
 - **Off-site backup (restic)** — an intentional, clearly-documented stub requiring per-env credentials; not active out of the box. (On-host hourly SQLite backup is wired but not confirmed enabled on the live host.)
 - **Postgres production DB** — code-supported, unconfigured; live runs single-host SQLite.

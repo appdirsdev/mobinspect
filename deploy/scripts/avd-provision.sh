@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # MobInspect — one-time AVD provisioning for dynamic analysis.
 #
-# Makes the emulator's /system partition writable so mobsfy_init can push the
+# Makes the emulator's /system partition writable so mobinspecty_init can push the
 # Frida server + Burp/MobInspect CA into /system. On API 29+ this REQUIRES
 # disabling dm-verity, which only takes effect after a guest reboot. Because
 # the AVD unit runs with -no-snapshot (cold boot every start), this must run

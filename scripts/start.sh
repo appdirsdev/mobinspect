@@ -17,7 +17,7 @@ BIND="${MOBINSPECT_BIND:-127.0.0.1}"
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 ROOT="$PWD"
-CSS="$ROOT/mobsf/static/mobinspect/css/dist/app.css"
+CSS="$ROOT/mobinspect/static/mobinspect/css/dist/app.css"
 
 log()  { printf '\033[1;36m[start]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[start]\033[0m %s\n' "$*" >&2; }

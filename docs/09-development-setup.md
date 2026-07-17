@@ -4,7 +4,7 @@
 
 | Tool | Version | Why |
 |------|---------|-----|
-| Python | 3.12+ | Inherited from upstream MobSF |
+| Python | 3.12+ | Inherited from upstream MobInspect |
 | Poetry | ≥1.5 | Package manager |
 | Git | any | duh |
 | `make` | any | Convenience commands |
@@ -43,10 +43,10 @@ poetry run python manage.py createsuperuser
 # 8. Run the dev server
 poetry run python manage.py runserver  # NOTE: blocked upstream, see below
 # OR
-poetry run mobsf                       # production-style server (gunicorn)
+poetry run mobinspect                       # production-style server (gunicorn)
 ```
 
-> Upstream MobSF blocks `manage.py runserver` (`manage.py:13`) for safety reasons. We unblock it under `MOBINSPECT_DEV=1`. Never set this in production.
+> Upstream MobInspect blocks `manage.py runserver` (`manage.py:13`) for safety reasons. We unblock it under `MOBINSPECT_DEV=1`. Never set this in production.
 
 ## Daily development loop
 

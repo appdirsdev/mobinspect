@@ -1,6 +1,6 @@
 # 04 — Design System
 
-> The visual + interaction language for MobInspect. Tokens are enforced by `tailwind.config.js` and the CSS custom properties in `mobsf/static/mobinspect/css/src/app.css`; component behavior lives in `mobsf/templates/components/` and the `#mi-chrome` style block in `mobsf/templates/base/app.html`. This doc is the prose reference for *why* things are the way they are — for the punchier one-page "tiebreaker" version see `docs/design/mood.md`, for the raw token export see `docs/design/tokens.json`, and for the (partly aspirational, phase-tracked) full component checklist see `docs/design/component-inventory.md`.
+> The visual + interaction language for MobInspect. Tokens are enforced by `tailwind.config.js` and the CSS custom properties in `mobinspect/static/mobinspect/css/src/app.css`; component behavior lives in `mobinspect/templates/components/` and the `#mi-chrome` style block in `mobinspect/templates/base/app.html`. This doc is the prose reference for *why* things are the way they are — for the punchier one-page "tiebreaker" version see `docs/design/mood.md`, for the raw token export see `docs/design/tokens.json`, and for the (partly aspirational, phase-tracked) full component checklist see `docs/design/component-inventory.md`.
 
 ## Where this comes from
 
@@ -30,7 +30,7 @@ If you're choosing a color for something new, ask "which of these four buckets i
 
 ## Color tokens
 
-Source of truth: `tailwind.config.js` for static Tailwind color classes, and the `--*` CSS custom properties in `mobsf/static/mobinspect/css/src/app.css`'s `@layer base` (`:root`/`[data-theme='light']` and `[data-theme='dark']` blocks) for anything that needs to resolve per-theme inside an inline `style=` attribute (SVGs, the gauge) where Tailwind's `dark:` class variant mechanism can't reach. Colors are expressed as bare `R G B` triplets so Tailwind's `rgb(var(--token) / <alpha-value>)` mechanism can apply alpha on top.
+Source of truth: `tailwind.config.js` for static Tailwind color classes, and the `--*` CSS custom properties in `mobinspect/static/mobinspect/css/src/app.css`'s `@layer base` (`:root`/`[data-theme='light']` and `[data-theme='dark']` blocks) for anything that needs to resolve per-theme inside an inline `style=` attribute (SVGs, the gauge) where Tailwind's `dark:` class variant mechanism can't reach. Colors are expressed as bare `R G B` triplets so Tailwind's `rgb(var(--token) / <alpha-value>)` mechanism can apply alpha on top.
 
 ### Brand ramp (`mobinspect`, 50–950)
 
@@ -94,13 +94,13 @@ These intentionally mirror the hex values of `severity.passed` / `severity.mediu
 #1A1A1A   light theme
 ```
 
-Defined in `mobsf/templates/base/app.html`'s `#mi-chrome` style block (not in `app.css`), because it was promoted from a single page (`general/home.html`) to a global utility class this session. See tier 3 of the policy above for the "one hero CTA per page" convention, and "Glass + pill utilities" below for the full implementation detail.
+Defined in `mobinspect/templates/base/app.html`'s `#mi-chrome` style block (not in `app.css`), because it was promoted from a single page (`general/home.html`) to a global utility class this session. See tier 3 of the policy above for the "one hero CTA per page" convention, and "Glass + pill utilities" below for the full implementation detail.
 
 ### Score tiers — one canonical threshold scale
 
 **This is the single source of truth for any score → color mapping in the product. Do not hand-write the `<30`/`<40`/`<60`/else ternary in a template again — this exact mistake was made independently 7 times before this session fixed it.**
 
-Before `mobsf/MobSF/templatetags/mi_score.py` existed, 7 different templates each hand-duplicated a security-score-to-color threshold ternary, and one of them — the analytics dashboard — used a *completely different* 3-tier scale with no "low"/blue tier at all. The practical consequence: the exact same numeric score (say, 45) could render as one color on a per-app static analysis report and a visually different color on the analytics dashboard, purely because of which template happened to implement the ternary. That's not a cosmetic inconsistency in a security tool — it actively misrepresents risk to whoever's reading the score.
+Before `mobinspect/MobInspect/templatetags/mi_score.py` existed, 7 different templates each hand-duplicated a security-score-to-color threshold ternary, and one of them — the analytics dashboard — used a *completely different* 3-tier scale with no "low"/blue tier at all. The practical consequence: the exact same numeric score (say, 45) could render as one color on a per-app static analysis report and a visually different color on the analytics dashboard, purely because of which template happened to implement the ternary. That's not a cosmetic inconsistency in a security tool — it actively misrepresents risk to whoever's reading the score.
 
 The fix is one canonical scale, defined once:
 
@@ -115,8 +115,8 @@ This matches the majority pre-existing scale (the one `appsec_dashboard.html` an
 
 Exposed two ways, both driven from the same thresholds:
 
-1. **CSS custom properties**, theme-aware, in `mobsf/static/mobinspect/css/src/app.css`'s `@layer base` — `--score-critical`, `--score-medium`, `--score-low`, `--score-passed`, `--score-unknown` (light + dark blocks). These mirror the `severity-*` tokens' exact hex pairs; they exist as a separate CSS-var family (rather than reusing `--severity-*` directly) specifically so an inline `style="color: ..."` attribute — e.g. the gauge's SVG, which can't use Tailwind's `dark:` class variant — can still resolve the right shade per theme.
-2. **Three Django template filters**, in `mobsf/MobSF/templatetags/mi_score.py`, loaded via `{% load mi_score %}`:
+1. **CSS custom properties**, theme-aware, in `mobinspect/static/mobinspect/css/src/app.css`'s `@layer base` — `--score-critical`, `--score-medium`, `--score-low`, `--score-passed`, `--score-unknown` (light + dark blocks). These mirror the `severity-*` tokens' exact hex pairs; they exist as a separate CSS-var family (rather than reusing `--severity-*` directly) specifically so an inline `style="color: ..."` attribute — e.g. the gauge's SVG, which can't use Tailwind's `dark:` class variant — can still resolve the right shade per theme.
+2. **Three Django template filters**, in `mobinspect/MobInspect/templatetags/mi_score.py`, loaded via `{% load mi_score %}`:
    - `score_tier` → returns the bare tier name (`'critical'`/`'medium'`/`'low'`/`'passed'`, or `''` if the value is `None`/non-numeric — it fails closed to "no tier" rather than guessing).
    - `score_color` → returns a ready-to-use CSS color value, `rgb(var(--score-<tier>))`, for inline `style=` usage (this is what `gauge_arc.html` requires — see below).
    - `score_class` → returns Tailwind utility classes, `text-severity-<tier> dark:text-severity-<tier>-dark`, for callers that want to color a text element via class rather than inline style.
@@ -161,9 +161,9 @@ In dark mode, hierarchy leans on these surface deltas and borders rather than sh
 
 ### Theme switching
 
-Implemented with Tailwind's class-based dark mode (`darkMode: ['class', '[data-theme="dark"]']` in `tailwind.config.js`), toggled via `data-theme="dark"|"light"` on `<html>`. State lives in `localStorage['mi-theme']` with three possible stored values — `'light'`, `'dark'`, `'system'` — managed by `mobsf/static/mobinspect/js/theme.js` (`window.MI.theme`).
+Implemented with Tailwind's class-based dark mode (`darkMode: ['class', '[data-theme="dark"]']` in `tailwind.config.js`), toggled via `data-theme="dark"|"light"` on `<html>`. State lives in `localStorage['mi-theme']` with three possible stored values — `'light'`, `'dark'`, `'system'` — managed by `mobinspect/static/mobinspect/js/theme.js` (`window.MI.theme`).
 
-**Default is now `'dark'`**, not `'system'`. This was a deliberate change this session: the CyberGuard reference has no light variant at all, and the dashboard is meant for SOC-style daily use where a shift-long dark UI is kinder than one that flips based on OS preference. Light mode remains fully built and supported — it's reachable via the toggle — it's just no longer what greets a first-time or no-preference user. The `get()` function in `theme.js` and the no-flicker inline bootstrap script (in `mobsf/MobSF/templatetags/theme.py`, run at the very top of `<head>` before paint) must stay in sync on this default; they're two separate places that both encode "default is dark" and a future change to one without the other would reintroduce flicker or a mismatched default.
+**Default is now `'dark'`**, not `'system'`. This was a deliberate change this session: the CyberGuard reference has no light variant at all, and the dashboard is meant for SOC-style daily use where a shift-long dark UI is kinder than one that flips based on OS preference. Light mode remains fully built and supported — it's reachable via the toggle — it's just no longer what greets a first-time or no-preference user. The `get()` function in `theme.js` and the no-flicker inline bootstrap script (in `mobinspect/MobInspect/templatetags/theme.py`, run at the very top of `<head>` before paint) must stay in sync on this default; they're two separate places that both encode "default is dark" and a future change to one without the other would reintroduce flicker or a mismatched default.
 
 **Two toggles, one event.** The theme toggle exists in two places in the UI — the topbar and the sidebar's bottom group — and both need to reflect the current theme and stay in sync with each other. This is done via a `mi:theme-change` `CustomEvent` dispatched on `window` by `theme.js`'s `apply()` whenever the theme changes (detail: `{ value, effective }`). `sidebar.html` and `topbar.html` both listen for it (`@mi:theme-change.window="pref = $event.detail.value"`), as does the Chart.js theming wrapper (`chart-theme.js`) so charts recolor without a page reload. The event itself already existed in `theme.js` before this session but nothing was listening for it — wiring both toggles (and the chart wrapper) to it fixed a real cross-toggle desync bug where clicking the topbar toggle wouldn't update the sidebar toggle's displayed state, and vice versa.
 
@@ -191,7 +191,7 @@ Body and UI text intentionally stays on **Inter**, not Albert Sans, at small siz
 
 **JetBrains Mono** is unchanged from before this session — hashes, code, technical values (permission names, package IDs), and any tabular figures.
 
-All three are self-hosted under `mobsf/static/mobinspect/fonts/` as variable-weight WOFF2 files with `font-display: swap`, declared via `@font-face` in `app.css`'s `@layer base`.
+All three are self-hosted under `mobinspect/static/mobinspect/fonts/` as variable-weight WOFF2 files with `font-display: swap`, declared via `@font-face` in `app.css`'s `@layer base`.
 
 ### Type scale (1.25 modular)
 
@@ -244,7 +244,7 @@ As noted under Surfaces above: in dark mode, prefer moving up a surface level or
 
 ## Glass + pill utilities
 
-Both defined in `mobsf/templates/base/app.html`'s `#mi-chrome` `<style>` block (not `app.css`) — they started as page-specific styling on `general/home.html` and were promoted to global, reusable classes this session.
+Both defined in `mobinspect/templates/base/app.html`'s `#mi-chrome` `<style>` block (not `app.css`) — they started as page-specific styling on `general/home.html` and were promoted to global, reusable classes this session.
 
 ### `.mi-glass`
 
@@ -272,7 +272,7 @@ A translucent, frosted card surface. **Opt-in per element** via `class="card mi-
 
 The dark grain-pill hero CTA — CyberGuard's own "Check Alerts" button treatment: a neutral near-black pill with a faint noise texture (not brand-colored). Applied as `class="btn ... mi-pillbtn"` alongside the normal `.btn` sizing classes. Convention (tier 3 of the color policy above): **exactly one** `.mi-pillbtn` per dashboard-style page — it's the one hero action, and a second pill on the same page dilutes that. Every other primary action on the page should be `.btn-primary` (brand blue) instead. The grain overlay is capped low enough in opacity (~2% effective contribution) that it doesn't measurably affect text contrast.
 
-## Signature component — the radial gauge (`mobsf/templates/components/gauge_arc.html`)
+## Signature component — the radial gauge (`mobinspect/templates/components/gauge_arc.html`)
 
 The 270° arc score meter is the component every scan report leads with, and it's built with a genuinely small piece of engineering rather than a dropped-in chart-library widget: **pure CSS/SVG, zero JS charting dependency, zero per-value backend trigonometry.**
 
@@ -284,7 +284,7 @@ The 270° arc score meter is the component every scan report leads with, and it'
 
 **The fallback color is a real bug fix, not a stylistic choice.** When `color` isn't supplied, the gauge now falls back to `rgb(var(--score-unknown))` — the theme-aware "unknown severity" gray — not brand blue. Previously, an uncalled `color=` argument silently rendered brand blue, which is actively misleading on a component whose entire job is communicating severity: gray-for-unknown honestly says "no severity color was supplied," while blue-for-unknown looked like a real (if oddly-colored) status. This was found and fixed this session.
 
-## Dot-matrix chart (`mobsf/templates/components/dot_matrix.html`)
+## Dot-matrix chart (`mobinspect/templates/components/dot_matrix.html`)
 
 A dot-grid "skyline" chart: takes pre-zipped `(label, value)` tuples plus a caller-computed `max_value` and `unit`, and renders a column of filled/unfilled dots per data point (6 dots per column, filled bottom-up proportional to `value / max_value`). Built while finding and fixing two genuine Django template-engine bugs, both worth knowing about since they're easy to reintroduce:
 

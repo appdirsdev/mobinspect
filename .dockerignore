@@ -8,7 +8,7 @@
 .python-version
 .venv
 tox.ini
-mobsf/db.sqlite3
+mobinspect/db.sqlite3
 Dockerfile
 dist
 build
@@ -21,9 +21,9 @@ setup.bat
 run.bat
 setup.sh
 run.sh
-mobsf/downloads
-mobsf/uploads
-mobsf/debug.log
-mobsf/secret
-mobsf/StaticAnalyzer/test_files/
+mobinspect/downloads
+mobinspect/uploads
+mobinspect/debug.log
+mobinspect/secret
+mobinspect/StaticAnalyzer/test_files/
 TODO.md

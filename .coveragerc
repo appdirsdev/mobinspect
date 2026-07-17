@@ -3,7 +3,7 @@
 # device / Corellium / VirusTotal / Windows host stay uncovered on this
 # host and close only on prod Linux + a device.
 [run]
-source = mobsf
+source = mobinspect
 branch = False
 parallel = True
 concurrency = multiprocessing,thread
@@ -14,8 +14,8 @@ omit =
     */test_*.py
     */tests_*.py
     */__pycache__/*
-    mobsf/MobSF/wsgi.py
-    mobsf/MobSF/asgi.py
+    mobinspect/MobInspect/wsgi.py
+    mobinspect/MobInspect/asgi.py
     manage.py
 
 [report]

@@ -5,7 +5,7 @@
 
 ## Context
 
-Upstream MobSF uses AdminLTE 3, a Bootstrap 4 admin template. The full UI redesign needs a CSS strategy. Candidates:
+Upstream MobInspect uses AdminLTE 3, a Bootstrap 4 admin template. The full UI redesign needs a CSS strategy. Candidates:
 
 1. **Stay on Bootstrap 5 + custom theme**
 2. **Tailwind CSS v3** (utility-first)

@@ -17,6 +17,6 @@ MobInspect's redesign uses `base/app.html` (Tailwind design system: `app.css`, h
 
 **Still legacy, NOT yet ported (lower priority, iOS/Corellium-only or tiny):** ios `dynamic_report.html` (+`device/`), ios `dynamic_analyzer.html` (+`device/`), ios `dynamic_analysis.html` (+`device/`); app-wide `general/error.html` (20 lines) and `general/zip.html` (28 lines).
 
-**Gotcha — the `key` filter:** `data|key:"name"` is used across report/analysis templates WITHOUT a `{% load %}`. It's registered globally via `register.filter('key', key)` in `StaticAnalyzer/views/android/static_analyzer.py` (util `mobsf/MobSF/utils.py:key`), so it works everywhere with only `{% load static %}`.
+**Gotcha — the `key` filter:** `data|key:"name"` is used across report/analysis templates WITHOUT a `{% load %}`. It's registered globally via `register.filter('key', key)` in `StaticAnalyzer/views/android/static_analyzer.py` (util `mobinspect/MobInspect/utils.py:key`), so it works everywhere with only `{% load static %}`.
 
 Related: [[dynamic-analysis-fixes]], [[compare-and-fonts]], [[start-script]].

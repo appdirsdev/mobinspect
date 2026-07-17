@@ -14,7 +14,7 @@ metadata:
 
 **Credential convention (important):** the app runs on **admin/admin** — the Postgres role, the MobInspect web admin user, and the local `.env.postgres` (`POSTGRES_USER/PASSWORD=admin`). `.env.postgres` is **gitignored** (as of the review fix) — the admin/admin values are LOCAL ONLY and must never be committed. `.env.postgres.example` holds placeholders. Set the web admin via `MOBINSPECT_ADMIN_USERNAME/PASSWORD` env + `manage.py bootstrap_admin`.
 
-**Security debt (unresolved):** the ORIGINAL `mobsf/mobsf` Postgres creds are still in **public git history** at commit `9466560` (already on GitHub `main`/`mobinspect`). Untracking `.env.postgres` on `release-2026.7` stops future exposure but does NOT purge history — fully removing them needs a history rewrite + force-push + credential rotation. Flagged to the user; not yet done.
+**Security debt (unresolved):** the ORIGINAL `mobinspect/mobinspect` Postgres creds are still in **public git history** at commit `9466560` (already on GitHub `main`/`mobinspect`). Untracking `.env.postgres` on `release-2026.7` stops future exposure but does NOT purge history — fully removing them needs a history rewrite + force-push + credential rotation. Flagged to the user; not yet done.
 
 **Local dev env:** Python 3.13.5 via pyenv (`~/.pyenv/versions/3.13.5`), poetry venv `mobinspect-btTnr8bA-py3.13`, Postgres 17 on **port 5433** (Homebrew `postgresql@17`), wkhtmltopdf at `~/.local/wkhtmltox/bin` (Rosetta). Launch: `./start.sh --no-emulator`.
 

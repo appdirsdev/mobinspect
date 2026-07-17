@@ -34,7 +34,7 @@ server {
 
     # static assets served directly by nginx (off the single gunicorn worker)
     location /static/ {
-        alias /home/mobinspect/MobInspect/mobsf/static/;
+        alias /home/mobinspect/MobInspect/mobinspect/static/;
         access_log off;
         expires 7d;
         add_header Cache-Control "public";

@@ -2,12 +2,12 @@
 
 Component inventory for the MobInspect redesign. The original premise here was
 that every item on this list becomes its own Django include under
-`mobsf/templates/components/<name>.html`. That's not what actually happened:
+`mobinspect/templates/components/<name>.html`. That's not what actually happened:
 a handful of genuinely reusable, non-trivial widgets did become real includes
 (`gauge_arc`, `dot_matrix`, `sidebar`, `sidebar_item`, `topbar`, `logo_mark` —
-all live under `mobsf/templates/components/`), but most of what people mean
+all live under `mobinspect/templates/components/`), but most of what people mean
 by "button", "input", "card", "badge" shipped instead as a small set of CSS
-utility classes in `mobsf/static/mobinspect/css/src/app.css`'s
+utility classes in `mobinspect/static/mobinspect/css/src/app.css`'s
 `@layer components`, applied directly in markup (`class="btn btn-primary
 btn-md"`) rather than `{% include %}`d. That's a legitimate, lighter-weight
 way to get a consistent system in a server-rendered, non-SPA Django app — it
@@ -38,7 +38,7 @@ must be superseded."
 ## Containers
 
 - ■ `card` — `.card` / `.card-hover` / `.card-header` / `.card-body` / `.card-footer` in `app.css`.
-  - ■ **`.mi-glass`** (not on the original list) — a glass-surface utility layered on top of `.card` (`mobsf/templates/base/app.html`, `#mi-chrome` style block): `backdrop-filter: blur()+saturate()` for a translucent card. Deliberately opt-in per element (`class="card mi-glass"`), *not* forced onto the base `.card` class app-wide — dense tables/forms intentionally stay opaque for legibility.
+  - ■ **`.mi-glass`** (not on the original list) — a glass-surface utility layered on top of `.card` (`mobinspect/templates/base/app.html`, `#mi-chrome` style block): `backdrop-filter: blur()+saturate()` for a translucent card. Deliberately opt-in per element (`class="card mi-glass"`), *not* forced onto the base `.card` class app-wide — dense tables/forms intentionally stay opaque for legibility.
 - □ `panel` — not built.
 - □ `modal` — not built as part of this redesign. The `modal`/`tabs` hits that do exist in the tree (e.g. `static_analysis/android_binary_analysis.html`, the iOS dynamic-analyzer pages) are pre-existing Bootstrap-era markup in legacy report pages the redesign hasn't touched — not a new design-system component.
 - □ `drawer` — not built (a text hit in `auth/users.html` is incidental, not a real slide-in panel).
@@ -59,7 +59,7 @@ must be superseded."
 - □ `chart_bar` — not built as a Chart.js wrapper; the trend-chart role this was meant to fill is instead served by `dot_matrix` (below), which is not Chart.js at all.
 - □ `chart_donut` — not built; no Chart.js dependency exists anywhere in the stack. The score-ring role this implies is served by `gauge_arc` (below).
 - □ `chart_area` — not built.
-- ■ `gauge` — **built, but not as specified — correcting a real inaccuracy in this doc.** This line originally said "half-donut for fleet health." What actually shipped (`mobsf/templates/components/gauge_arc.html`) is a **270° full radial arc gauge**, not a half-donut (180°) at all. Mechanism, concretely: it's pure CSS/SVG with zero JS charting library and zero per-value backend trig. The arc track is an SVG `<circle>` with `pathLength="100"` + a `stroke-dasharray`/`stroke-dashoffset` trick to draw a partial ring. The value pointer (the small dot on the arc) gets its angle from **composing two CSS `rotate()` transforms** — an outer static `rotate(225deg)` frame (the arc's start angle) and an inner `rotate({% widthratio value 100 270 %}deg)` driven straight off Django's `{% widthratio %}` template tag — rather than any computed trig in Python or JS. Tick marks are fixed hardcoded coordinates (their angle doesn't depend on `value`). For any real security-score/severity use, callers must pass `color=value|score_color` (see `mi_score.py` below) — the fallback when no color is passed is the theme-aware "unknown" gray (`rgb(var(--score-unknown))`), not brand blue; that replaced a real bug where an uncalled `color=` previously silently rendered brand-blue, reading as a false severity signal.
+- ■ `gauge` — **built, but not as specified — correcting a real inaccuracy in this doc.** This line originally said "half-donut for fleet health." What actually shipped (`mobinspect/templates/components/gauge_arc.html`) is a **270° full radial arc gauge**, not a half-donut (180°) at all. Mechanism, concretely: it's pure CSS/SVG with zero JS charting library and zero per-value backend trig. The arc track is an SVG `<circle>` with `pathLength="100"` + a `stroke-dasharray`/`stroke-dashoffset` trick to draw a partial ring. The value pointer (the small dot on the arc) gets its angle from **composing two CSS `rotate()` transforms** — an outer static `rotate(225deg)` frame (the arc's start angle) and an inner `rotate({% widthratio value 100 270 %}deg)` driven straight off Django's `{% widthratio %}` template tag — rather than any computed trig in Python or JS. Tick marks are fixed hardcoded coordinates (their angle doesn't depend on `value`). For any real security-score/severity use, callers must pass `color=value|score_color` (see `mi_score.py` below) — the fallback when no color is passed is the theme-aware "unknown" gray (`rgb(var(--score-unknown))`), not brand blue; that replaced a real bug where an uncalled `color=` previously silently rendered brand-blue, reading as a false severity signal.
 - ▣ `code_block` — only the base `.code` inline-chip utility shipped (`app.css`); no syntax highlighting, copy button, or expand/collapse behavior.
 - ■ `kbd` — `.kbd` utility class in `app.css`.
 - ▣ `avatar` — a real initials-avatar pattern shipped in `auth/users.html` (`.mi-avatar`, tone cycled amber/violet/neutral, `w-8 h-8`) plus a separate avatar ring in the sidebar/topbar user menu — but as page-local patterns, not one shared component with the originally-specified xs/sm/md/lg size range.
@@ -87,8 +87,8 @@ must be superseded."
 ### Utilities shipped this session that aren't on the original list at all
 
 - ■ **`.mi-pillbtn`** — the dark grain-pill hero-CTA button (`#17181C` dark theme / `#1A1A1A` light theme), defined in `base/app.html`'s `#mi-chrome` style block. Convention: exactly one hero CTA per dashboard-style page.
-- ■ **Theme system** — `mobsf/static/mobinspect/js/theme.js`. Defaults to **dark** app-wide (was `'system'` before this session — the visual reference this redesign follows has no light variant, and the tool is meant for SOC-style daily use). Exists as two synced toggles (topbar + sidebar bottom group), kept in sync via the `mi:theme-change` `CustomEvent` — that event already existed in `theme.js` but was unused before this session; wiring both toggles to listen for it fixed a real cross-toggle desync bug (toggling in one place used to leave the other showing a stale icon).
-- ■ **`mi_score.py` filter trio** (`mobsf/MobSF/templatetags/mi_score.py`) — `score_tier` / `score_color` / `score_class`, the single shared 0–100 security-score threshold (`<30` critical, `30–39` medium, `40–59` low, `>=60` passed). Before this existed, the same red/amber/blue/green ternary was hand-duplicated in 6 templates, and a 7th (`analytics/dashboard.html`) used a *different* 3-tier scale with no "low"/blue tier at all — so the same numeric score could render a different color depending which page you looked at it on. `gauge_arc.html` and every AppSec score display now source color from this filter instead.
+- ■ **Theme system** — `mobinspect/static/mobinspect/js/theme.js`. Defaults to **dark** app-wide (was `'system'` before this session — the visual reference this redesign follows has no light variant, and the tool is meant for SOC-style daily use). Exists as two synced toggles (topbar + sidebar bottom group), kept in sync via the `mi:theme-change` `CustomEvent` — that event already existed in `theme.js` but was unused before this session; wiring both toggles to listen for it fixed a real cross-toggle desync bug (toggling in one place used to leave the other showing a stale icon).
+- ■ **`mi_score.py` filter trio** (`mobinspect/MobInspect/templatetags/mi_score.py`) — `score_tier` / `score_color` / `score_class`, the single shared 0–100 security-score threshold (`<30` critical, `30–39` medium, `40–59` low, `>=60` passed). Before this existed, the same red/amber/blue/green ternary was hand-duplicated in 6 templates, and a 7th (`analytics/dashboard.html`) used a *different* 3-tier scale with no "low"/blue tier at all — so the same numeric score could render a different color depending which page you looked at it on. `gauge_arc.html` and every AppSec score display now source color from this filter instead.
 
 ## Domain-specific
 
@@ -112,7 +112,7 @@ must be superseded."
 
 ## Data-viz chart shipped this session, not on the original list
 
-- ■ `dot_matrix` (`mobsf/templates/components/dot_matrix.html`) — a dot-grid "skyline" chart: a column of filled/unfilled dots per data point, driven by a caller-supplied `max_value`. Takes **pre-zipped `(label, value)` tuples**, not two parallel lists — because Django template dot-lookup can't index a list by a loop-derived variable (`{{ values.idx }}` treats `idx` as a literal string key, not a resolved variable), the view has to `zip()` labels and values before passing them in, and the template unpacks with `{% for label, value in pairs %}`. It was also built while finding a second genuine template-engine bug: `{% widthratio %}` returns a *string*, so comparing `forloop.counter <= filled` silently evaluates false for every dot unless `filled` is coerced with `{{ filled|add:0 }}` to force a real int comparison.
+- ■ `dot_matrix` (`mobinspect/templates/components/dot_matrix.html`) — a dot-grid "skyline" chart: a column of filled/unfilled dots per data point, driven by a caller-supplied `max_value`. Takes **pre-zipped `(label, value)` tuples**, not two parallel lists — because Django template dot-lookup can't index a list by a loop-derived variable (`{{ values.idx }}` treats `idx` as a literal string key, not a resolved variable), the view has to `zip()` labels and values before passing them in, and the template unpacks with `{% for label, value in pairs %}`. It was also built while finding a second genuine template-engine bug: `{% widthratio %}` returns a *string*, so comparing `forloop.counter <= filled` silently evaluates false for every dot unless `filled` is coerced with `{{ filled|add:0 }}` to force a real int comparison.
 
 ## The three-tier color/button policy (context for the statuses above)
 

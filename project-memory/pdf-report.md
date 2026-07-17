@@ -7,7 +7,7 @@ metadata:
   originSessionId: cc2a3ba9-0869-4596-b93d-e1550cf847c2
 ---
 
-PDF export (`/pdf/<md5>/`) renders `mobsf/templates/pdf/{android,ios,windows}_report.html` via **pdfkit → wkhtmltopdf 0.12.6** (options in `mobsf/StaticAnalyzer/views/common/pdf.py`: Letter, Landscape, `enable-local-file-access`). Needs `wkhtmltopdf` (see [[toolchain]]; env `MOBSF_WKHTMLTOPDF_BINARY` → `settings.WKHTMLTOPDF_BINARY`, else PATH).
+PDF export (`/pdf/<md5>/`) renders `mobinspect/templates/pdf/{android,ios,windows}_report.html` via **pdfkit → wkhtmltopdf 0.12.6** (options in `mobinspect/StaticAnalyzer/views/common/pdf.py`: Letter, Landscape, `enable-local-file-access`). Needs `wkhtmltopdf` (see [[toolchain]]; env `MOBINSPECT_WKHTMLTOPDF_BINARY` → `settings.WKHTMLTOPDF_BINARY`, else PATH).
 
 **wkhtmltopdf 0.12.6 uses an ancient Qt 4.8 WebKit** (~2012). The stock templates were authored for a modern browser and rendered badly (invisible cover band, garbled overlapping labels, dropped letters). All fixed by editing the templates + options:
 

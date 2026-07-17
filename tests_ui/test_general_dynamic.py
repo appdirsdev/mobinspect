@@ -282,7 +282,7 @@ def test_android_dynamic_analyzer_landing_renders_controls(admin_page):
     expect(prepare_btn).to_be_attached()
     if runtime_state == 'runtime offline':
         expect(prepare_btn).to_be_disabled()
-    prepare_modal = page.locator('#mi-mobsfy')
+    prepare_modal = page.locator('#mi-mobinspecty')
     expect(prepare_modal).to_be_attached()
 
     # Supported runtimes reference card.

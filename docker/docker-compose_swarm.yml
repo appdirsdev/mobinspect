@@ -4,48 +4,48 @@ services:
     image: "postgres:${POSTGRES_VERSION:-17.0-bookworm}"
     restart: always
     volumes:
-      - $HOME/MobSF/postgresql_data:/var/lib/postgresql/data
+      - $HOME/MobInspect/postgresql_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD_FILE=/run/secrets/mobsfDB_password
+      - POSTGRES_PASSWORD_FILE=/run/secrets/mobinspectDB_password
       - POSTGRES_DB=mobinspect
     networks:
-        - mobsf_network
+        - mobinspect_network
     secrets:
-      - mobsfDB_password
+      - mobinspectDB_password
 
-  mobsf:
-    image: ${MOBSF_IMAGE:-opensecurity/mobile-security-framework-mobsf:latest}
+  mobinspect:
+    image: ${MOBINSPECT_IMAGE:-appdirsdev/mobinspect:latest}
     restart: always
     ports:
      - "8000:8000"
      - "1337:1337"
     volumes:
-      - $HOME/MobSF/mobsf_data:/home/mobsf/.MobSF
+      - $HOME/MobInspect/mobinspect_data:/home/mobinspect/.MobInspect
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD_FILE=/run/secrets/mobsfDB_password
+      - POSTGRES_PASSWORD_FILE=/run/secrets/mobinspectDB_password
       - POSTGRES_DB=mobinspect
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - MOBINSPECT_API_KEY_FILE=/run/secrets/mobsf_api_key
+      - MOBINSPECT_API_KEY_FILE=/run/secrets/mobinspect_api_key
     healthcheck:
       test: curl -f http://localhost:8000/login/ || exit 1
     depends_on:
       - postgres
     networks:
-      - mobsf_network
+      - mobinspect_network
     extra_hosts:
       - "host.docker.internal:host-gateway"
     secrets:
-      - mobsfDB_password
-      - mobsf_api_key
+      - mobinspectDB_password
+      - mobinspect_api_key
 
 networks:
-  mobsf_network:
+  mobinspect_network:
 
 secrets:
-  mobsfDB_password:
+  mobinspectDB_password:
     external: true
-  mobsf_api_key:
+  mobinspect_api_key:
     external: true

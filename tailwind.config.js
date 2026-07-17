@@ -13,10 +13,10 @@ module.exports = {
 
   // Scan every place that can reference Tailwind class names.
   content: [
-    './mobsf/templates/**/*.html',
-    './mobsf/**/templates/**/*.html',
-    './mobsf/**/*.py',                 // template strings, form widgets
-    './mobsf/static/mobinspect/js/**/*.js',
+    './mobinspect/templates/**/*.html',
+    './mobinspect/**/templates/**/*.html',
+    './mobinspect/**/*.py',                 // template strings, form widgets
+    './mobinspect/static/mobinspect/js/**/*.js',
   ],
 
   theme: {

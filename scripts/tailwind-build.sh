@@ -19,8 +19,8 @@ fi
 cd "$ROOT"
 "$TAILWIND" \
   --config tailwind.config.js \
-  --input  mobsf/static/mobinspect/css/src/app.css \
-  --output mobsf/static/mobinspect/css/dist/app.css \
+  --input  mobinspect/static/mobinspect/css/src/app.css \
+  --output mobinspect/static/mobinspect/css/dist/app.css \
   $MINIFY
 
-echo "Built: mobsf/static/mobinspect/css/dist/app.css"
+echo "Built: mobinspect/static/mobinspect/css/dist/app.css"

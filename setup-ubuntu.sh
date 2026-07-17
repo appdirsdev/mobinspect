@@ -29,7 +29,7 @@ PG_DB="${POSTGRES_DB:-mobinspect}"
 PG_USER="${POSTGRES_USER:-mobinspect}"
 PG_HOST="${POSTGRES_HOST:-127.0.0.1}"
 PG_PORT="${POSTGRES_PORT:-5432}"
-MOBSF_HOME="${MOBINSPECT_HOME_DIR:-$HOME/.MobInspect}"
+MOBINSPECT_HOME="${MOBINSPECT_HOME_DIR:-$HOME/.MobInspect}"
 
 log()  { printf '\n\033[1;36m[setup] %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m[warn]  %s\033[0m\n' "$*"; }
@@ -142,15 +142,15 @@ rm -f /tmp/mi-req.txt
 
 # ---- 7. JADX (static-analysis decompiler) -----------------------------------
 log "Downloading bundled analysis tools (JADX)…"
-mkdir -p "$MOBSF_HOME"
-PYTHONPATH="$REPO_DIR" .venv/bin/python mobsf/MobSF/tools_download.py "$MOBSF_HOME" \
+mkdir -p "$MOBINSPECT_HOME"
+PYTHONPATH="$REPO_DIR" .venv/bin/python mobinspect/MobInspect/tools_download.py "$MOBINSPECT_HOME" \
   || warn "tools_download.py failed — JADX decompilation may be degraded."
 
 # ---- 8. Frontend CSS (Tailwind → css/dist/app.css) --------------------------
 log "Building the frontend CSS (Tailwind)…"
 npx --yes tailwindcss@3 \
-  -i mobsf/static/mobinspect/css/src/app.css \
-  -o mobsf/static/mobinspect/css/dist/app.css --minify \
+  -i mobinspect/static/mobinspect/css/src/app.css \
+  -o mobinspect/static/mobinspect/css/dist/app.css --minify \
   || warn "Tailwind build failed — the UI may render unstyled."
 
 # ---- 9. Environment file ----------------------------------------------------
@@ -195,7 +195,7 @@ log "Applying migrations and seeding RBAC…"
 .venv/bin/python manage.py shell <<'PY' 2>/dev/null || warn "Could not auto-assign the Administrator role — assign it in the UI."
 from django.contrib.auth import get_user_model
 try:
-    from mobsf.RBAC.models import Role, RoleAssignment
+    from mobinspect.RBAC.models import Role, RoleAssignment
 except Exception:
     Role = RoleAssignment = None
 admin = get_user_model().objects.filter(is_superuser=True).order_by('id').first()
@@ -223,7 +223,7 @@ $(printf '\033[1;32m')==========================================================
 
   Web UI:   http://${DETECTED_IP:-127.0.0.1}:8000/
   Login:    admin / (see MOBINSPECT_ADMIN_PASSWORD in .env.postgres,
-            or $MOBSF_HOME/initial-admin-password.txt if it was generated)
+            or $MOBINSPECT_HOME/initial-admin-password.txt if it was generated)
 
   Dynamic analysis (AVD) is intentionally NOT set up. To enable it later,
   point at a separate emulator host:

@@ -17,7 +17,7 @@ flowchart TB
     subgraph web["Web tier — systemd: mobinspect.service"]
         gunicorn["gunicorn<br/>:8001"]
         whitenoise["WhiteNoise<br/>(static)"]
-        django["Django 6.0<br/>(mobsf.MobSF)"]
+        django["Django 6.0<br/>(mobinspect.MobInspect)"]
         gunicorn --> whitenoise --> django
     end
 
@@ -121,7 +121,7 @@ Launcher environment variables:
 
 #### First-time admin
 
-There are no longer any default seeded credentials — the upstream `mobsf / mobsf` superuser is gone. Bootstrap your first admin instead:
+There are no longer any default seeded credentials — the upstream `mobinspect / mobinspect` superuser is gone. Bootstrap your first admin instead:
 
 ```bash
 # Idempotent: re-runs are a no-op once any superuser exists.

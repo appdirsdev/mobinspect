@@ -15,18 +15,18 @@ After the C1–C7 / H1–H17 audit pass, the following are **on by default** in 
 
 | Item | Where it lives | How to verify |
 |------|----------------|---------------|
-| `ALLOWED_HOSTS` driven by `MOBINSPECT_ALLOWED_HOSTS` (no `*` default) | `mobsf/MobSF/settings.py:191` | `curl -H 'Host: evil.example' http://<host>:8001/` returns 400 |
-| Secure session/CSRF cookies + HSTS + `X-Frame-Options=DENY` + CSP, gated on `MOBINSPECT_BEHIND_TLS=1` | `mobsf/MobSF/settings.py:200` | `curl -sI https://<host>/ \| grep -iE 'strict-transport\|x-frame\|set-cookie.*secure'` |
-| `MIDDLEWARE` tuple includes `SecurityMiddleware`, `CommonMiddleware`, `XFrameOptionsMiddleware`, ratelimit middleware | `mobsf/MobSF/settings.py` MIDDLEWARE | `poetry run python manage.py check --deploy` returns 0 warnings on the headers checks |
-| SQLite **WAL + `busy_timeout=20000`** | `mobsf/MobSF/settings.py` DATABASES OPTIONS | `sqlite3 ~/.MobInspect/db.sqlite3 'PRAGMA journal_mode;'` → `wal` |
+| `ALLOWED_HOSTS` driven by `MOBINSPECT_ALLOWED_HOSTS` (no `*` default) | `mobinspect/MobInspect/settings.py:191` | `curl -H 'Host: evil.example' http://<host>:8001/` returns 400 |
+| Secure session/CSRF cookies + HSTS + `X-Frame-Options=DENY` + CSP, gated on `MOBINSPECT_BEHIND_TLS=1` | `mobinspect/MobInspect/settings.py:200` | `curl -sI https://<host>/ \| grep -iE 'strict-transport\|x-frame\|set-cookie.*secure'` |
+| `MIDDLEWARE` tuple includes `SecurityMiddleware`, `CommonMiddleware`, `XFrameOptionsMiddleware`, ratelimit middleware | `mobinspect/MobInspect/settings.py` MIDDLEWARE | `poetry run python manage.py check --deploy` returns 0 warnings on the headers checks |
+| SQLite **WAL + `busy_timeout=20000`** | `mobinspect/MobInspect/settings.py` DATABASES OPTIONS | `sqlite3 ~/.MobInspect/db.sqlite3 'PRAGMA journal_mode;'` → `wal` |
 | `MOBINSPECT_ASYNC_ANALYSIS=1` (also the settings.py default) on the web drop-in + gunicorn `--workers=2 --max-requests=200 --timeout=180` | `deploy/systemd/mobinspect.service.d/avd.conf`, `mobinspect.service` `ExecStart` | `systemctl show mobinspect.service -p Environment \| grep ASYNC` |
-| `/healthz` + `/readyz` reachable, unauthenticated | `mobsf/MobSF/views/healthz.py` | `curl -s http://127.0.0.1:8001/healthz \| jq .status` returns `ok`/`degraded`/`failed` |
+| `/healthz` + `/readyz` reachable, unauthenticated | `mobinspect/MobInspect/views/healthz.py` | `curl -s http://127.0.0.1:8001/healthz \| jq .status` returns `ok`/`degraded`/`failed` |
 | Hourly SQLite backups + 14-day retention | `mobinspect-backup.{service,timer}` | `systemctl list-timers mobinspect-backup.timer` + `ls /var/backups/mobinspect/` |
-| Audit signals on (login / logout / api auth fail / admin user.* / RBAC changes) | `mobsf/RBAC/signals.py`, `mobsf/RBAC/audit.py` | `poetry run python manage.py shell -c "from mobsf.RBAC.models import AuditEvent; print(AuditEvent.objects.count())"` after a few logins |
-| AuditEvent **hash chain** + DB-level immutability triggers | `mobsf/RBAC/models.py`, migrations 0006/0007 | `poetry run python manage.py audit_verify` returns 0 |
+| Audit signals on (login / logout / api auth fail / admin user.* / RBAC changes) | `mobinspect/RBAC/signals.py`, `mobinspect/RBAC/audit.py` | `poetry run python manage.py shell -c "from mobinspect.RBAC.models import AuditEvent; print(AuditEvent.objects.count())"` after a few logins |
+| AuditEvent **hash chain** + DB-level immutability triggers | `mobinspect/RBAC/models.py`, migrations 0006/0007 | `poetry run python manage.py audit_verify` returns 0 |
 | systemd hardening: `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem`, `MemoryMax`, `TimeoutStopSec=600` on all three units | `deploy/systemd/*.service` | `systemd-analyze security mobinspect.service` exposure score ≤ 5.0 |
-| Default `mobsf/mobsf` superuser **removed** — initial admin via `manage.py bootstrap_admin` | `mobsf/MobSF/management/commands/bootstrap_admin.py` | `User.objects.filter(username='mobsf').exists() == False` after bootstrap |
-| Frida server **SHA256-verified** before push to device; spawn retry bounded | `mobsf/DynamicAnalyzer/views/common/frida/server_update.py`, `frida_core.py` | journal: `frida-server hash matches`; no infinite `Failed to spawn` loop |
+| Default `mobinspect/mobinspect` superuser **removed** — initial admin via `manage.py bootstrap_admin` | `mobinspect/MobInspect/management/commands/bootstrap_admin.py` | `User.objects.filter(username='mobinspect').exists() == False` after bootstrap |
+| Frida server **SHA256-verified** before push to device; spawn retry bounded | `mobinspect/DynamicAnalyzer/views/common/frida/server_update.py`, `frida_core.py` | journal: `frida-server hash matches`; no infinite `Failed to spawn` loop |
 | `wkhtmltopdf` installed (PDF report export) | system package; optional `MOBINSPECT_WKHTMLTOPDF_BINARY` override | `which wkhtmltopdf`; clicking *PDF* on a report returns a PDF, not a 503 |
 
 If any row above doesn't pass, **don't expose the host outside the LAN** until it does.
@@ -47,7 +47,7 @@ sudo apt-get install -y \
 ```
 
 `wkhtmltopdf` is what `pdfkit` shells out to when you click *PDF* on a report
-(`mobsf/StaticAnalyzer/views/common/pdf.py`). If it is **not** on `PATH`, the
+(`mobinspect/StaticAnalyzer/views/common/pdf.py`). If it is **not** on `PATH`, the
 report view now returns a clear **HTTP 503**
 (`PDF export requires wkhtmltopdf - install it ...`) instead of a 500 — but the
 fix is still to install the binary.
@@ -65,7 +65,7 @@ This is read into `settings.WKHTMLTOPDF_BINARY` and passed to
 
 ### 1. StaticAnalyzer migrations (was the #1 deploy gotcha)
 
-Upstream MobSF gitignores `mobsf/StaticAnalyzer/migrations`. We **un-gitignore** it in this fork and ship `0001_initial.py` in the repo. If you ever see:
+Upstream MobInspect gitignores `mobinspect/StaticAnalyzer/migrations`. We **un-gitignore** it in this fork and ship `0001_initial.py` in the repo. If you ever see:
 
 ```
 sqlite3.OperationalError: no such table: StaticAnalyzer_recentscansdb
@@ -74,15 +74,15 @@ sqlite3.OperationalError: no such table: StaticAnalyzer_recentscansdb
 it means the migrations directory was somehow missed. Regenerate:
 
 ```bash
-mkdir -p mobsf/StaticAnalyzer/migrations
-touch mobsf/StaticAnalyzer/migrations/__init__.py
+mkdir -p mobinspect/StaticAnalyzer/migrations
+touch mobinspect/StaticAnalyzer/migrations/__init__.py
 poetry run python manage.py makemigrations StaticAnalyzer
 poetry run python manage.py migrate StaticAnalyzer --noinput
 ```
 
 ### 2. AVD: API level must be ≤ 30
 
-`mobsf/DynamicAnalyzer/views/android/environment.py:40` has `ANDROID_API_SUPPORTED = 30`. Newer images are rejected by `system_check()`.
+`mobinspect/DynamicAnalyzer/views/android/environment.py:40` has `ANDROID_API_SUPPORTED = 30`. Newer images are rejected by `system_check()`.
 
 ```bash
 sdkmanager 'system-images;android-30;google_apis;x86_64'
@@ -133,7 +133,7 @@ Environment=MOBINSPECT_ADB_BINARY=/home/ubuntu/android-sdk/platform-tools/adb
 Environment=MOBINSPECT_ASYNC_ANALYSIS=1
 ```
 
-`MOBINSPECT_ADB_BINARY` (or the legacy `MOBSF_ADB_BINARY`) is read by `mobsf.MobSF.settings`. Without it, `get_adb()` falls into a `find_process_by('adb')` proc-scan that hits PermissionError on other-uid `/proc/*/exe` reads, returns `None`, and the "Prepare runtime" UI shows:
+`MOBINSPECT_ADB_BINARY` (or the legacy `MOBINSPECT_ADB_BINARY`) is read by `mobinspect.MobInspect.settings`. Without it, `get_adb()` falls into a `find_process_by('adb')` proc-scan that hits PermissionError on other-uid `/proc/*/exe` reads, returns `None`, and the "Prepare runtime" UI shows:
 
 ```
 argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'
@@ -164,7 +164,7 @@ If you need to relax the sandbox while debugging a "permission denied" that *mig
 
 ### 7. The admin user
 
-`seed_rbac` creates roles only, not users. Bootstrap the initial admin via the dedicated management command — it is **idempotent** (re-runs are a no-op once any superuser exists) and refuses to ever recreate the upstream `mobsf/mobsf` account.
+`seed_rbac` creates roles only, not users. Bootstrap the initial admin via the dedicated management command — it is **idempotent** (re-runs are a no-op once any superuser exists) and refuses to ever recreate the upstream `mobinspect/mobinspect` account.
 
 ```bash
 # Preferred: supply the password out-of-band (systemd EnvironmentFile,
@@ -185,19 +185,19 @@ Then bind the new admin to the Administrator role:
 ```python
 # poetry run python manage.py shell
 from django.contrib.auth.models import User
-from mobsf.RBAC.models import Role, RoleAssignment
+from mobinspect.RBAC.models import Role, RoleAssignment
 u = User.objects.get(username='superadmin')
 RoleAssignment.objects.get_or_create(user=u, role=Role.objects.get(name='Administrator'))
 ```
 
 Password floor is **12 characters** (`AUTH_PASSWORD_VALIDATORS` in `settings.py`). Pick something a password manager generated.
 
-> **If you used the legacy bootstrap** (any pre-C7 deploy that ran `createsuperuser --noinput` with `DJANGO_SUPERUSER_PASSWORD=mobsf`, or a RUNBOOK snippet that set `changeme123`): rotate **immediately**. The old `mobsf` user and any `changeme123` password were considered compromised the moment they shipped. Easiest path:
+> **If you used the legacy bootstrap** (any pre-C7 deploy that ran `createsuperuser --noinput` with `DJANGO_SUPERUSER_PASSWORD=mobinspect`, or a RUNBOOK snippet that set `changeme123`): rotate **immediately**. The old `mobinspect` user and any `changeme123` password were considered compromised the moment they shipped. Easiest path:
 >
 > ```bash
 > # Delete the legacy user, then bootstrap a fresh one with a strong password.
 > poetry run python manage.py shell -c \
->   "from django.contrib.auth.models import User; User.objects.filter(username__in=['mobsf','superadmin']).delete()"
+>   "from django.contrib.auth.models import User; User.objects.filter(username__in=['mobinspect','superadmin']).delete()"
 > MOBINSPECT_ADMIN_USERNAME=superadmin \
 > MOBINSPECT_ADMIN_PASSWORD='<new-strong-password>' \
 >   poetry run python manage.py bootstrap_admin
@@ -312,7 +312,7 @@ A backup that has never been restored is a wish, not a recovery plan. Once per q
 
 ### Health probes
 
-Two unauthenticated endpoints land in `mobsf/MobSF/views/healthz.py`:
+Two unauthenticated endpoints land in `mobinspect/MobInspect/views/healthz.py`:
 
 | Route | Probes | Use for |
 |-------|--------|---------|
@@ -451,7 +451,7 @@ repo file without copying it to `/etc/systemd/system/`.
 ## Dynamic analysis: writable /system + host requirements (2026-06-12)
 
 Android dynamic analysis needs the emulator's `/system` partition writable so
-`mobsfy_init` can push the Frida server + CA. On API 30 that requires disabling
+`mobinspecty_init` can push the Frida server + CA. On API 30 that requires disabling
 dm-verity, which **only takes effect after a guest reboot**.
 
 **Provisioning (capable host):** `deploy/scripts/avd-provision.sh` + the

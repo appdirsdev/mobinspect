@@ -1,0 +1,78 @@
+{% comment %}
+  Reusable 270° arc gauge (radial score meter). Pure CSS/SVG — no JS charting
+  library, no per-value trig in the template: the pointer dot's angle comes
+  from composing two CSS rotate() transforms (see #mi-chrome .mi-gauge-* in
+  base/app.html), and the arc itself uses the pathLength=100 stroke-dasharray
+  trick. Tick marks are fixed (angle is constant regardless of value) so their
+  coordinates are hardcoded literals.
+
+  Params:
+    value        — 0..100 (required)
+    color        — CSS color for the progress arc / dot / glow. For any
+                   security-score/severity use, ALWAYS pass
+                   `value|score_color` (requires `{% load mi_score %}` in
+                   the including template) — the one shared threshold
+                   source in mobinspect/MobInspect/templatetags/mi_score.py, so the
+                   same numeric score never renders a different color on
+                   different pages. A bare hex is only appropriate for a
+                   genuinely non-severity gauge (none exist yet).
+    sub_label    — small text under the number, e.g. "/ 100" or "% risk"
+    size_class   — Tailwind size classes for the SVG, default "w-36 h-36"
+    animate      — if True, wires the existing global counter() Alpine
+                   helper (the including page must already define/load it,
+                   as appsec_dashboard.html and analytics/dashboard.html do)
+
+  Usage:
+    {% load mi_score %}
+    {% include "components/gauge_arc.html" with value=security_score color=security_score|score_color sub_label="/ 100" animate=True %}
+
+  The fallback below is the theme-aware "unknown severity" gray
+  (var(--score-unknown), same family as severity-unknown), NOT brand blue —
+  brand blue must never stand in for an unset severity tier (a real bug
+  this replaces: an uncalled `color=` previously silently rendered
+  brand-blue, which reads as a false severity signal rather than "no color
+  was supplied").
+{% endcomment %}
+<div class="relative inline-flex items-center justify-center" style="color: {{ color|default:"rgb(var(--score-unknown))" }}">
+  {# ambient glow behind the gauge, tinted to the same accent #}
+  <div class="absolute inset-2 rounded-full blur-xl opacity-25" style="background: currentColor" aria-hidden="true"></div>
+
+  <svg viewBox="0 0 140 140" class="{{ size_class|default:'w-36 h-36' }} relative z-[1]" aria-hidden="true">
+    {# static tick marks at 0 / 25 / 50 / 75 / 100 — fixed regardless of value #}
+    <line class="mi-gauge-tick" x1="26.87" y1="113.13" x2="22.62" y2="117.38" />
+    <line class="mi-gauge-tick" x1="13.64" y1="46.66"  x2="8.10"  y2="44.36" />
+    <line class="mi-gauge-tick" x1="70"    y1="9"      x2="70"    y2="3" />
+    <line class="mi-gauge-tick" x1="126.36" y1="46.66" x2="131.90" y2="44.36" />
+    <line class="mi-gauge-tick" x1="113.13" y1="113.13" x2="117.38" y2="117.38" />
+
+    {# track — full 270° sweep, low-emphasis #}
+    <circle cx="70" cy="70" r="52" fill="none" stroke-width="10" stroke-linecap="round"
+      class="text-surface-2" stroke="currentColor"
+      stroke-dasharray="75 100" pathLength="100"
+      style="transform: rotate(135deg); transform-origin: 70px 70px;" />
+
+    {# progress — animates in on load, settles at the real value #}
+    <circle cx="70" cy="70" r="52" fill="none" stroke-width="10" stroke-linecap="round"
+      stroke="currentColor" pathLength="100"
+      stroke-dasharray="{% widthratio value 100 75 %} 100"
+      style="transform: rotate(135deg); transform-origin: 70px 70px;
+             --mi-gauge-len: {% widthratio value 100 75 %};"
+      class="mi-gauge-ring" />
+  </svg>
+
+  {# pointer dot — angle = 225deg (arc start) + value/100 * 270deg, via composed rotates #}
+  <div class="mi-gauge-pointer-frame">
+    <div class="mi-gauge-pointer-inner" style="transform: rotate({% widthratio value 100 270 %}deg)">
+      <span class="mi-gauge-dot"></span>
+    </div>
+  </div>
+
+  <div class="absolute inset-0 flex flex-col items-center justify-center z-[2]">
+    {% if animate %}
+      <span class="text-display tabular leading-none text-text-primary" x-data="counter({{ value }})" x-text="shown">{{ value }}</span>
+    {% else %}
+      <span class="text-display tabular leading-none text-text-primary">{{ value }}</span>
+    {% endif %}
+    {% if sub_label %}<span class="text-tiny text-text-tertiary">{{ sub_label }}</span>{% endif %}
+  </div>
+</div>

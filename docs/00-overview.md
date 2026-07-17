@@ -4,7 +4,7 @@
 
 **MobInspect** is an open-source mobile application security testing platform. It performs automated **static analysis**, **dynamic analysis**, and **malware/threat-intelligence** scanning on Android (APK / AAB / XAPK), iOS (IPA), and Windows Mobile (APPX) applications.
 
-It is a fork of the well-known [Mobile Security Framework (MobSF)](https://github.com/MobSF/Mobile-Security-Framework-MobSF) project, originally created by Ajin Abraham. The fork exists to deliver three things that the upstream codebase does not currently prioritize:
+It is a fork of the well-known [Mobile Security Framework (MobInspect)](https://github.com/MobInspect/mobinspect) project. The fork exists to deliver three things that the upstream codebase does not currently prioritize:
 
 1. **A modern, dynamic user interface** with first-class light & dark themes
 2. **Dynamic role-based access control** suitable for multi-tenant security teams
@@ -22,11 +22,11 @@ It is a fork of the well-known [Mobile Security Framework (MobSF)](https://githu
 
 These personas map directly to the four default roles defined in [03 — RBAC Design](03-rbac-design.md).
 
-## What changes vs. upstream MobSF?
+## What changes vs. upstream MobInspect?
 
-| Area | Upstream MobSF | MobInspect |
+| Area | Upstream MobInspect | MobInspect |
 |------|----------------|------------|
-| Brand | MobSF | MobInspect (full rebrand) |
+| Brand | MobInspect | MobInspect (full rebrand) |
 | UI framework | AdminLTE / Bootstrap 4 | Tailwind CSS v3 + Alpine.js + HTMX + Motion One |
 | Themes | Single light theme | Light + dark with system-pref detection |
 | Auth | Django auth + SAML2 | Same, plus dynamic RBAC layer |
@@ -43,12 +43,12 @@ We are **not** rewriting the analysis engine. The static and dynamic analyzers, 
 
 - **Single-page application** — we keep server-rendered Django, with HTMX for partial updates. SPAs add complexity, attack surface, and a JS toolchain we don't need.
 - **Multi-tenancy at the data layer** — RBAC restricts what users can do, not what data they see. True per-tenant data isolation is out of scope.
-- **Cloud-native rewrite** — MobInspect runs as a self-hosted Django app, like upstream MobSF. No microservices.
+- **Cloud-native rewrite** — MobInspect runs as a self-hosted Django app, like upstream MobInspect. No microservices.
 - **Mobile-first UI** — the product is used on workstations by analysts. We make it responsive, but don't optimize for phones.
 
 ## Licensing
 
-MobInspect is **GPL-3.0**, inherited from upstream MobSF. This means:
+MobInspect is **GPL-3.0**, inherited from upstream MobInspect. This means:
 
 - Source must remain publicly available
 - Modifications must also be GPL-3.0

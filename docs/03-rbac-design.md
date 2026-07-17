@@ -10,9 +10,9 @@ Replace the current 2-role / 3-permission model with a **dynamic, industry-stand
 - Enforcement is **uniform** across web views, REST API, and template-level UI hiding
 - Defaults ship out of the box so the product is usable on day one
 
-## Current state (upstream MobSF)
+## Current state (upstream MobInspect)
 
-`mobsf/MobSF/views/authorization.py:38-50` defines:
+`mobinspect/MobInspect/views/authorization.py:38-50` defines:
 
 ```python
 PERM_CAN_SCAN = 'can_scan'
@@ -29,7 +29,7 @@ Roles (Django `Group`s):
 - **Maintainer** — gets all three permissions
 - **Viewer** — read-only
 
-Roles are populated from SAML group claims (`MOBSF_IDP_MAINTAINER_GROUP`, `MOBSF_IDP_VIEWER_GROUP`) or manually via the rudimentary `users.html` UI. There is no role CRUD, no custom roles, no permission discovery.
+Roles are populated from SAML group claims (`MOBINSPECT_IDP_MAINTAINER_GROUP`, `MOBINSPECT_IDP_VIEWER_GROUP`) or manually via the rudimentary `users.html` UI. There is no role CRUD, no custom roles, no permission discovery.
 
 ## Target state (MobInspect)
 
@@ -242,7 +242,7 @@ Out of scope. If two analysts can both `scan.view`, they both see all scans. We 
 
 ### What about API keys per user?
 
-Today, MobSF stores a single global API key. In Phase 1 we make API keys per-user, with the key inheriting the user's roles. This unlocks revocable per-user API access without code changes.
+Today, MobInspect stores a single global API key. In Phase 1 we make API keys per-user, with the key inheriting the user's roles. This unlocks revocable per-user API access without code changes.
 
 ```python
 class ApiKey(models.Model):

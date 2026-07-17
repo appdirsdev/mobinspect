@@ -74,7 +74,7 @@ start_qcluster() {
 # the EXIT trap runs cleanup no matter how the wait ends.
 run_web_foreground() {
   log "Starting MobInspect web server → http://$HOST:$PORT  (Ctrl-C to stop everything)"
-  "${GUNICORN[@]}" -b "$HOST:$PORT" mobsf.MobSF.wsgi:application \
+  "${GUNICORN[@]}" -b "$HOST:$PORT" mobinspect.MobInspect.wsgi:application \
     --workers=1 --threads=10 --timeout=3600 \
     --log-level=info --log-file=- --access-logfile=- --error-logfile=- --capture-output &
   WEB_PID=$!

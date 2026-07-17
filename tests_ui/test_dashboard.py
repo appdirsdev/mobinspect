@@ -1,6 +1,6 @@
 """UI spec for the Home dashboard ('/').
 
-Covers the CyberGuard-mirror redesign (per mobsf/templates/general/home.html):
+Covers the CyberGuard-mirror redesign (per mobinspect/templates/general/home.html):
   * the upload dropzone (#upload_form / #uploadFile / "Choose file") is
     present and wired, WITHOUT ever submitting a real file
   * the 5-tile KPI strip (Total scans / Findings / Avg score / This week /

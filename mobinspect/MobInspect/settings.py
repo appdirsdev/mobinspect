@@ -1,0 +1,720 @@
+# noqa: E800
+"""
+Django settings for MobInspect project.
+
+MobInspect and Django settings
+"""
+
+import logging
+import os
+
+from django.core.exceptions import ImproperlyConfigured
+
+from mobinspect.MobInspect.init import (
+    env,
+    first_run,
+    get_mobinspect_home,
+    get_mobinspect_version,
+    get_secret_from_file_or_env,
+    load_source,
+)
+
+logger = logging.getLogger(__name__)
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#       MOBINSPECT CONFIGURATION
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+BANNER, VERSION, MOBINSPECT_VER = get_mobinspect_version()
+USE_HOME = True
+# True : All Uploads/Downloads will be stored in user's home directory
+# False : All Uploads/Downloads will be stored under MobInspect root directory
+
+# MobInspect Data Directory
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MOBINSPECT_HOME = get_mobinspect_home(USE_HOME, BASE_DIR)
+# Download Directory
+DWD_DIR = os.path.join(MOBINSPECT_HOME, 'downloads/')
+# Screenshot Directory
+SCREEN_DIR = os.path.join(MOBINSPECT_HOME, 'downloads/screen/')
+# Upload Directory
+UPLD_DIR = os.path.join(MOBINSPECT_HOME, 'uploads/')
+# Signatures used by modules
+SIGNATURE_DIR = os.path.join(MOBINSPECT_HOME, 'signatures/')
+# Tools Directory
+TOOLS_DIR = os.path.join(BASE_DIR, 'DynamicAnalyzer/tools/')
+# Downloaded Tools Directory
+DOWNLOADED_TOOLS_DIR = os.path.join(MOBINSPECT_HOME, 'tools/')
+# Secret File
+SECRET_FILE = os.path.join(MOBINSPECT_HOME, 'secret')
+
+# ==========Load MobInspect User Settings==========
+try:
+    if USE_HOME:
+        USER_CONFIG = os.path.join(MOBINSPECT_HOME, 'config.py')
+        sett = load_source('user_settings', USER_CONFIG)
+        locals().update(  # lgtm [py/modification-of-locals]
+            {k: v for k, v in list(sett.__dict__.items())
+                if not k.startswith('__')})
+        CONFIG_HOME = True
+    else:
+        CONFIG_HOME = False
+except Exception:
+    logger.exception('Reading Config')
+    CONFIG_HOME = False
+
+# ===MOBINSPECT SECRET GENERATION AND DB MIGRATION====
+SECRET_KEY = first_run(SECRET_FILE, BASE_DIR, MOBINSPECT_HOME)
+
+# =============ALLOWED DOWNLOAD EXTENSIONS=====
+ALLOWED_EXTENSIONS = {
+    '.txt': 'text/plain',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+    '.webp': 'image/webp',
+    '.zip': 'application/zip',
+    '.tar': 'application/x-tar',
+    '.apk': 'application/octet-stream',
+    '.apks': 'application/octet-stream',
+    '.xapk': 'application/octet-stream',
+    '.aab': 'application/octet-stream',
+    '.ipa': 'application/octet-stream',
+    '.jar': 'application/java-archive',
+    '.aar': 'application/octet-stream',
+    '.so': 'application/octet-stream',
+    '.dylib': 'application/octet-stream',
+    '.a': 'application/octet-stream',
+    '.pcap': 'application/vnd.tcpdump.pcap',
+    '.appx': 'application/vns.ms-appx',
+}
+# =============ALLOWED MIMETYPES=================
+APK_MIME = [
+    'application/octet-stream',
+    'application/vnd.android.package-archive',
+    'application/x-zip-compressed',
+    'binary/octet-stream',
+    'application/java-archive',
+    'application/x-authorware-bin',
+]
+IPA_MIME = [
+    'application/iphone',
+    'application/octet-stream',
+    'application/x-itunes-ipa',
+    'application/x-zip-compressed',
+    'application/x-ar',
+    'text/vnd.a',
+    'binary/octet-stream',
+]
+ZIP_MIME = [
+    'application/zip',
+    'application/octet-stream',
+    'application/x-zip-compressed',
+    'binary/octet-stream',
+]
+APPX_MIME = [
+    'application/octet-stream',
+    'application/vns.ms-appx',
+    'application/x-zip-compressed',
+]
+# Supported File Extensions
+ANDROID_EXTS = (
+    'apk', 'xapk', 'apks', 'zip',
+    'aab', 'so', 'jar', 'aar',
+)
+IOS_EXTS = ('ipa', 'dylib', 'a')
+WINDOWS_EXTS = ('appx',)
+# REST API only mode
+# Set MOBINSPECT_API_ONLY to 1 to enable REST API only mode
+# In this mode, web UI related urls are disabled.
+API_ONLY = env('MOBINSPECT_API_ONLY', '0')
+
+# -----External URLS--------------------------
+MALWARE_DB_URL = 'https://www.malwaredomainlist.com/mdlcsv.php'
+MALTRAIL_DB_URL = ('https://raw.githubusercontent.com/stamparm/aux/'
+                   'master/maltrail-malware-domains.txt')
+VIRUS_TOTAL_BASE_URL = 'https://www.virustotal.com/vtapi/v2/file/'
+EXODUS_URL = 'https://reports.exodus-privacy.eu.org'
+APPMONSTA_URL = 'https://api.appmonsta.com/v1/stores/android/details/'
+ITUNES_URL = 'https://itunes.apple.com/lookup'
+FRIDA_SERVER = 'https://api.github.com/repos/frida/frida/releases/tags/'
+# Fail-closed Frida server integrity verification.
+# When enabled (MOBINSPECT_FRIDA_VERIFY=1), a Frida server binary with no pinned
+# SHA-256 (or a mismatching one) is refused. Default off (0) for backwards
+# compatibility: unverified binaries are still used, but a loud warning is
+# logged. Populate FRIDA_SERVER_SHA256 in
+# DynamicAnalyzer/views/common/frida/server_update.py to enable real
+# verification. Defined here (outside the user-config block) so it is always
+# present even when a CONFIG_HOME user config is loaded.
+FRIDA_VERIFY = env('MOBINSPECT_FRIDA_VERIFY', '0') == '1'
+GOOGLE = 'https://www.google.com'
+PLAYSTORE = 'https://play.google.com'
+BAIDU = 'https://www.baidu.com/'
+APKPURE = 'https://m.apkpure.com/android/{}/download?from=details'
+APKTADA = 'https://apktada.com/download-apk/'
+APKPLZ = 'https://apkplz.net/download-app/'
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# ============DJANGO SETTINGS =================
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+# Database
+# https://docs.djangoproject.com/en/dev/ref/settings/#databases
+# PostgreSQL is required — MobInspect never falls back to SQLite. Fail fast
+# and loudly if the required env vars are missing, rather than silently
+# running against a throwaway local file that diverges from production.
+_missing_pg_vars = [v for v in ('POSTGRES_USER', 'POSTGRES_HOST')
+                     if not os.environ.get(v)]
+if not (os.environ.get('POSTGRES_PASSWORD')
+        or os.environ.get('POSTGRES_PASSWORD_FILE')):
+    _missing_pg_vars.append('POSTGRES_PASSWORD (or POSTGRES_PASSWORD_FILE)')
+if _missing_pg_vars:
+    raise ImproperlyConfigured(
+        'PostgreSQL is required for MobInspect — missing: '
+        + ', '.join(_missing_pg_vars)
+        + '. Set them in .env.postgres (see .env.postgres.example).')
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': os.getenv('POSTGRES_DB', 'mobinspect'),
+        'USER': os.environ['POSTGRES_USER'],
+        'PASSWORD': get_secret_from_file_or_env('POSTGRES_PASSWORD'),
+        'HOST': os.environ['POSTGRES_HOST'],
+        'PORT': int(os.getenv('POSTGRES_PORT', 5432)),
+    },
+}
+# ===============================================
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+DEBUG = bool(env('MOBINSPECT_DEBUG', '0') == '1')
+DJANGO_LOG_LEVEL = DEBUG
+TEMPLATE_DEBUG = DEBUG
+# ALLOWED_HOSTS: read from env (comma-separated). Never default to '*' — that
+# disables Django's Host header validation and enables host-header spoofing.
+_allowed_hosts_env = os.getenv('MOBINSPECT_ALLOWED_HOSTS', '').strip()
+if _allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
+else:
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+# Hardening headers — only enforce HTTPS-only behaviour when we know we're
+# behind TLS termination (MOBINSPECT_BEHIND_TLS=1). HTTP-only dev keeps the
+# cookies usable. Content-type sniffing, referrer policy, and clickjacking
+# protection are safe to apply unconditionally in production (DEBUG=False).
+_behind_tls = os.getenv('MOBINSPECT_BEHIND_TLS', '0') == '1'
+_behind_proxy = os.getenv('MOBINSPECT_BEHIND_PROXY', '0') == '1'
+# Runtime executable-tampering detection monkeypatches subprocess to verify
+# bundled tool binaries (wkhtmltopdf, JADX, apktool, …) against a hash snapshot
+# taken at startup. OFF by default: on a redeployed / cloned OVA appliance the
+# gunicorn worker's runtime PATH/environment differs from the startup snapshot,
+# so the recomputed signature no longer matches and it raises
+# "Executable/Library Tampering Detected" on routine tool calls — breaking PDF
+# export (wkhtmltopdf) and scans (JADX). Set MOBINSPECT_EXEC_TAMPER_DETECTION=1
+# to re-enable it where the runtime environment is fixed and controlled.
+EXEC_TAMPER_DETECTION = os.getenv('MOBINSPECT_EXEC_TAMPER_DETECTION', '0') == '1'
+# CSRF_TRUSTED_ORIGINS: Django 4+ rejects an unsafe (POST) request — including
+# the login form — when the Origin header isn't a trusted origin. Logging in
+# from a LAN IP (e.g. http://192.168.2.118:8001) fails with "CSRF verification
+# failed. Origin checking failed" unless that scheme://host[:port] is trusted.
+# Derive trusted origins from ALLOWED_HOSTS (scheme depends on TLS), include the
+# bind port, and allow an explicit override via MOBINSPECT_CSRF_TRUSTED_ORIGINS
+# (comma-separated full origins, e.g. "http://mob.example:8001,https://mob.example").
+_csrf_scheme = 'https' if _behind_tls else 'http'
+_bind_port = os.getenv('MOBINSPECT_PORT', '8001').strip()
+_csrf_origins = set()
+for _h in ALLOWED_HOSTS:
+    if _h in ('*',):
+        continue
+    _csrf_origins.add(f'{_csrf_scheme}://{_h}')
+    if _bind_port:
+        _csrf_origins.add(f'{_csrf_scheme}://{_h}:{_bind_port}')
+_csrf_env = os.getenv('MOBINSPECT_CSRF_TRUSTED_ORIGINS', '').strip()
+if _csrf_env:
+    _csrf_origins.update(o.strip() for o in _csrf_env.split(',') if o.strip())
+CSRF_TRUSTED_ORIGINS = sorted(_csrf_origins)
+if not DEBUG:
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'same-origin'
+    X_FRAME_OPTIONS = 'DENY'
+    if _behind_tls:
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
+        SECURE_HSTS_SECONDS = 31536000
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
+# Application definition
+INSTALLED_APPS = (
+    # 'django.contrib.admin',
+    'django_q',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'mobinspect.StaticAnalyzer',
+    'mobinspect.DynamicAnalyzer',
+    'mobinspect.MobInspect',
+    'mobinspect.MalwareAnalyzer',
+    'mobinspect.RBAC.apps.RBACConfig',
+    'mobinspect.Analytics.apps.AnalyticsConfig',
+)
+MIDDLEWARE = (
+    # SecurityMiddleware first so HSTS / SSL redirect headers are applied
+    # before anything else can short-circuit the response.
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    # Serve STATIC_ROOT directly (covers runserver in dev + gunicorn in prod).
+    # Carried over from the legacy MIDDLEWARE_CLASSES; was lost in the MIDDLEWARE rename.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # API auth runs after AuthenticationMiddleware so it can layer key-based
+    # auth on top of session auth, then store the key user in request.api_user
+    # without being clobbered by Django's lazy session-user resolution.
+    'mobinspect.MobInspect.views.api.api_middleware.RestApiAuthMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_ratelimit.middleware.RatelimitMiddleware',
+    # MobInspect RBAC: populate request.mi_permissions / request.mi_roles.
+    'mobinspect.RBAC.middleware.RBACMiddleware',
+    # Every dynamic page carries a session-bound CSRF token — prevent the
+    # browser (bfcache in particular) from ever serving a stale cached copy
+    # of one, which is the classic cause of a false "CSRF verification
+    # failed" after login/logout. Static assets are unaffected (whitenoise
+    # already sets its own Cache-Control on those).
+    'mobinspect.MobInspect.cache_middleware.NoStoreCacheMiddleware',
+)
+ROOT_URLCONF = 'mobinspect.MobInspect.urls'
+WSGI_APPLICATION = 'mobinspect.MobInspect.wsgi.application'
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = os.getenv('TIME_ZONE', 'UTC')
+USE_I18N = True
+USE_L10N = True
+USE_TZ = True
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'APP_DIRS': True,
+        'DIRS':
+            [
+                os.path.join(BASE_DIR, 'templates'),
+            ],
+        'OPTIONS':
+            {
+                'debug': TEMPLATE_DEBUG,
+                'context_processors': [
+                    'django.template.context_processors.debug',
+                    'django.template.context_processors.request',
+                    'django.contrib.auth.context_processors.auth',
+                    'django.contrib.messages.context_processors.messages',
+                    'mobinspect.RBAC.context.rbac_context',
+                ],
+            },
+    },
+]
+MEDIA_ROOT = os.path.join(BASE_DIR, 'uploads')
+MEDIA_URL = '/uploads/'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# WhiteNoise auto-enables autorefresh (and use_finders) when DEBUG=True. Both
+# bypass the prebuilt STATIC_ROOT index — and because mobinspect/static lives outside
+# any app and isn't in STATICFILES_DIRS, finder lookups all 404 in dev. Pin both
+# to the prebuilt-index path so the same code path serves dev and prod.
+WHITENOISE_AUTOREFRESH = False
+WHITENOISE_USE_FINDERS = False
+# Hard Django-level backstop for file uploads — kept above
+# MOBINSPECT_MAX_UPLOAD_SIZE below so an oversized upload hits our own
+# friendly size check first, not Django's raw RequestDataTooBig error.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 550 * 1024 * 1024
+# App-level upload size guardrail, mirrored at the nginx layer
+# (client_max_body_size). Enforced explicitly in Upload.upload_html/
+# upload_api so oversized files are rejected with a clear message.
+MOBINSPECT_MAX_UPLOAD_SIZE_MB = int(
+    os.getenv('MOBINSPECT_MAX_UPLOAD_SIZE_MB', '500'))
+MOBINSPECT_MAX_UPLOAD_SIZE = MOBINSPECT_MAX_UPLOAD_SIZE_MB * 1024 * 1024
+# 400MB per file limit for uncompressed files
+ZIP_MAX_UNCOMPRESSED_FILE_SIZE = 400 * 1024 * 1024
+# 3GB total limit for all uncompressed files
+ZIP_MAX_UNCOMPRESSED_TOTAL_SIZE = 3000 * 1024 * 1024
+LOGIN_URL = 'login'
+LOGOUT_REDIRECT_URL = '/'
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': ('django.contrib.auth.password_validation.'
+                 'UserAttributeSimilarityValidator'),
+    },
+    {
+        'NAME': ('django.contrib.auth.password_validation.'
+                 'MinimumLengthValidator'),
+        'OPTIONS': {
+            # Bumped from 6 → 12 (C7). 6-char floor allowed `mobinspect` /
+            # `123456` style admin passwords on a plaintext-HTTP host.
+            'min_length': 12,
+        },
+    },
+    {
+        'NAME': ('django.contrib.auth.password_validation.'
+                 'CommonPasswordValidator'),
+    },
+    {
+        'NAME': ('django.contrib.auth.password_validation.'
+                 'NumericPasswordValidator'),
+    },
+]
+# Better logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': True,
+    'formatters': {
+        'standard': {
+            'format': '[%(levelname)s] %(asctime)-15s - %(message)s',
+            'datefmt': '%d/%b/%Y %H:%M:%S',
+        },
+        'color': {
+            '()': 'colorlog.ColoredFormatter',
+            'format':
+                '%(log_color)s[%(levelname)s] %(asctime)-15s - %(message)s',
+            'datefmt': '%d/%b/%Y %H:%M:%S',
+            'log_colors': {
+                'DEBUG': 'cyan',
+                'INFO': 'green',
+                'WARNING': 'yellow',
+                'ERROR': 'red',
+                'CRITICAL': 'red,bg_white',
+            },
+        },
+    },
+    'handlers': {
+        'logfile': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(MOBINSPECT_HOME, 'debug.log'),
+            'formatter': 'standard',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'color',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'logfile'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'django_q': {
+            'handlers': ['console', 'logfile'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'django.db.backends': {
+            'handlers': ['console', 'logfile'],
+            # DEBUG will log all queries, so change it to WARNING.
+            'level': 'INFO',
+            'propagate': False,   # Don't propagate to other handlers
+        },
+        'django.template': {
+            'handlers': ['console', 'logfile'],
+            # DEBUG logs harmless VariableDoesNotExist lookups (e.g. the
+            # optional 'title' context var in base/app.html), so raise to INFO.
+            'level': 'INFO',
+            'propagate': False,   # Don't propagate to other handlers
+        },
+        'mobinspect.MobInspect': {
+            'handlers': ['console', 'logfile'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'mobinspect.StaticAnalyzer': {
+            'handlers': ['console', 'logfile'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'mobinspect.MalwareAnalyzer': {
+            'handlers': ['console', 'logfile'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'mobinspect.DynamicAnalyzer': {
+            'handlers': ['console', 'logfile'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
+# Background scanning is ON by default (queues large/slow scans onto the
+# django-q worker instead of running them in-request) — set
+# MOBINSPECT_ASYNC_ANALYSIS=0 to force the old in-request behavior.
+ASYNC_ANALYSIS = bool(os.getenv('MOBINSPECT_ASYNC_ANALYSIS', '1') == '1')
+ASYNC_ANALYSIS_TIMEOUT = int(os.getenv('MOBINSPECT_ASYNC_ANALYSIS_TIMEOUT', '60'))
+Q_CLUSTER = {
+    'name': 'scan_queue',
+    # One static-analysis process at a time by default: a single worker
+    # serializes scans so concurrent (esp. large) APKs cannot exhaust the host.
+    # Override with MOBINSPECT_ASYNC_WORKERS if the host has ample CPU/RAM.
+    'workers': int(os.getenv('MOBINSPECT_ASYNC_WORKERS', '1')),
+    'recycle': 100,
+    'timeout': ASYNC_ANALYSIS_TIMEOUT * 60,
+    'retry': (ASYNC_ANALYSIS_TIMEOUT * 60) + 100,
+    'compress': True,
+    'label': 'scan_queue',
+    'orm': 'default',
+    'max_attempts': 1,
+    'save_limit': -1,
+    'ack_failures': True,
+}
+QUEUE_MAX_SIZE = 100
+# =============== MobInspect Local AI (Granite) enrichment ===============
+# Dashboard-only, background, fail-closed. Default OFF. The endpoint is
+# operator-set and never hardcoded (e.g. http://192.168.92.1:11434). All AI
+# code is additive and best-effort; it can never affect a scan or the report.
+MOBINSPECT_AI_ENABLED = os.getenv(
+    'MOBINSPECT_AI_ENABLED', '').strip().lower() in ('1', 'true', 'yes', 'on')
+MOBINSPECT_AI_BASE_URL = os.getenv(
+    'MOBINSPECT_AI_BASE_URL', 'http://127.0.0.1:11434').strip().rstrip('/')
+# Use the local Granite 4.1 3B (granite4:3b) for BOTH generation and
+# classification for now. Point MOBINSPECT_AI_MODEL_GENERATE at a larger model
+# (e.g. granite4:8b) later when it is available on the model host.
+MOBINSPECT_AI_MODEL_GENERATE = os.getenv(
+    'MOBINSPECT_AI_MODEL_GENERATE', 'granite4:3b')
+MOBINSPECT_AI_MODEL_CLASSIFY = os.getenv(
+    'MOBINSPECT_AI_MODEL_CLASSIFY', 'granite4:3b')
+# Egress pinning / TLS
+MOBINSPECT_AI_ALLOWED_HOSTS = [
+    h.strip() for h in os.getenv('MOBINSPECT_AI_ALLOWED_HOSTS', '').split(',')
+    if h.strip()]
+MOBINSPECT_AI_TLS_VERIFY = os.getenv('MOBINSPECT_AI_TLS_VERIFY', '1') == '1'
+MOBINSPECT_AI_CA_BUNDLE = os.getenv('MOBINSPECT_AI_CA_BUNDLE', '').strip()
+# Resource bounds
+MOBINSPECT_AI_CONNECT_TIMEOUT = int(os.getenv('MOBINSPECT_AI_CONNECT_TIMEOUT', '5'))
+MOBINSPECT_AI_READ_TIMEOUT = int(os.getenv('MOBINSPECT_AI_READ_TIMEOUT', '60'))
+MOBINSPECT_AI_MAX_RESPONSE_BYTES = int(
+    os.getenv('MOBINSPECT_AI_MAX_RESPONSE_BYTES', '2097152'))
+MOBINSPECT_AI_NUM_PREDICT = int(os.getenv('MOBINSPECT_AI_NUM_PREDICT', '768'))
+# Larger output budget for the one-shot comprehensive report (6 sections).
+MOBINSPECT_AI_REPORT_TOKENS = int(os.getenv('MOBINSPECT_AI_REPORT_TOKENS', '1200'))
+# Output cap for the classification model's short secret-triage call (stage 2).
+MOBINSPECT_AI_TRIAGE_TOKENS = int(os.getenv('MOBINSPECT_AI_TRIAGE_TOKENS', '400'))
+# Ollama runtime options. num_ctx is the context WINDOW (input+output tokens):
+# Ollama defaults to ~4096, which truncates a complete static-analysis prompt —
+# raise it (Granite 4.x supports 128K; 8192 comfortably fits one app profile).
+MOBINSPECT_AI_NUM_CTX = int(os.getenv('MOBINSPECT_AI_NUM_CTX', '8192'))
+MOBINSPECT_AI_TOP_P = float(os.getenv('MOBINSPECT_AI_TOP_P', '0.9'))
+# How long Ollama keeps the model loaded between calls (avoids reload latency).
+MOBINSPECT_AI_KEEP_ALIVE = os.getenv('MOBINSPECT_AI_KEEP_ALIVE', '10m')
+MOBINSPECT_AI_MAX_ITEMS = int(os.getenv('MOBINSPECT_AI_MAX_ITEMS', '25'))
+# Aggregate wall-clock budget (seconds) for one enrichment run — bounds total
+# time on the shared scan worker pool so AI can never starve real scans.
+MOBINSPECT_AI_TOTAL_BUDGET = int(os.getenv('MOBINSPECT_AI_TOTAL_BUDGET', '300'))
+MOBINSPECT_AI_STORED_TEXT_CAP = int(os.getenv('MOBINSPECT_AI_STORED_TEXT_CAP', '8000'))
+
+
+def _mobinspect_ai_url_ok(url):
+    """Format-only endpoint validation (no DNS at import). Returns bool."""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        return (parsed.scheme in ('http', 'https')
+                and bool(parsed.hostname) and bool(parsed.port))
+    except Exception:
+        return False
+
+
+# Fail-closed: a malformed endpoint disables AI rather than risking bad egress.
+if MOBINSPECT_AI_ENABLED and not _mobinspect_ai_url_ok(MOBINSPECT_AI_BASE_URL):
+    MOBINSPECT_AI_ENABLED = False
+
+MULTIPROCESSING = env('MOBINSPECT_MULTIPROCESSING')
+JADX_TIMEOUT = int(env('MOBINSPECT_JADX_TIMEOUT', 1000))
+SAST_TIMEOUT = int(env('MOBINSPECT_SAST_TIMEOUT', 1000))
+BINARY_ANALYSIS_TIMEOUT = int(env('MOBINSPECT_BINARY_ANALYSIS_TIMEOUT', 600))
+DISABLE_AUTHENTICATION = env('MOBINSPECT_DISABLE_AUTHENTICATION')
+RATELIMIT = env('MOBINSPECT_RATELIMIT', '7/m')
+USE_X_FORWARDED_HOST = bool(
+    env('MOBINSPECT_USE_X_FORWARDED_HOST', '1') == '1')
+USE_X_FORWARDED_PORT = bool(
+    env('MOBINSPECT_USE_X_FORWARDED_PORT', '1') == '1')
+# Trust the X-Forwarded-Proto header ONLY when explicitly told we sit behind
+# a reverse proxy that strips/sets it. Otherwise a client can spoof the
+# header and trick Django into thinking the request is HTTPS.
+if _behind_proxy:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# ===========================
+# ENTERPRISE FEATURE REQUESTS
+# ===========================
+EFR_01 = os.getenv('EFR_01', '0')
+# SAML SSO
+# IdP Configuration
+IDP_METADATA_URL = env('MOBINSPECT_IDP_METADATA_URL')
+IDP_ENTITY_ID = env('MOBINSPECT_IDP_ENTITY_ID')
+IDP_SSO_URL = env('MOBINSPECT_IDP_SSO_URL')
+IDP_X509CERT = env('MOBINSPECT_IDP_X509CERT')
+IDP_IS_ADFS = env('MOBINSPECT_IDP_IS_ADFS', '0')
+IDP_MAINTAINER_GROUP = env('MOBINSPECT_IDP_MAINTAINER_GROUP', 'Maintainer')
+IDP_VIEWER_GROUP = env('MOBINSPECT_IDP_VIEWER_GROUP', 'Viewer')
+# SP Configuration
+SP_HOST = env('MOBINSPECT_SP_HOST')
+SP_ALLOW_PASSWORD = env('MOBINSPECT_SP_ALLOW_PASSWORD', '0')
+# ===================
+# USER CONFIGURATION
+# ===================
+if CONFIG_HOME:
+    logger.info('Loading User config from: %s', USER_CONFIG)
+else:
+    """
+    IMPORTANT
+    If 'USE_HOME' is set to True,
+    then below user configuration settings are not considered.
+    The user configuration will be loaded from
+    .MobInspect/config.py in user's home directory.
+    """
+    # ^CONFIG-START^: Do not edit this line
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    #          MOBINSPECT USER CONFIGURATIONS
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # -------------------------
+    # STATIC ANALYZER SETTINGS
+    # -------------------------
+
+    # ==========ANDROID SKIP CLASSES==========================
+    # Common third party classes/paths that will be skipped
+    # during static analysis
+    import os
+    from mobinspect.MobInspect.init import env
+    SKIP_CLASS_PATH = {
+        'com/google/', 'androidx', 'okhttp2/', 'okhttp3/',
+        'com/android/', 'com/squareup', 'okhttp/'
+        'android/content/', 'com/twitter/', 'twitter4j/',
+        'android/support/', 'org/apache/', 'oauth/signpost',
+        'android/arch', 'org/chromium/', 'com/facebook',
+        'org/spongycastle', 'org/bouncycastle',
+        'com/amazon/identity/', 'io/fabric/sdk',
+        'com/instabug', 'com/crashlytics/android',
+        'kotlinx/', 'kotlin/',
+    }
+    # Disable CVSSV2 Score by default
+    CVSS_SCORE_ENABLED = bool(env('MOBINSPECT_CVSS_SCORE_ENABLED', ''))
+    # NIAP Scan
+    NIAP_ENABLED = env('MOBINSPECT_NIAP_ENABLED', '')
+    # Permission to Code Mapping
+    PERM_MAPPING_ENABLED = env('MOBINSPECT_PERM_MAPPING_ENABLED', '1')
+    # Dex 2 Smali Conversion
+    DEX2SMALI_ENABLED = env('MOBINSPECT_DEX2SMALI_ENABLED', '1')
+    # Android Shared Object Binary Analysis
+    SO_ANALYSIS_ENABLED = env('MOBINSPECT_SO_ANALYSIS_ENABLED', '1')
+    # iOS Dynamic Library Binary Analysis
+    DYLIB_ANALYSIS_ENABLED = env('MOBINSPECT_DYLIB_ANALYSIS_ENABLED', '1')
+    # =================================================
+    # --------------------------
+    # MALWARE ANALYZER SETTINGS
+    # --------------------------
+
+    DOMAIN_MALWARE_SCAN = env('MOBINSPECT_DOMAIN_MALWARE_SCAN', '1')
+    APKID_ENABLED = env('MOBINSPECT_APKID_ENABLED', '1')
+    # ==================================================
+    # ======WINDOWS STATIC ANALYSIS SETTINGS ===========
+    # Private key
+    WINDOWS_VM_SECRET = env(
+        'MOBINSPECT_WINDOWS_VM_SECRET',
+        'mobinspect/MobInspect/windows_vm_priv_key.asc')
+    # IP and Port of the MobInspect Windows VM
+    # example: WINDOWS_VM_IP = '127.0.0.1'   ;noqa E800
+    WINDOWS_VM_IP = env('MOBINSPECT_WINDOWS_VM_IP')
+    WINDOWS_VM_PORT = env('MOBINSPECT_WINDOWS_VM_PORT', '8000')
+    # ==================================================
+
+    # ==============3rd Party Tools=====================
+    """
+    If you want to use a different version of 3rd party tools used by MobInspect.
+    You can do that by specifying the path here. If specified, MobInspect will run
+    the tool from this location.
+    """
+
+    # Android 3P Tools
+    BUNDLE_TOOL = env('MOBINSPECT_BUNDLE_TOOL', '')
+    JADX_BINARY = env('MOBINSPECT_JADX_BINARY', '')
+    BACKSMALI_BINARY = env('MOBINSPECT_BACKSMALI_BINARY', '')
+    VD2SVG_BINARY = env('MOBINSPECT_VD2SVG_BINARY', '')
+    APKTOOL_BINARY = env('MOBINSPECT_APKTOOL_BINARY', '')
+    ADB_BINARY = env('MOBINSPECT_ADB_BINARY', '')
+    AAPT2_BINARY = env('MOBINSPECT_AAPT2_BINARY', '')
+    AAPT_BINARY = env('MOBINSPECT_AAPT_BINARY', '')
+
+    # iOS 3P Tools
+    JTOOL_BINARY = env('MOBINSPECT_JTOOL_BINARY', '')
+    CLASSDUMP_BINARY = env('MOBINSPECT_CLASSDUMP_BINARY', '')
+    CLASSDUMP_SWIFT_BINARY = env('MOBINSPECT_CLASSDUMP_SWIFT_BINARY', '')
+
+    # COMMON
+    JAVA_DIRECTORY = env('MOBINSPECT_JAVA_DIRECTORY', '')
+    # PDF report generation (wkhtmltopdf). If empty, pdfkit relies on PATH.
+    WKHTMLTOPDF_BINARY = env('MOBINSPECT_WKHTMLTOPDF_BINARY', '')
+
+    """
+    Examples:
+    JAVA_DIRECTORY = 'C:/Program Files/Java/jdk1.7.0_17/bin/'
+    JAVA_DIRECTORY = '/usr/bin/'
+    JADX_BINARY = 'C:/Users/user/AppData/Local/Programs/jadx/bin/jadx.bat'
+    JADX_BINARY = '/Users/ajin/jadx/bin/jadx'
+    """
+    # ==========================================================
+    # -------------------------
+    # DYNAMIC ANALYZER SETTINGS
+    # -------------------------
+
+    # =======ANDROID DYNAMIC ANALYSIS SETTINGS===========
+    ANALYZER_IDENTIFIER = env('MOBINSPECT_ANALYZER_IDENTIFIER', '')
+    FRIDA_TIMEOUT = int(env('MOBINSPECT_FRIDA_TIMEOUT', '4'))
+    ACTIVITY_TESTER_SLEEP = int(env('MOBINSPECT_ACTIVITY_TESTER_SLEEP', '4'))
+    # ==============================================
+
+    # ================HTTPS PROXY ===============
+    PROXY_IP = env('MOBINSPECT_PROXY_IP', '127.0.0.1')
+    PROXY_PORT = int(env('MOBINSPECT_PROXY_PORT', '1337'))
+    # ===================================================
+
+    # ========UPSTREAM PROXY SETTINGS ==============
+    # If you are behind a Proxy
+    UPSTREAM_PROXY_ENABLED = bool(env(
+        'MOBINSPECT_UPSTREAM_PROXY_ENABLED', ''))
+    UPSTREAM_PROXY_SSL_VERIFY = env(
+        'MOBINSPECT_UPSTREAM_PROXY_SSL_VERIFY', '1')
+    UPSTREAM_PROXY_TYPE = env('MOBINSPECT_UPSTREAM_PROXY_TYPE', 'http')
+    UPSTREAM_PROXY_IP = env('MOBINSPECT_UPSTREAM_PROXY_IP', '127.0.0.1')
+    UPSTREAM_PROXY_PORT = int(env('MOBINSPECT_UPSTREAM_PROXY_PORT', '3128'))
+    UPSTREAM_PROXY_USERNAME = env('MOBINSPECT_UPSTREAM_PROXY_USERNAME', '')
+    UPSTREAM_PROXY_PASSWORD = env('MOBINSPECT_UPSTREAM_PROXY_PASSWORD', '')
+    # ==============================================
+
+    # ========DISABLED BY DEFAULT COMPONENTS=========
+    # Get AppMonsta API from https://appmonsta.com/dashboard/get_api_key/
+    APPMONSTA_API = env('MOBINSPECT_APPMONSTA_API', '')
+    # ----------VirusTotal--------------------------
+    VT_ENABLED = bool(env('MOBINSPECT_VT_ENABLED', ''))
+    VT_API_KEY = env('MOBINSPECT_VT_API_KEY', '')
+    VT_UPLOAD = bool(env('MOBINSPECT_VT_UPLOAD', ''))
+    # Before setting VT_ENABLED to True,
+    # Make sure VT_API_KEY is set to your VirusTotal API key
+    # register at: https://www.virustotal.com/#/join-us
+    # You can get your API KEY from:
+    # https://www.virustotal.com/en/user/<username>/apikey/
+    # Files will be uploaded to VirusTotal
+    # if VT_UPLOAD is set to True.
+    # ===============================================
+    # =======IOS DYNAMIC ANALYSIS SETTINGS===========
+    # Should be SSH IP:PORT, example: 192.168.1.100:22
+    # Field also supports multiple devices, example: 192.168.1.100:22,192.168.1.101:22
+    IOS_ANALYZER_IDENTIFIERS = env('MOBINSPECT_IOS_ANALYZER_IDENTIFIERS', '')
+    # SSH credentials for jailbroken iOS device (USB or WiFi path)
+    # Defaults match the standard jailbreak SSH default (root/alpine)
+    IOS_SSH_USER = env('MOBINSPECT_IOS_SSH_USER', 'root')
+    IOS_SSH_PASSWORD = env('MOBINSPECT_IOS_SSH_PASSWORD', 'alpine')
+    # ==============================================
+
+    # =======IOS DYNAMIC ANALYSIS CORELLIUM SETTINGS===========
+    CORELLIUM_API_DOMAIN = env('MOBINSPECT_CORELLIUM_API_DOMAIN', '')
+    CORELLIUM_API_KEY = env('MOBINSPECT_CORELLIUM_API_KEY', '')
+    CORELLIUM_PROJECT_ID = env('MOBINSPECT_CORELLIUM_PROJECT_ID', '')
+    # CORELLIUM_PROJECT_ID is optional, MobInspect will use any available project id
+    # ===============================================
+    # ^CONFIG-END^: Do not edit this line

@@ -3,11 +3,7 @@ FROM python:3.13-slim-bookworm
 
 LABEL \
     name="MobInspect" \
-    upstream="MobSF — https://github.com/MobSF/Mobile-Security-Framework-MobSF" \
-    upstream_author="Ajin Abraham <ajin25@gmail.com>" \
-    contributor_1="OscarAkaElvis <oscar.alfonso.diaz@gmail.com>" \
-    contributor_2="Vincent Nadal <vincent.nadal@orange.fr>" \
-    description="MobInspect — Mobile Application Security Inspector. A fork of Mobile Security Framework (MobSF) with a modern UI, dynamic RBAC, and analytics on top of the original static, dynamic, and malware analyzers."
+    description="MobInspect — Mobile Application Security Inspector with a modern UI, dynamic RBAC, and analytics for static, dynamic, and malware analysis of mobile apps."
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=en_US.UTF-8 \
@@ -16,10 +12,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONFAULTHANDLER=1 \
-    MOBSF_USER=mobsf \
+    MOBINSPECT_USER=mobinspect \
     USER_ID=9901 \
-    MOBSF_PLATFORM=docker \
-    MOBSF_ADB_BINARY=/usr/bin/adb \
+    MOBINSPECT_PLATFORM=docker \
+    MOBINSPECT_ADB_BINARY=/usr/bin/adb \
     JAVA_HOME=/jdk-22.0.2 \
     PATH=/jdk-22.0.2/bin:/root/.local/bin:$PATH
 # Initial admin credentials are NOT baked into the image. At first boot
@@ -60,7 +56,7 @@ RUN apt update -y && \
 ARG TARGETPLATFORM
 
 # Install wkhtmltopdf, OpenJDK and jadx
-COPY scripts/dependencies.sh mobsf/MobSF/tools_download.py ./
+COPY scripts/dependencies.sh mobinspect/MobInspect/tools_download.py ./
 RUN ./dependencies.sh
 
 # Install Python dependencies
@@ -83,22 +79,22 @@ RUN \
     rm -rf /var/lib/apt/lists/* /tmp/* > /dev/null 2>&1
 
 # Copy source code
-WORKDIR /home/mobsf/Mobile-Security-Framework-MobSF
+WORKDIR /home/mobinspect/mobinspect
 COPY . .
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl --fail http://localhost:8000/healthz/ || exit 1
 
-# Expose MobSF Port and Proxy Port
+# Expose MobInspect Port and Proxy Port
 EXPOSE 8000 1337
 
-# Create mobsf user
-RUN groupadd --gid $USER_ID $MOBSF_USER && \
-    useradd $MOBSF_USER --uid $USER_ID --gid $MOBSF_USER --shell /bin/false && \
-    chown -R $MOBSF_USER:$MOBSF_USER /home/mobsf
+# Create mobinspect user
+RUN groupadd --gid $USER_ID $MOBINSPECT_USER && \
+    useradd $MOBINSPECT_USER --uid $USER_ID --gid $MOBINSPECT_USER --shell /bin/false && \
+    chown -R $MOBINSPECT_USER:$MOBINSPECT_USER /home/mobinspect
 
-# Switch to mobsf user
-USER $MOBSF_USER
+# Switch to mobinspect user
+USER $MOBINSPECT_USER
 
-# Run MobSF
-CMD ["/home/mobsf/Mobile-Security-Framework-MobSF/scripts/entrypoint.sh"]
+# Run MobInspect
+CMD ["/home/mobinspect/mobinspect/scripts/entrypoint.sh"]

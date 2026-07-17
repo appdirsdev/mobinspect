@@ -84,4 +84,4 @@ Start-Process -NoNewWindow -Wait -FilePath $ADB_PATH -ArgumentList "root"
 Write-Output "Remounting the filesystem..."
 Start-Process -NoNewWindow -Wait -FilePath $ADB_PATH -ArgumentList "remount"
  
-Write-Output "Emulator ready for Dynamic Analysis with MobSF."
+Write-Output "Emulator ready for Dynamic Analysis with MobInspect."

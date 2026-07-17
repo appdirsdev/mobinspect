@@ -16,7 +16,7 @@ jobs:
           issuesOpened: >
             👋 @{{ author }}
             
-            Issues is only for reporting a bug/feature request. For limited support, questions, and discussions, please join [MobSF Slack channel](https://join.slack.com/t/mobsf/shared_invite/zt-3ephptj6c-OuDMatJ9z9MT0T_Vb~l2pg)
+            Issues is only for reporting a bug/feature request. For limited support, questions, and discussions, please join [MobInspect Slack channel](https://join.slack.com/t/mobinspect/shared_invite/zt-3ephptj6c-OuDMatJ9z9MT0T_Vb~l2pg)
             
             Please include all the requested and relevant information when opening a bug report. Improper reports will be closed without any response.
 
@@ -25,4 +25,4 @@ jobs:
             
             Thank you for sending this pull request ❤️.
             
-            Please make sure you have followed our [contribution guidelines](https://github.com/MobSF/Mobile-Security-Framework-MobSF/blob/master/.github/CONTRIBUTING.md). We will review it as soon as possible
+            Please make sure you have followed our [contribution guidelines](https://github.com/MobInspect/mobinspect/blob/master/.github/CONTRIBUTING.md). We will review it as soon as possible

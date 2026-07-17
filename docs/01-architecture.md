@@ -11,13 +11,13 @@ MobInspect is a **monolithic Django application** with five sub-apps and a small
 └──────────────────────────┬───────────────────────────────────────┘
                            │ HTTPS
 ┌──────────────────────────▼───────────────────────────────────────┐
-│   Gunicorn / Waitress  →  Django (ROOT_URLCONF = MobSF.urls)     │
+│   Gunicorn / Waitress  →  Django (ROOT_URLCONF = MobInspect.urls)     │
 │   ┌──────────────────────────────────────────────────────────┐   │
 │   │  Middleware: CSRF · Session · Auth · Ratelimit · RBAC    │   │
 │   └──────────────────────────────────────────────────────────┘   │
 │                                                                  │
 │   ┌─────────────┐ ┌─────────────────┐ ┌────────────────────┐     │
-│   │   MobSF     │ │  StaticAnalyzer │ │  DynamicAnalyzer   │     │
+│   │   MobInspect     │ │  StaticAnalyzer │ │  DynamicAnalyzer   │     │
 │   │ (web + API) │ │  (apk/ipa/appx) │ │  (Frida + device)  │     │
 │   └─────────────┘ └─────────────────┘ └────────────────────┘     │
 │                ┌─────────────────────────────┐                   │
@@ -33,7 +33,7 @@ MobInspect is a **monolithic Django application** with five sub-apps and a small
               ┌────────────┴────────────┐
               │                         │
         ┌─────▼─────┐            ┌──────▼──────┐
-        │  SQLite/  │            │  $MOBSF_HOME│
+        │  SQLite/  │            │  $MOBINSPECT_HOME│
         │  Postgres │            │   (uploads, │
         │           │            │  downloads, │
         │           │            │ signatures) │
@@ -42,15 +42,15 @@ MobInspect is a **monolithic Django application** with five sub-apps and a small
 
 ## Django apps (current)
 
-Defined in `mobsf/MobSF/settings.py:182`:
+Defined in `mobinspect/MobInspect/settings.py:182`:
 
 | App | Path | Responsibility |
 |-----|------|----------------|
 | `django_q` | external | Async task queue for long scans |
-| `mobsf.MobSF` | `mobsf/MobSF/` | Web UI, REST API, auth, SAML, URL routing |
-| `mobsf.StaticAnalyzer` | `mobsf/StaticAnalyzer/` | APK/IPA/APPX decompilation and code analysis |
-| `mobsf.DynamicAnalyzer` | `mobsf/DynamicAnalyzer/` | Emulator/device control + Frida instrumentation |
-| `mobsf.MalwareAnalyzer` | `mobsf/MalwareAnalyzer/` | VirusTotal, tracker detection, domain reputation |
+| `mobinspect.MobInspect` | `mobinspect/MobInspect/` | Web UI, REST API, auth, SAML, URL routing |
+| `mobinspect.StaticAnalyzer` | `mobinspect/StaticAnalyzer/` | APK/IPA/APPX decompilation and code analysis |
+| `mobinspect.DynamicAnalyzer` | `mobinspect/DynamicAnalyzer/` | Emulator/device control + Frida instrumentation |
+| `mobinspect.MalwareAnalyzer` | `mobinspect/MalwareAnalyzer/` | VirusTotal, tracker detection, domain reputation |
 
 ## Django apps (target — adds for MobInspect)
 
@@ -59,12 +59,12 @@ Defined in `mobsf/MobSF/settings.py:182`:
 | `mobinspect.RBAC` *[NEW]* | `mobinspect/RBAC/` | Role / Permission / Assignment models, admin UI |
 | `mobinspect.Analytics` *[NEW]* | `mobinspect/Analytics/` | Aggregation queries + dashboard widgets |
 
-These are added before the rebrand; once Phase 3 lands, all `mobsf.*` paths become `mobinspect.*`.
+These are added before the rebrand; once Phase 3 lands, all `mobinspect.*` paths become `mobinspect.*`.
 
 ## Request lifecycle
 
 1. **Edge** — Gunicorn (Linux/macOS) or Waitress (Windows) accepts the request. WhiteNoise serves `/static/`.
-2. **Middleware chain** (`mobsf/MobSF/settings.py:195`):
+2. **Middleware chain** (`mobinspect/MobInspect/settings.py:195`):
    - `SecurityMiddleware` — security headers
    - `WhiteNoiseMiddleware` — static asset serving
    - `CommonMiddleware` — host validation
@@ -74,16 +74,16 @@ These are added before the rebrand; once Phase 3 lands, all `mobsf.*` paths beco
    - `XFrameOptionsMiddleware` — clickjacking
    - `RatelimitMiddleware` — rate limiting (`django-ratelimit`)
    - **`RBACMiddleware` *[NEW]*** — populate `request.role`, `request.permissions`
-3. **API path only** (`mobsf/MobSF/settings.py:206`):
+3. **API path only** (`mobinspect/MobInspect/settings.py:206`):
    - `RestApiAuthMiddleware` — API-key auth, sets `request.api = True` for downstream views
-4. **URL routing** — `mobsf/MobSF/urls.py` dispatches to one of:
+4. **URL routing** — `mobinspect/MobInspect/urls.py` dispatches to one of:
    - Auth views (`authentication.py`, `authorization.py`, `saml2.py`)
    - Web home / scan submission (`home.py`, `scanning.py`)
    - Static analyzer views (Android / iOS / Windows)
    - Dynamic analyzer views (Android / iOS Corellium / iOS device)
    - REST API views (`api/api_static_analysis.py`, `api/api_android_dynamic_analysis.py`, ...)
 5. **View** — enqueues a `django-q2` task for async scans by default (`MOBINSPECT_ASYNC_ANALYSIS`, default `1`) or runs synchronously if disabled.
-6. **Template** — server-rendered Django template under `mobsf/templates/`. After Phase 2, all templates use the new `base/app.html` layout.
+6. **Template** — server-rendered Django template under `mobinspect/templates/`. After Phase 2, all templates use the new `base/app.html` layout.
 7. **Response** — full HTML page or HTMX fragment for partial updates.
 
 ## Data flow — a static scan
@@ -92,7 +92,7 @@ These are added before the rebrand; once Phase 3 lands, all `mobsf.*` paths beco
 upload(.apk)
    │
    ▼
-[scanning.upload]  ──► save to MOBSF_HOME/uploads/<md5>/
+[scanning.upload]  ──► save to MOBINSPECT_HOME/uploads/<md5>/
    │
    ▼
 [StaticAnalyzer.android.static_analyzer.static_analyzer]
@@ -105,7 +105,7 @@ upload(.apk)
    └─► MalwareAnalyzer — VT, trackers, domains
    │
    ▼
-StaticAnalyzerAndroid model (mobsf/StaticAnalyzer/models.py)
+StaticAnalyzerAndroid model (mobinspect/StaticAnalyzer/models.py)
    │
    ▼
 Render report template / return JSON via API
@@ -114,10 +114,10 @@ Render report template / return JSON via API
 ## Filesystem layout — target state
 
 ```
-Mobile-Security-Framework-MobSF/      # repo root (not renamed; only Python pkg renames)
+mobinspect/      # repo root (not renamed; only Python pkg renames)
 ├── docs/                             # this directory
-├── mobinspect/                       # Python package (was mobsf/)
-│   ├── MobInspect/                   # core app (was MobSF/)
+├── mobinspect/                       # Python package (was mobinspect/)
+│   ├── MobInspect/                   # core app (was MobInspect/)
 │   │   ├── settings.py
 │   │   ├── urls.py
 │   │   ├── views/
@@ -146,15 +146,15 @@ Mobile-Security-Framework-MobSF/      # repo root (not renamed; only Python pkg 
 | Store | Engine | Purpose |
 |-------|--------|---------|
 | Relational DB | SQLite (default) or Postgres (`POSTGRES_*` envs) | Scan metadata, users, roles, permissions, suppressions, async tasks |
-| Filesystem | `$MOBSF_HOME/uploads/<md5>/` | Uploaded binaries and decompiled output |
-| Filesystem | `$MOBSF_HOME/downloads/` | Generated artifacts (PDFs, screenshots) |
-| Filesystem | `$MOBSF_HOME/signatures/` | Malware signatures, DBs |
+| Filesystem | `$MOBINSPECT_HOME/uploads/<md5>/` | Uploaded binaries and decompiled output |
+| Filesystem | `$MOBINSPECT_HOME/downloads/` | Generated artifacts (PDFs, screenshots) |
+| Filesystem | `$MOBINSPECT_HOME/signatures/` | Malware signatures, DBs |
 
-`$MOBSF_HOME` defaults to `~/.MobSF/` and becomes `~/.MobInspect/` after Phase 3.
+`$MOBINSPECT_HOME` defaults to `~/.MobInspect/` and becomes `~/.MobInspect/` after Phase 3.
 
 ## What we are intentionally not changing
 
 - **Analysis engine** — `StaticAnalyzer`, `DynamicAnalyzer`, `MalwareAnalyzer` internals stay byte-for-byte where possible
 - **Database schema for scan results** — additive only; we do not migrate existing scan tables
 - **API contract** — REST endpoints keep their paths, request/response shapes, and auth model
-- **CLI behaviour of the `mobsf` command** — until Phase 3 renames it to `mobinspect`
+- **CLI behaviour of the `mobinspect` command** — until Phase 3 renames it to `mobinspect`

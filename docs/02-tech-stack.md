@@ -57,8 +57,8 @@ See [ADR 0003](adr/0003-htmx-alpine-over-spa.md).
         ▲
         │ scans for class names in...
         │
-mobsf/templates/**/*.html
-mobsf/**/*.py
+mobinspect/templates/**/*.html
+mobinspect/**/*.py
 ```
 
 - **Dev**: `./scripts/tailwind-watch.sh` — runs the standalone CLI in watch mode, ~5 ms rebuilds
@@ -67,7 +67,7 @@ mobsf/**/*.py
 
 ## Vendored / third-party JS
 
-All shipped JS lives under `mobsf/static/mobinspect/vendor/` with a `LICENSES.md` next to it. Subresource integrity hashes are computed at build time. We **do not** load any JS from third-party CDNs at runtime — same supply-chain rationale as above.
+All shipped JS lives under `mobinspect/static/mobinspect/vendor/` with a `LICENSES.md` next to it. Subresource integrity hashes are computed at build time. We **do not** load any JS from third-party CDNs at runtime — same supply-chain rationale as above.
 
 | Library | Version | License | SHA256 |
 |---------|---------|---------|--------|

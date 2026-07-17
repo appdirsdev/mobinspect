@@ -71,13 +71,13 @@ classes-error.zip
 .tox
 .python-version
 
-#MobSF Files
-mobsf/debug.log
-mobsf/uploads/
-mobsf/db.sqlite3
-mobsf/secret
-mobsf/MobSF/windows_vm_priv_key.asc
-mobsf/setup_done.txt
+#MobInspect Files
+mobinspect/debug.log
+mobinspect/uploads/
+mobinspect/db.sqlite3
+mobinspect/secret
+mobinspect/MobInspect/windows_vm_priv_key.asc
+mobinspect/setup_done.txt
 TODO.md
 
 # Genymotion installer + runtime (retired — AVD is used instead)

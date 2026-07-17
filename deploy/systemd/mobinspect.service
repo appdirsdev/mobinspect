@@ -35,7 +35,7 @@ ExecStart=/home/ubuntu/.local/bin/poetry run gunicorn \
   --max-requests 200 --max-requests-jitter 50 \
   --timeout 180 --graceful-timeout 30 \
   --access-logfile - --error-logfile - --capture-output --log-level info \
-  mobsf.MobSF.wsgi:application
+  mobinspect.MobInspect.wsgi:application
 Restart=on-failure
 RestartSec=5
 # Long stop window so in-flight scans (esp. synchronous fallback paths) finish

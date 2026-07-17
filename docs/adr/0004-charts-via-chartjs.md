@@ -34,7 +34,7 @@ D3 is overkill — we want charts, not bespoke dataviz primitives.
 
 ## Theming integration
 
-A single wrapper at `mobsf/static/mobinspect/js/chart-theme.js` reads CSS variables from the active theme:
+A single wrapper at `mobinspect/static/mobinspect/js/chart-theme.js` reads CSS variables from the active theme:
 
 ```js
 const styles = getComputedStyle(document.documentElement);

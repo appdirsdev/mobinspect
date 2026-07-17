@@ -6,11 +6,11 @@ name: Branch tests (pytest)
 # ENABLED so the RBAC enforcement is actually exercised.
 #
 # Intentionally excluded (need an Android emulator / Frida / real toolchain /
-# network, unsuitable for a lean runner): mobsf/DynamicAnalyzer, the dynamic &
+# network, unsuitable for a lean runner): mobinspect/DynamicAnalyzer, the dynamic &
 # device API tests, the real jadx/apktool/baksmali/apksigner conversions, the
 # full StaticAnalyzer integration scans, and the network-dependent probes
 # (Play Store, Firebase, malware-domain, downloaders). The upstream
-# mobsf-test.yml covers full integration with the toolchain.
+# mobinspect-test.yml covers full integration with the toolchain.
 
 on:
   push:
@@ -37,8 +37,8 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: mobsf
-          POSTGRES_PASSWORD: mobsf
+          POSTGRES_USER: mobinspect
+          POSTGRES_PASSWORD: mobinspect
           POSTGRES_DB: mobinspect
         ports:
           - 5432:5432
@@ -50,10 +50,10 @@ jobs:
 
     env:
       # settings.py requires these — PostgreSQL is mandatory, no SQLite
-      # fallback. Leaving MOBSF_DISABLE_AUTHENTICATION unset keeps RBAC
+      # fallback. Leaving MOBINSPECT_DISABLE_AUTHENTICATION unset keeps RBAC
       # enforcement active.
-      POSTGRES_USER: mobsf
-      POSTGRES_PASSWORD: mobsf
+      POSTGRES_USER: mobinspect
+      POSTGRES_PASSWORD: mobinspect
       POSTGRES_HOST: 127.0.0.1
       POSTGRES_PORT: 5432
       POSTGRES_DB: mobinspect
