@@ -322,19 +322,12 @@ def get_secret_from_file_or_env(env_secret_key):
 
 def api_key(home_dir):
     """Print REST API Key."""
-    # Form Docker Secrets — prefer new env name, fall back to legacy.
+    # Read the API key from a docker secret file if configured.
     new_key_file = env('MOBINSPECT_API_KEY_FILE')
     if new_key_file:
         logger.info('\nAPI Key read from docker secrets')
         try:
-            # The shim returns the value of the *file path* env var; pass that
-            # through to the docker-secret reader (which expects an env var name).
-            secret_var = (
-                'MOBINSPECT_API_KEY_FILE'
-                if os.environ.get('MOBINSPECT_API_KEY_FILE')
-                else 'MOBINSPECT_API_KEY_FILE'
-            )
-            return get_docker_secret_by_file(secret_var)
+            return get_docker_secret_by_file('MOBINSPECT_API_KEY_FILE')
         except Exception:
             logger.exception('Cannot read API Key from docker secrets')
     # From Environment Variable

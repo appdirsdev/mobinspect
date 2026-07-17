@@ -37,13 +37,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent  # .../MobInspect/mobinspect
 
 # Env var names touched by the module; snapshot/restore around each test.
 _ENV_KEYS = [
-    'MOBINSPECT_SECRET_KEY', 'MOBINSPECT_SECRET_KEY',
-    'MOBINSPECT_API_KEY', 'MOBINSPECT_API_KEY',
-    'MOBINSPECT_API_KEY_FILE', 'MOBINSPECT_API_KEY_FILE',
-    'MOBINSPECT_HOME_DIR', 'MOBINSPECT_HOME_DIR',
+    'MOBINSPECT_SECRET_KEY',
+    'MOBINSPECT_API_KEY',
+    'MOBINSPECT_API_KEY_FILE',
+    'MOBINSPECT_HOME_DIR',
     'MOBINSPECT_ADMIN_USERNAME', 'MOBINSPECT_ADMIN_PASSWORD',
     'MI_ENV_TEST_NEW', 'MI_ENV_TEST_OLD',
-    'MOBINSPECT_ADB_BINARY', 'MOBINSPECT_ADB_BINARY',
+    'MOBINSPECT_ADB_BINARY',
 ]
 
 
@@ -161,11 +161,6 @@ def test_get_secret_from_file_or_env_file_variant(tmp_path):
 def test_api_key_from_env_variable(tmp_path):
     os.environ['MOBINSPECT_API_KEY'] = 'envapikey'
     assert api_key(tmp_path.as_posix()) == 'envapikey'
-
-
-def test_api_key_from_legacy_env_variable(tmp_path):
-    os.environ['MOBINSPECT_API_KEY'] = 'legacyapikey'
-    assert api_key(tmp_path.as_posix()) == 'legacyapikey'
 
 
 def test_api_key_from_docker_secret_file(tmp_path):

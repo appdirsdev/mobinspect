@@ -34,7 +34,7 @@ def _decorate_api_headers(resp):
     resp['Access-Control-Allow-Origin'] = '*'
     resp['Access-Control-Allow-Methods'] = 'POST'
     resp['Access-Control-Allow-Headers'] = (
-        'Authorization, X-MobInspect-Api-Key, X-MobInspect-Api-Key')
+        'Authorization, X-MobInspect-Api-Key')
     resp['Content-Type'] = 'application/json; charset=utf-8'
     return resp
 
@@ -59,13 +59,12 @@ def make_api_response(data, status=OK):
 
 
 def _extract_key(meta):
-    """Pull the candidate API key string from request headers.
+    """Pull the candidate API key from the request headers.
 
-    ``X-MobInspect-Api-Key`` is the current header; ``X-MobInspect-Api-Key`` stays
-    accepted so existing/legacy API clients keep working.
+    The key is presented via ``X-MobInspect-Api-Key`` or the standard
+    ``Authorization`` header.
     """
     return (meta.get('HTTP_X_MOBINSPECT_API_KEY')
-            or meta.get('HTTP_X_MOBINSPECT_API_KEY')
             or meta.get('HTTP_AUTHORIZATION') or '')
 
 
@@ -82,12 +81,10 @@ def api_auth(request):
 
     Resolution order:
       1. Per-user MobInspect ApiKey (preferred) — sets request.api_user + request.api_key
-      2. Global API key from MOBINSPECT_API_KEY (or legacy MOBINSPECT_API_KEY) —
+      2. Global API key from MOBINSPECT_API_KEY —
          sets request.api = True (no user attribution).
 
-    The HTTP header name X-MobInspect-Api-Key is intentionally NOT renamed
-    (would break existing API clients); the body of the rebrand is in
-    the env-var names and per-user key system.
+    The key is presented via the X-MobInspect-Api-Key or Authorization header.
 
     Returns True if either succeeds; False otherwise.
     """

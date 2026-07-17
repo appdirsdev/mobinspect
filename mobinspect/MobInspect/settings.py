@@ -655,7 +655,7 @@ else:
     JAVA_DIRECTORY = 'C:/Program Files/Java/jdk1.7.0_17/bin/'
     JAVA_DIRECTORY = '/usr/bin/'
     JADX_BINARY = 'C:/Users/user/AppData/Local/Programs/jadx/bin/jadx.bat'
-    JADX_BINARY = '/Users/ajin/jadx/bin/jadx'
+    JADX_BINARY = '/Users/you/jadx/bin/jadx'
     """
     # ==========================================================
     # -------------------------
