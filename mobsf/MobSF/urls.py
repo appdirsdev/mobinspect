@@ -524,5 +524,11 @@ if settings.API_ONLY == '0':
             'AI report route not registered; continuing without it')
 
 utils.print_version()
-init_exec_hooks()
-store_exec_hashes_at_first_run()
+# Runtime executable-tampering detection is opt-in (off by default). It
+# false-positives on redeployed / cloned appliances — the worker environment
+# differs from the startup hash snapshot — and then raises
+# "Executable/Library Tampering Detected" on routine tool calls like
+# wkhtmltopdf (PDF export). Enable with MOBINSPECT_EXEC_TAMPER_DETECTION=1.
+if settings.EXEC_TAMPER_DETECTION:
+    init_exec_hooks()
+    store_exec_hashes_at_first_run()

@@ -202,6 +202,15 @@ else:
 # protection are safe to apply unconditionally in production (DEBUG=False).
 _behind_tls = os.getenv('MOBINSPECT_BEHIND_TLS', '0') == '1'
 _behind_proxy = os.getenv('MOBINSPECT_BEHIND_PROXY', '0') == '1'
+# Runtime executable-tampering detection monkeypatches subprocess to verify
+# bundled tool binaries (wkhtmltopdf, JADX, apktool, …) against a hash snapshot
+# taken at startup. OFF by default: on a redeployed / cloned OVA appliance the
+# gunicorn worker's runtime PATH/environment differs from the startup snapshot,
+# so the recomputed signature no longer matches and it raises
+# "Executable/Library Tampering Detected" on routine tool calls — breaking PDF
+# export (wkhtmltopdf) and scans (JADX). Set MOBINSPECT_EXEC_TAMPER_DETECTION=1
+# to re-enable it where the runtime environment is fixed and controlled.
+EXEC_TAMPER_DETECTION = os.getenv('MOBINSPECT_EXEC_TAMPER_DETECTION', '0') == '1'
 # CSRF_TRUSTED_ORIGINS: Django 4+ rejects an unsafe (POST) request — including
 # the login form — when the Origin header isn't a trusted origin. Logging in
 # from a LAN IP (e.g. http://192.168.2.118:8001) fails with "CSRF verification

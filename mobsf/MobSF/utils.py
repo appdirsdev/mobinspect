@@ -163,16 +163,21 @@ def check_update():
         local_version = settings.VERSION
         response = requests.head(github_url, timeout=5,
                                  proxies=proxies, verify=verify)
-        remote_version = response.next.path_url.split('v')[1]
-        if remote_version:
-            sem_loc = Version(local_version)
-            sem_rem = Version(remote_version)
-            if sem_loc < sem_rem:
-                logger.warning('A new version of MobInspect is available, '
-                               'Please update to %s from master branch.',
-                               remote_version)
-            else:
-                logger.info('No updates available.')
+        # /releases/latest redirects to /releases/tag/<tag> only when the repo
+        # has a published release; otherwise (no releases) it redirects to the
+        # releases index and there's simply nothing to compare against.
+        nxt = getattr(response, 'next', None)
+        path = nxt.path_url if nxt else ''
+        if '/tag/' not in path:
+            logger.info('No published release to compare against; '
+                        'skipping update check.')
+            return
+        remote_version = path.rsplit('/', 1)[-1].lstrip('vV')
+        if Version(local_version) < Version(remote_version):
+            logger.warning('A new version of MobInspect is available, '
+                           'Please update to %s.', remote_version)
+        else:
+            logger.info('No updates available.')
     except requests.exceptions.HTTPError:
         logger.warning('\nCannot check for updates..'
                        ' No Internet Connection Found.')
