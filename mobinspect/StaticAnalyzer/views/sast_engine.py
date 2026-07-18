@@ -90,7 +90,10 @@ class SastEngine:
                 if file_path not in tmp_dict:
                     tmp_dict[file_path] = str(match_lines)
                 elif tmp_dict[file_path].endswith(','):
-                    tmp_dict[file_path] += str(match_lines)
+                    # unreachable: match_lines is either an int-as-str or a
+                    # ','.join(...) of ints, neither of which can ever end
+                    # in ',', so tmp_dict[file_path] can never end in ','
+                    tmp_dict[file_path] += str(match_lines)  # pragma: no cover - see comment above: condition can never be true
                 else:
                     tmp_dict[file_path] += ',' + str(match_lines)
             details['files'] = tmp_dict

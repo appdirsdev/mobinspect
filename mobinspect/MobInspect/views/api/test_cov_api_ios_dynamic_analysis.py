@@ -52,6 +52,32 @@ def api_key(db, superuser):
 
 
 @pytest.fixture
+def viewer(db, django_user_model):
+    """Real, non-privileged Django user: not staff, not superuser, and
+    holds no Django `auth.Permission` rows at all.
+
+    Every corellium_instance.py / dynamic_analyzer.py / tests_frida.py
+    view backing this module's wrapper is gated by
+    ``@permission_required(Permissions.SCAN)``, which resolves the
+    principal from ``request.api_user`` and checks
+    ``principal.has_perm('StaticAnalyzer.can_scan')`` (Django's built-in
+    permission system) UNLESS the principal is staff/superuser. A plain
+    user with none of that is denied for real -- no mocking involved.
+    """
+    return django_user_model.objects.create_user(
+        username='ios_dyn_viewer',
+        password='viewer-pw-not-used',
+    )
+
+
+@pytest.fixture
+def viewer_key(db, viewer):
+    """Real per-user RBAC ApiKey bound to the viewer (plaintext)."""
+    _inst, plaintext = ApiKey.generate(user=viewer, name='ios-dyn-viewer-test')
+    return plaintext
+
+
+@pytest.fixture
 def rf():
     return RequestFactory()
 
@@ -187,6 +213,93 @@ def test_common_check_missing_corellium_key_returns_500(
     assert 'Corellium API key' in body.get('message', '')
 
 
+# --------------------------------------- 403 via real RBAC permission denial
+#
+# Every view below is wrapped with
+# ``@login_required @permission_required(Permissions.SCAN)`` in
+# corellium_instance.py / dynamic_analyzer.py / tests_frida.py. That
+# decorator resolves the principal from ``request.api_user`` and, unless
+# staff/superuser, checks a real Django `auth.Permission`
+# (`StaticAnalyzer.can_scan`) via ``principal.has_perm(...)``. A plain
+# user with neither staff/superuser status nor that permission is denied
+# BEFORE the view body runs -- so this exercises the RBAC-403 branch
+# without ever touching common_check()/network/device code (the decorator
+# returns its own ``JsonResponse({'status': 'denied', ...}, status=403)``
+# and never calls the wrapped view at all).
+#
+# The wrapper functions in api_ios_dynamic_analysis.py do not have an
+# explicit `_passthrough`-style isinstance(HttpResponse) check the way the
+# Android wrapper does. They rely on the *same* protection existing one
+# layer down, inside `make_api_response()` (which passes an already-built
+# HttpResponse straight through untouched), plus the fact that
+# ``JsonResponse.get(...)``/``in`` test HTTP *headers*, not the JSON body
+# -- so `resp.get('status') == FAILED` is always False for a denial
+# response, and every wrapper falls through to its final
+# ``return make_api_response(resp, 200)`` line, which detects the
+# HttpResponse and forwards the real 403 unmodified. This is exactly the
+# branch that was previously unreachable (every existing test in this file
+# uses the superuser, which always passes `permission_required` because
+# ``is_staff`` short-circuits the check).
+RBAC_DENIED_CASES = [
+    (mod.api_ios_dynamic_analyzer,
+     {'instance_id': VALID_INSTANCE, 'bundle_id': VALID_BUNDLE}),
+    (mod.api_corellium_get_supported_models, {}),
+    (mod.api_corellium_get_supported_ios_versions, {'model': 'iphone11'}),
+    (mod.api_corellium_create_ios_instance,
+     {'name': 'x', 'project_id': VALID_INSTANCE,
+      'flavor': 'iphone11', 'version': '15.0'}),
+    (mod.api_corellium_start_instance, {'instance_id': VALID_INSTANCE}),
+    (mod.api_corellium_stop_instance, {'instance_id': VALID_INSTANCE}),
+    (mod.api_corellium_unpause_instance, {'instance_id': VALID_INSTANCE}),
+    (mod.api_corellium_reboot_instance, {'instance_id': VALID_INSTANCE}),
+    (mod.api_corellium_destroy_instance, {'instance_id': VALID_INSTANCE}),
+    (mod.api_corellium_instance_list_apps, {'instance_id': VALID_INSTANCE}),
+    (mod.api_setup_environment,
+     {'instance_id': VALID_INSTANCE, 'hash': 'a' * 32}),
+    (mod.api_run_app,
+     {'instance_id': VALID_INSTANCE, 'bundle_id': VALID_BUNDLE}),
+    (mod.api_stop_app,
+     {'instance_id': VALID_INSTANCE, 'bundle_id': VALID_BUNDLE}),
+    (mod.api_remove_app,
+     {'instance_id': VALID_INSTANCE, 'bundle_id': VALID_BUNDLE}),
+    (mod.api_take_screenshot, {'instance_id': VALID_INSTANCE}),
+    (mod.api_network_capture,
+     {'instance_id': VALID_INSTANCE, 'state': 'on'}),
+    (mod.api_live_pcap_download, {'instance_id': VALID_INSTANCE}),
+    (mod.api_download_app_data,
+     {'instance_id': VALID_INSTANCE, 'bundle_id': VALID_BUNDLE}),
+    (mod.api_instance_input, {'instance_id': VALID_INSTANCE}),
+    (mod.api_system_logs, {'instance_id': VALID_INSTANCE}),
+    (mod.api_device_file_upload, {'instance_id': VALID_INSTANCE}),
+    (mod.api_device_file_download,
+     {'instance_id': VALID_INSTANCE, 'file': '/tmp/x'}),
+    (mod.api_ios_instrument,
+     {'instance_id': VALID_INSTANCE,
+      'bundle_id': VALID_BUNDLE,
+      'hash': 'a' * 32,
+      'default_hooks': 'true',
+      'dump_hooks': 'true',
+      'auxiliary_hooks': 'false',
+      'frida_code': ''}),
+]
+# NOTE (verified by reading source, not guessed): `api_ios_view_report` is
+# intentionally ABSENT from `RBAC_DENIED_CASES` above.
+# `DynamicAnalyzer.views.ios.report.ios_view_report` is decorated with
+# `@login_required` ONLY (no `@permission_required` gate), so a viewer is
+# never denied there -- it is a real, reachable non-403 response for any
+# authenticated API caller, not a 403.
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize('view, data', RBAC_DENIED_CASES)
+def test_scan_guarded_views_deny_viewer_403(
+        rf, viewer, viewer_key, view, data):
+    request = _authed_post(rf, viewer, viewer_key, data)
+    resp = view(request)
+    assert resp.status_code == 403, (
+        f'{view.__name__} -> {resp.status_code}: {resp.content!r}')
+
+
 # ------------------------------------------- 500 via local validation failures
 @pytest.mark.django_db
 def test_dynamic_analyzer_invalid_bundle_id_returns_500(
@@ -304,6 +417,42 @@ def test_view_report_invalid_bundle_returns_500(rf, superuser, api_key):
     resp = mod.api_ios_view_report(request)
     assert resp.status_code == 500
     assert 'Invalid iOS Bundle id' in _body(resp)['error']
+
+
+@pytest.mark.django_db
+def test_view_report_ok_200(rf, superuser, api_key):
+    """Reachable success branch, no device/Corellium required.
+
+    ``ios_view_report`` only needs ``strict_package_check(bundle_id)`` to
+    pass and *either* a real ``mobinspect_frida_out.txt`` marker file or a
+    ``DYNAMIC_DeviceData`` directory to exist under the app's upload dir to
+    skip the "report not available" early-return. Every downstream helper
+    (``ios_api_analysis``, ``run_analysis``, ``Trackers``,
+    ``get_screenshots``) degrades to empty results when its own supporting
+    files are absent, so the whole real call chain completes -- pure
+    filesystem, no Corellium/device involved. A collision-resistant
+    bundle id is used because ``UPLD_DIR`` is a real, shared-on-this-host
+    directory (not per-worktree) that other agents' coverage suites may
+    also be writing to concurrently.
+    """
+    from pathlib import Path
+    from mobinspect.MobInspect.utils import get_md5
+
+    bundle_id = 'com.agentb.dynapi.iosviewreport.cf35a1'
+    checksum = get_md5(bundle_id.encode('utf-8'))
+    app_dir = Path(settings.UPLD_DIR) / checksum
+    app_dir.mkdir(parents=True, exist_ok=True)
+    frida_log = app_dir / 'mobinspect_frida_out.txt'
+    frida_log.write_text('', encoding='utf-8')
+    try:
+        request = _authed_post(
+            rf, superuser, api_key,
+            {'instance_id': VALID_INSTANCE, 'bundle_id': bundle_id})
+        resp = mod.api_ios_view_report(request)
+        assert resp.status_code == 200
+        assert 'error' not in _body(resp)
+    finally:
+        frida_log.unlink()
 
 
 # --------------------------------------------------------- entrypoint (no key)

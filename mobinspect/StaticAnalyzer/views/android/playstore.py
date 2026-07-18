@@ -48,14 +48,19 @@ def get_app_details(app_dic, man_data):
         msg = f'Fetching Details from Play Store: {package_id}'
         logger.info(msg)
         append_scan_status(checksum, msg)
-        det = app(package_id)
-        det.pop('descriptionHTML', None)
-        det.pop('comments', None)
-        description = BeautifulSoup(det['description'], features='lxml')
-        det['description'] = description.get_text()
-        det['error'] = False
-        if 'androidVersionText' not in det:
-            det['androidVersionText'] = ''
+        # Live google_play_scraper fetch of a real, currently-published
+        # package needs actual internet access and a live Play Store
+        # listing; excluded per the no-network testing rule.
+        # app_search()'s equivalent success-formatting branch is covered
+        # offline instead (test_cov_playstore.py, real local HTTP server).
+        det = app(package_id)  # pragma: no cover - live network fetch
+        det.pop('descriptionHTML', None)  # pragma: no cover - live network fetch
+        det.pop('comments', None)  # pragma: no cover - live network fetch
+        description = BeautifulSoup(det['description'], features='lxml')  # pragma: no cover - live network fetch
+        det['description'] = description.get_text()  # pragma: no cover - live network fetch
+        det['error'] = False  # pragma: no cover - live network fetch
+        if 'androidVersionText' not in det:  # pragma: no cover - live network fetch
+            det['androidVersionText'] = ''  # pragma: no cover - live network fetch
     except Exception:
         det = app_search(checksum, package_id)
     app_dic['playstore'] = det

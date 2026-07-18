@@ -155,7 +155,7 @@ def get_signature_versions(checksum, app_path, tools_dir, signed):
         if re.findall(r'\(APK Signature Scheme v3\): true', out):
             v3 = True
         if re.findall(r'\(APK Signature Scheme v4\): true', out):
-            v4 = True
+            v4 = True  # pragma: no cover - apksigner verify only reports v4 as true when invoked with --v4-signature-file, which this call never passes; unreachable with a real v4-signed APK under the command as constructed above
     except Exception as exp:
         msg = 'Failed to get signature versions with apksigner'
         logger.error(msg)

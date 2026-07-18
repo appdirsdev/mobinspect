@@ -14,6 +14,33 @@ id BEFORE any hardware I/O, returning an error string. That drives every
 device. The 422 (missing-parameter) branches need no auth because the
 validation lives in the wrapper itself, before the permission-guarded
 inner function is ever called.
+
+One exception: `view_report_device()` (behind `api_device_report_json`)
+never calls `validate_and_connect_device()` at all -- it only checks the
+device id's regex FORMAT and then reads purely local files under
+UPLD_DIR. `test_report_json_success_with_real_local_data` exploits this
+to reach the one genuine 200/success branch in this module that needs no
+live device: create a real (empty) `mobinspect_frida_out.txt` so the
+"has dynamic analysis run" gate passes, then let the real (mostly-empty)
+report-assembly code run to completion.
+
+SUSPECTED BUGS (not fixed, only documented + pragma'd in the production
+file with a one-line reason each):
+  * `api_device_dynamic_analyzer`'s `resp.get('status') == FAILED` check
+    is dead code: the underlying `dynamic_analyzer_device()` never sets
+    a 'status' key on any path (failure returns {'error': ...} via
+    print_n_send_error_response; success returns a plain context dict
+    with no 'status' key either). The practical effect is that a REAL
+    analyzer error (e.g. an invalid bundle id) is reported as HTTP 200
+    with an 'error' key buried in the body, not HTTP 500 -- see the
+    already-existing `test_dynamic_analyzer_invalid_bundle_returns_200_error`
+    below, which pins this exact (probably unintended) behavior.
+  * `api_device_file_download`'s final `return make_api_response(resp, 200)`
+    is dead code: `download_file_device()` either returns a real file
+    HttpResponse (caught by the Content-Disposition check above it) or a
+    dict whose 'status' is initialized to 'failed' and never changed to
+    anything else on any non-file code path, so the FAILED check above
+    it always fires first when resp is a dict.
 """
 import json
 import os
@@ -35,6 +62,10 @@ VALID_BUNDLE = 'com.example.testapp'
 # A device id that fails IOS_DEVICE_ID_REGEX and SSH_DEVICE_ID_REGEX,
 # so validate_and_connect_device returns an error without touching HW.
 BAD_DEVICE = 'not-a-real-device!!'
+# A device id that PASSES IOS_DEVICE_ID_REGEX (r'^[a-fA-F0-9-]{20,40}$')
+# purely on format -- used only for view_report_device(), which validates
+# the device id's format but never actually connects to it.
+VALID_FORMAT_DEVICE = 'a' * 24
 
 
 @pytest.fixture
@@ -367,3 +398,38 @@ def test_report_json_bad_device_500(rf, superuser):
     # -> wrapper returns 500.
     assert resp.status_code == 500
     assert 'error' in _body(resp)
+
+
+def test_report_json_success_with_real_local_data(rf, superuser):
+    # KEY INSIGHT: unlike every other endpoint in this module,
+    # view_report_device() never calls validate_and_connect_device() --
+    # it only checks the device_id's REGEX FORMAT (no live SSH/USB
+    # connection at all) and then reads real, purely local files under
+    # UPLD_DIR. A real (empty) mobinspect_frida_out.txt is enough to pass
+    # the "has dynamic analysis been run" gate and fall through to a real
+    # (mostly-empty) success context with no 'error' key -> 200. This is
+    # the ONE report/success branch in this module reachable without a
+    # live jailbroken device.
+    checksum = get_md5(VALID_BUNDLE.encode('utf-8'))
+    app_dir = Path(settings.UPLD_DIR) / checksum
+    app_dir.mkdir(parents=True, exist_ok=True)
+    frida_log = app_dir / 'mobinspect_frida_out.txt'
+    frida_log.write_text('', encoding='utf-8')
+    try:
+        req = _authed(
+            rf.post('/', {
+                'device_id': VALID_FORMAT_DEVICE,
+                'bundle_id': VALID_BUNDLE}),
+            superuser)
+        resp = mod.api_device_report_json(req)
+        assert resp.status_code == 200
+        body = _body(resp)
+        assert 'error' not in body
+        assert body['bundleid'] == VALID_BUNDLE
+        assert body['hash'] == checksum
+    finally:
+        frida_log.unlink(missing_ok=True)
+        try:
+            app_dir.rmdir()
+        except OSError:
+            pass

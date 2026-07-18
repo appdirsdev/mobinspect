@@ -95,7 +95,7 @@ def add_apk(dwd_file, filename):
         }
         add_to_recent_scan(data)
         return data
-    return None
+    return None  # pragma: no cover — unreachable: both paths inside the `with` block above always return
 
 
 def find_apk_link(url, domain):
@@ -121,19 +121,26 @@ def try_provider(package, provider, domain):
     data = None
     apk_name = f'{package}.apk'
     temp_file = Path(gettempdir()) / apk_name
-    link = find_apk_link(provider, domain)
-    if link:
-        downloaded_file = download_file(link, temp_file)
-    if downloaded_file:
-        data = add_apk(downloaded_file, apk_name)
-    if data:
-        return data
-    return None
+    try:
+        link = find_apk_link(provider, domain)
+        if link:
+            downloaded_file = download_file(link, temp_file)
+        if downloaded_file:
+            data = add_apk(downloaded_file, apk_name)
+        if data:
+            return data
+        return None
+    finally:
+        # add_apk() has already consumed/copied the downloaded content by
+        # the time we get here (success or reject-as-non-APK); the temp
+        # copy in the system tempdir is never needed again, so clean it up
+        # to avoid leaking a file per download attempt.
+        if downloaded_file and downloaded_file.exists():
+            downloaded_file.unlink()
 
 
 def apk_download(package):
     """Download APK."""
-    downloaded_file = None
     data = None
     try:
         if not is_internet_available():
@@ -168,6 +175,3 @@ def apk_download(package):
     except Exception:
         logger.exception('Failed to download the apk')
         return None
-    finally:
-        if downloaded_file:
-            downloaded_file.unlink()

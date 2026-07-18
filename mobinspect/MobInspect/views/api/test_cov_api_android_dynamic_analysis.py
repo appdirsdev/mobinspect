@@ -24,7 +24,9 @@ noted as a ceiling gap and intentionally NOT faked.
 """
 import json
 import os
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.test import Client, RequestFactory, TestCase, override_settings
@@ -36,6 +38,7 @@ from mobinspect.RBAC.models import (
     Role,
     RoleAssignment,
 )
+from mobinspect.StaticAnalyzer.models import StaticAnalyzerAndroid
 
 
 # A syntactically valid but unreachable device identifier. Setting this
@@ -418,7 +421,26 @@ class AndroidDynamicApiTests(TestCase):
                 'hash': 'x', 'default_hooks': '',
                 'auxiliary_hooks': '', 'frida_code': ''}),
             ('/api/v1/frida/get_dependencies', {'hash': 'x'}),
+            # report.view_report is gated by a DIFFERENT real RBAC
+            # permission (`scan.view`, checked via RBAC.decorators
+            # .require_permission) than the Permissions.SCAN Django-perm
+            # used by every other row above. The viewer role here only
+            # holds `api.use`, so it lacks `scan.view` too -> real 403.
+            ('/api/v1/dynamic/report_json', {'hash': 'x'}),
         ]
+        # NOTE (verified by reading source, not guessed): the frida
+        # endpoints list_scripts/get_script/logs and the api_monitor
+        # endpoint are intentionally ABSENT from `cases` above.
+        # `DynamicAnalyzer.views.common.frida.views.list_frida_scripts`,
+        # `.get_script_content`, `.frida_logs`, and
+        # `DynamicAnalyzer.views.android.tests_frida.live_api` are each
+        # decorated with `@login_required` ONLY (no
+        # `@permission_required(Permissions.SCAN)` / `@require_permission`
+        # gate). `login_required` short-circuits to a direct call whenever
+        # `api=True`, so a viewer holding only `api.use` is never denied by
+        # these views -- they are real, reachable 200s for any
+        # authenticated API caller, not 403s. Asserting 403 for them would
+        # be testing behavior the code does not have.
         for path, data in cases:
             with self.subTest(path=path):
                 resp = self._viewer_post(path, data)
@@ -442,3 +464,211 @@ class AndroidDynamicApiTests(TestCase):
         request.is_api = True
         resp = api_dz.api_screenshot(request)
         self.assertEqual(resp.status_code, 403)
+
+    # ---- api_logcat: real 'invalid package' dict-error branch ---------
+
+    def test_logcat_invalid_package_name_dict_error_500(self):
+        """api=True path: POST['package'] fails strict_package_check.
+
+        ``dynamic_analyzer.logcat`` reads ``request.GET.get('package')``
+        first (empty for a plain POST), falls through to
+        ``request.POST['package']``, and since ``'bad package name'``
+        contains spaces it fails ``strict_package_check`` ->
+        ``print_n_send_error_response(request, 'Invalid package name',
+        True)`` returns a plain ``{'error': ...}`` dict (no device touched).
+        This exercises the wrapper's ``isinstance(lcat, dict)`` /
+        ``'error' in lcat`` branch that a device-touching success path
+        can never reach in this environment.
+        """
+        resp = self._post(
+            '/api/v1/android/logcat', {'package': 'bad package name'})
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(self._json(resp).get('error'), 'Invalid package name')
+
+    # ---- api_adb_execute: real non-device 'ok' branch ------------------
+
+    def test_adb_execute_devices_subcommand_ok_200(self):
+        """'devices' is on the adb allowlist and needs no target device.
+
+        ``execute_adb`` always sets ``data = {'status': 'ok', ...}`` after
+        the subprocess call completes, regardless of the adb command's own
+        exit status/output -- it never inspects the return code. Running
+        the real (locally installed) adb binary with the 'devices'
+        subcommand is fast, deterministic, and touches no device/network;
+        it is the only way to reach this real 'ok' branch without faking
+        a device.
+        """
+        resp = self._post('/api/v1/android/adb_command', {'cmd': 'devices'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._json(resp).get('status'), 'ok')
+
+    # ---- api_root_ca: real non-device 'ok' branch ----------------------
+
+    def test_root_ca_install_action_ok_200(self):
+        """install_mobinspect_ca() never raises and never checks device
+        reachability -- ``Environment.adb_command`` swallows any
+        subprocess failure internally and returns None. `mobinspect_ca`
+        unconditionally sets ``{'status': 'ok', 'message': 'installed'}``
+        after calling it, so this is a real, deterministic, non-device
+        success branch.
+        """
+        resp = self._post('/api/v1/android/root_ca', {'action': 'install'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._json(resp).get('status'), 'ok')
+
+    # ---- api_act_tester / api_start_activity: real 'ok' branch ---------
+    #
+    # activity_tester()/start_activity() call Environment.launch_n_capture,
+    # which only performs Environment.adb_command calls (each swallows its
+    # own subprocess failure and returns None -- never raises) followed by
+    # Environment.screen_shot(), which itself bails out early via
+    # is_device_connected() returning False without further adb calls. So
+    # with a *real* StaticAnalyzerAndroid row (no device needed), the
+    # whole call chain completes without exception -> 'ok'.
+
+    @override_settings(ACTIVITY_TESTER_SLEEP=0)
+    def test_act_tester_ok_200(self):
+        StaticAnalyzerAndroid.objects.create(
+            MD5='6d94299ea98f417af40b53054b86d4de',
+            PACKAGE_NAME='com.example.testapp',
+            EXPORTED_ACTIVITIES="['com.example.testapp.MainActivity']",
+            ACTIVITIES="['com.example.testapp.MainActivity']",
+        )
+        resp = self._post(
+            '/api/v1/android/activity',
+            {'test': 'exported', 'hash': '6d94299ea98f417af40b53054b86d4de'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._json(resp).get('status'), 'ok')
+
+    @override_settings(ACTIVITY_TESTER_SLEEP=0)
+    def test_start_activity_ok_200(self):
+        StaticAnalyzerAndroid.objects.create(
+            MD5='a4c84d0abe307ee0df1484189aa7d50c',
+            PACKAGE_NAME='com.example.testapp',
+        )
+        resp = self._post(
+            '/api/v1/android/start_activity',
+            {'activity': 'MainActivity', 'hash': 'a4c84d0abe307ee0df1484189aa7d50c'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._json(resp).get('status'), 'ok')
+
+    # ---- api_stop_analysis 'ok' branch: CEILING GAP, not a test --------
+    #
+    # download_data() alone (called second, after collect_logs) would
+    # unconditionally end 'ok' via safe Environment.adb_command() calls.
+    # But collect_logs() runs FIRST and calls
+    # ``env.adb_command(['logcat', '-d', package + ':V', '*:*'])`` --
+    # empirically (verified live against this host's real adb binary and
+    # a fake ANALYZER_IDENTIFIER), ``adb -s <fake> logcat -d ...`` BLOCKS
+    # indefinitely instead of failing fast (unlike ``adb -s <fake>
+    # devices``, which returns immediately). ``Environment.adb_command``
+    # sets no subprocess timeout, so this hangs the whole request. There
+    # is no safe way to reach api_stop_analysis's 200 branch without a
+    # real device on this host; forcing it here would make the suite
+    # flaky/hanging. Left uncovered -- see suspected-bug notes.
+
+    # ---- api_get_script_content: real path-traversal 'failed' branch --
+
+    def test_get_script_content_path_traversal_500(self):
+        """A `scripts[]` entry escaping the frida_scripts/others directory
+        is rejected by the real ``is_safe_path`` check inside
+        ``get_script_content`` -- pure filesystem logic, no device.
+        """
+        resp = self._post(
+            '/api/v1/frida/get_script',
+            {'scripts[]': ['../../../../etc/passwd'], 'device': 'android'})
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(self._json(resp).get('status'), 'failed')
+
+    # ---- api_frida_logs: real 'failed'/500 branch ----------------------
+
+    def test_frida_logs_read_error_500(self):
+        """Force frida_logs() into its except-branch (no 'data'/'message'
+        key) using a real, deterministic filesystem condition: create a
+        *directory* at the exact path frida_logs expects a file, so
+        ``Path.read_text()`` raises ``IsADirectoryError`` for real (no
+        mocking of any MobInspect logic -- only real on-disk state).
+        """
+        apphash = 'c6fc87884124ed580c7b9c0df4282538'
+        apk_dir = Path(settings.UPLD_DIR) / apphash
+        conflict_dir = apk_dir / 'mobinspect_frida_out.txt'
+        conflict_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            resp = self._post('/api/v1/frida/logs', {'hash': apphash})
+            self.assertEqual(resp.status_code, 500)
+            body = self._json(resp)
+            self.assertNotIn('data', body)
+            self.assertNotIn('message', body)
+        finally:
+            conflict_dir.rmdir()
+
+    # ---- api_api_monitor: real 'ok' branch (pure filesystem) -----------
+
+    def test_api_monitor_ok_200_with_real_file(self):
+        """live_api()'s stream branch reads a real
+        ``mobinspect_api_monitor.txt`` file and returns ``{'data': [...]}``
+        when it parses -- pure filesystem, no device. The file format is
+        newline-free JSON objects each followed by a trailing comma (the
+        real writer's format); the reader strips the final character
+        before wrapping in ``[...]``.
+        """
+        apphash = '93b908a919dd82e7e92c896141038f72'
+        apk_dir = Path(settings.UPLD_DIR) / apphash
+        apk_dir.mkdir(parents=True, exist_ok=True)
+        apimon_file = apk_dir / 'mobinspect_api_monitor.txt'
+        apimon_file.write_text('{},', encoding='utf-8')
+        try:
+            resp = self._post(
+                '/api/v1/frida/api_monitor', {'hash': apphash})
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('data', self._json(resp))
+        finally:
+            apimon_file.unlink()
+
+    # ---- api_dynamic_view_file: real 'ok' branch (pure filesystem) -----
+
+    def test_view_file_ok_200(self):
+        """device.view_file() with type='others' just reads a real file
+        under DYNAMIC_DeviceData and returns a rendering context -- no
+        device required.
+        """
+        apphash = '12d3a269d7c627e6762eccd8c732abe1'
+        data_dir = Path(settings.UPLD_DIR) / apphash / 'DYNAMIC_DeviceData'
+        data_dir.mkdir(parents=True, exist_ok=True)
+        target = data_dir / 'note.txt'
+        target.write_text('hello from a real file', encoding='utf-8')
+        try:
+            resp = self._post(
+                '/api/v1/dynamic/view_source',
+                {'hash': apphash, 'file': 'note.txt', 'type': 'others'})
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn('data', self._json(resp))
+        finally:
+            target.unlink()
+
+    # ---- api_dynamic_report: real 'ok' branch (pure filesystem) --------
+
+    def test_dynamic_report_ok_200(self):
+        """view_report() only needs a resolvable package (real
+        StaticAnalyzerAndroid row) and a real ``logcat.txt`` marker file
+        to skip the "no artifacts yet" branch; every downstream analysis
+        helper (droidmon/apimon/dependency/trackers/screenshots) degrades
+        to empty results when its own supporting files are absent, so the
+        whole real call chain completes -- no device required.
+        """
+        checksum = 'd55aafef8d9402bcce5f8bfb11ea99e5'
+        StaticAnalyzerAndroid.objects.create(
+            MD5=checksum,
+            PACKAGE_NAME='com.example.testapp',
+        )
+        app_dir = Path(settings.UPLD_DIR) / checksum
+        app_dir.mkdir(parents=True, exist_ok=True)
+        logcat_file = app_dir / 'logcat.txt'
+        logcat_file.write_text('', encoding='utf-8')
+        try:
+            resp = self._post(
+                '/api/v1/dynamic/report_json', {'hash': checksum})
+            self.assertEqual(resp.status_code, 200)
+            self.assertNotIn('error', self._json(resp))
+        finally:
+            logcat_file.unlink()

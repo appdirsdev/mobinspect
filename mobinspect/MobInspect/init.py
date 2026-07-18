@@ -60,7 +60,7 @@ def first_run(secret_file, base_dir, mobinspect_home):
             secret_key = get_random()
             secret_file.write_text(secret_key)
         except IOError:
-            raise Exception('Secret file generation failed' % secret_file)
+            raise Exception(f'Secret file generation failed: {secret_file}')
         # Run Once
         make_migrations(base_dir)
         migrate(base_dir)
@@ -185,12 +185,7 @@ def bootstrap_admin():
         password_source = 'generated'
         try:
             # Resolve home lazily so tests can monkey-patch ``Path.home``.
-            new_home = Path.home() / '.MobInspect'
-            legacy_home = Path.home() / '.MobInspect'
-            if not new_home.exists() and legacy_home.exists():
-                home_dir = legacy_home
-            else:
-                home_dir = new_home
+            home_dir = Path.home() / '.MobInspect'
             custom_home = env('MOBINSPECT_HOME_DIR')
             if custom_home:
                 p = Path(custom_home)
@@ -244,14 +239,7 @@ def get_mobinspect_home(use_home, base_dir):
         base_dir = Path(base_dir)
         mobinspect_home = ''
         if use_home:
-            # Prefer ~/.MobInspect; fall back to ~/.MobInspect if it exists
-            # (existing installs continue to work without manual migration).
-            new_home = Path.home() / '.MobInspect'
-            legacy_home = Path.home() / '.MobInspect'
-            if not new_home.exists() and legacy_home.exists():
-                mobinspect_home = legacy_home
-            else:
-                mobinspect_home = new_home
+            mobinspect_home = Path.home() / '.MobInspect'
             custom_home = env('MOBINSPECT_HOME_DIR')
             if custom_home:
                 p = Path(custom_home)

@@ -47,6 +47,9 @@ DOWNLOADED_TOOLS_DIR = os.path.join(MOBINSPECT_HOME, 'tools/')
 SECRET_FILE = os.path.join(MOBINSPECT_HOME, 'secret')
 
 # ==========Load MobInspect User Settings==========
+# Always bind CONFIG_HOME so `if CONFIG_HOME:` below can never NameError,
+# regardless of USE_HOME; set True only when a USE_HOME user config loads.
+CONFIG_HOME = False
 try:
     if USE_HOME:
         USER_CONFIG = os.path.join(MOBINSPECT_HOME, 'config.py')
@@ -55,8 +58,6 @@ try:
             {k: v for k, v in list(sett.__dict__.items())
                 if not k.startswith('__')})
         CONFIG_HOME = True
-    else:
-        CONFIG_HOME = False
 except Exception:
     logger.exception('Reading Config')
     CONFIG_HOME = False

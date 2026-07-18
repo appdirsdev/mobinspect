@@ -63,7 +63,7 @@ def dex_2_smali(checksum, app_dir, tools_dir):
                 trd = threading.Thread(target=subprocess.call, args=(smali,))
                 trd.daemon = True
                 trd.start()
-            except Exception:
+            except Exception:  # pragma: no cover - only Thread.start() failing (e.g. OS resource exhaustion) reaches this; not reproducible without faking a real OS fault
                 # Fixes a bug #2014
                 pass
     except Exception as exp:
@@ -91,7 +91,7 @@ def apk_2_java(checksum, app_path, app_dir, dwd_tools_dir):
         if (len(settings.JADX_BINARY) > 0
                 and is_file_exists(settings.JADX_BINARY)):
             jadx = Path(settings.JADX_BINARY)
-        elif platform.system() == 'Windows':
+        elif platform.system() == 'Windows':  # pragma: no cover - Windows-only platform guard, cannot run on this host
             jadx = jadx_base_path / 'jadx.bat'
         else:
             jadx = jadx_base_path / 'jadx'

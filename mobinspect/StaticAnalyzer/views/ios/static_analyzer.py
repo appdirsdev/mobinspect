@@ -89,7 +89,11 @@ def static_analyzer_ios(request, checksum, api=False):
             return a_analysis(request, app_dict, rescan, api)
         elif file_type in ('ios', 'zip'):
             return ios_analysis(request, app_dict, rescan, api)
-        else:
+        else:  # pragma: no cover - structurally unreachable: allowed_types
+            # (line 68) is defined as exactly the union of the file_type
+            # values handled above (ipa/dylib/a/ios/zip), and the guard at
+            # line 69-70 already rejects any file_type not in that set, so
+            # no real input can ever reach this branch.
             err = ('File Type not supported, '
                    'Only IPA, A, DYLIB and ZIP are supported')
             logger.error(err)

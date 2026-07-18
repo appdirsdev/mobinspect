@@ -416,6 +416,84 @@ def test_device_test_key_get_not_allowed(su_client):
     assert resp.status_code == 405
 
 
+# ─────────────────────── device_test_key: posted host_port branch
+# (Test button exercised with unsaved form input rather than a saved row —
+# mirrors what Save & Test validates, but must never persist anything.)
+@pytest.mark.django_db
+def test_device_test_key_posted_host_port_invalid(su_client):
+    resp = su_client.post(
+        reverse('rbac:device_test', args=['android']),
+        {'host_port': 'garbage$(rm -rf /)'},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['success'] is False
+    assert data['status'] == 'failed'
+    assert 'Invalid device address' in data['message']
+    assert not AdbConnection.objects.exists()
+
+
+@pytest.mark.django_db
+def test_device_test_key_posted_host_port_collision(su_client, superuser):
+    """A typed address that already belongs to the OTHER platform's saved
+    row must be rejected by Test exactly as Save would reject it."""
+    AdbConnection.objects.create(
+        label='iOS device', host_port='127.0.0.1:6111',
+        platform=AdbConnection.PLATFORM_IOS, created_by=superuser,
+    )
+    resp = su_client.post(
+        reverse('rbac:device_test', args=['android']),
+        {'host_port': '127.0.0.1:6111'},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['success'] is False
+    assert data['status'] == 'failed'
+    assert '"127.0.0.1:6111" is already used by another device' in data['message']
+
+
+@pytest.mark.django_db
+def test_device_test_key_posted_host_port_success(su_client, monkeypatch):
+    mock_run = MagicMock(return_value=(AdbConnection.STATUS_CONNECTED, 'connected'))
+    monkeypatch.setattr(views, '_run_adb', mock_run)
+
+    resp = su_client.post(
+        reverse('rbac:device_test', args=['android']),
+        {'host_port': '127.0.0.1:6222'},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['success'] is True
+    assert data['status'] == AdbConnection.STATUS_CONNECTED
+    assert data['message'] == 'connected'
+    assert 'last_status_at' in data
+    mock_run.assert_called_once_with(['connect', '127.0.0.1:6222'])
+    # A typed-and-tested address is validated/tested only — never persisted.
+    assert not AdbConnection.objects.exists()
+    ev = AuditEvent.objects.filter(action='integration.adb.test').first()
+    assert ev is not None
+    assert ev.metadata['platform'] == 'android'
+    assert ev.metadata['host_port'] == '127.0.0.1:6222'
+    assert ev.metadata['result'] == AdbConnection.STATUS_CONNECTED
+
+
+@pytest.mark.django_db
+def test_device_test_key_posted_host_port_failure(su_client, monkeypatch):
+    monkeypatch.setattr(
+        views, '_run_adb',
+        MagicMock(return_value=(AdbConnection.STATUS_FAILED, 'unable to connect')))
+
+    resp = su_client.post(
+        reverse('rbac:device_test', args=['android']),
+        {'host_port': '127.0.0.1:6333'},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['success'] is False
+    assert data['status'] == AdbConnection.STATUS_FAILED
+    assert data['message'] == 'unable to connect'
+
+
 # ═══════════════════════════════════════════════════════ model_test_key
 @pytest.mark.django_db
 def test_model_test_key_not_configured(su_client):
@@ -477,6 +555,69 @@ def test_model_test_key_denied_for_plain_user(client, plain_user):
 def test_model_test_key_get_not_allowed(su_client):
     resp = su_client.get(reverse('rbac:model_test', args=['generate']))
     assert resp.status_code == 405
+
+
+# ─────────────────────── model_test_key: posted endpoint branch
+# (Test button exercised with unsaved form input — must reflect unsaved
+# edits and never persist, unlike the saved-row fallback tested above.)
+@pytest.mark.django_db
+def test_model_test_key_posted_endpoint_missing_model_name(su_client):
+    resp = su_client.post(
+        reverse('rbac:model_test', args=['generate']),
+        {'base_url': LOOPBACK_URL, 'model_name': ''},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['success'] is False
+    assert data['status'] == 'failed'
+    assert 'Provide a model name' in data['message']
+    assert data['models_list'] == []
+    assert not ModelIntegration.objects.exists()
+
+
+@pytest.mark.django_db
+def test_model_test_key_posted_endpoint_reachable(su_client, monkeypatch):
+    probe = MagicMock(return_value=(
+        ModelIntegration.STATUS_CONNECTED, '1 model(s) available', ['granite4:3b']))
+    monkeypatch.setattr(views, '_probe_model_endpoint', probe)
+
+    resp = su_client.post(
+        reverse('rbac:model_test', args=['generate']),
+        {'base_url': LOOPBACK_URL, 'model_name': 'granite4:3b'},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['success'] is True
+    assert data['status'] == ModelIntegration.STATUS_CONNECTED
+    assert data['models_list'] == ['granite4:3b']
+    assert 'last_status_at' in data
+    probe.assert_called_once_with(LOOPBACK_URL, 'granite4:3b')
+    # Typed-and-tested endpoint is validated/tested only — never persisted.
+    assert not ModelIntegration.objects.exists()
+    ev = AuditEvent.objects.filter(action='integration.model.test').first()
+    assert ev is not None
+    assert ev.metadata['role'] == 'generate'
+    assert ev.metadata['base_url'] == LOOPBACK_URL
+    assert ev.metadata['model'] == 'granite4:3b'
+    assert ev.metadata['result'] == ModelIntegration.STATUS_CONNECTED
+
+
+@pytest.mark.django_db
+def test_model_test_key_posted_endpoint_unreachable(su_client, monkeypatch):
+    monkeypatch.setattr(
+        views, '_probe_model_endpoint',
+        MagicMock(return_value=(ModelIntegration.STATUS_FAILED, 'HTTP 500', [])))
+
+    resp = su_client.post(
+        reverse('rbac:model_test', args=['classify']),
+        {'base_url': LOOPBACK_URL, 'model_name': 'granite4:1b'},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['success'] is False
+    assert data['status'] == ModelIntegration.STATUS_FAILED
+    assert data['message'] == 'HTTP 500'
+    assert data['models_list'] == []
 
 
 # ═══════════════════════════════════════════════════════ adb_connections_list
@@ -644,6 +785,41 @@ def test_probe_model_endpoint_strips_trailing_slash(monkeypatch):
     views._probe_model_endpoint(LOOPBACK_URL + '/')
     called_url = mock_get.call_args.args[0]
     assert called_url == LOOPBACK_URL + '/api/tags'
+
+
+def test_probe_model_endpoint_model_not_present_lists_available(monkeypatch):
+    """Host reachable, but the requested model isn't in its /api/tags list
+    -- the "model not available" message-building branch, with at least
+    one other model actually on the host (the "Available: ..." half)."""
+    fake_resp = MagicMock()
+    fake_resp.status_code = 200
+    fake_resp.json.return_value = {
+        'models': [{'name': 'granite4:3b'}, {'name': 'nomic-embed-text'}],
+    }
+    monkeypatch.setattr('requests.get', MagicMock(return_value=fake_resp))
+
+    status, message, models = views._probe_model_endpoint(
+        LOOPBACK_URL, 'granite4:8b')
+    assert status == ModelIntegration.STATUS_FAILED
+    assert '"granite4:8b" is not available there' in message
+    assert 'Available: granite4:3b, nomic-embed-text' in message
+    assert models == ['granite4:3b', 'nomic-embed-text']
+
+
+def test_probe_model_endpoint_model_not_present_no_models_on_host(monkeypatch):
+    """Same branch, but the host has NO models pulled at all -- the other
+    half of the message ternary."""
+    fake_resp = MagicMock()
+    fake_resp.status_code = 200
+    fake_resp.json.return_value = {'models': []}
+    monkeypatch.setattr('requests.get', MagicMock(return_value=fake_resp))
+
+    status, message, models = views._probe_model_endpoint(
+        LOOPBACK_URL, 'granite4:8b')
+    assert status == ModelIntegration.STATUS_FAILED
+    assert '"granite4:8b" is not available there' in message
+    assert 'host has no models pulled' in message
+    assert models == []
 
 
 # ═══════════════════════════════════════ _apply_model_probe (pure-ish)

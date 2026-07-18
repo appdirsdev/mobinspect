@@ -398,3 +398,64 @@ class UploadDuplicateEndpointTests(TestCase):
         md5 = resp.json()['hash']
         self._md5s.add(md5)
         self.assertTrue(RecentScansDB.objects.filter(MD5=md5).exists())
+
+
+class RemainingGapCoverageTests(TestCase):
+    """Closes the last real-execution gaps in scanning.py:
+    add_to_recent_scan's except branch, _apk_package_version's OSError
+    branch, and _remove_orphan_upload's except branch."""
+
+    def test_add_to_recent_scan_exception_is_caught(self):
+        # Real fault injection: MD5 is a CharField(max_length=32,
+        # primary_key=True); Postgres (unlike SQLite) genuinely enforces
+        # varchar length at the DB layer, so an oversized value raises a
+        # real DataError on save() -- no mock, no monkeypatch.
+        #
+        # add_to_recent_scan's except swallows the DataError itself, but it
+        # does not open its own savepoint around the .save() call -- so
+        # (only under Django's per-test atomic-wrapped TestCase, where any
+        # DB error marks the current transaction "needs rollback" the
+        # instant it happens, independent of whether Python code catches
+        # it) a plain follow-up query in the SAME test would itself raise
+        # TransactionManagementError. A nested atomic() block here isolates
+        # that as its own savepoint so this test can keep querying
+        # afterward -- this mirrors how a real caller wrapped in its own
+        # transaction.atomic() would recover.
+        from django.db import transaction
+        oversize_md5 = 'x' * 200
+        data = {
+            'analyzer': 'static_analyzer', 'status': 'success',
+            'hash': oversize_md5, 'scan_type': 'apk',
+            'file_name': 'oversize.apk',
+        }
+        with transaction.atomic():
+            scanning.add_to_recent_scan(data)  # must not raise
+        self.assertFalse(
+            RecentScansDB.objects.filter(MD5=oversize_md5).exists())
+
+    def test_find_duplicate_scan_missing_file_oserror_is_caught(self):
+        # Real fault injection: a genuinely nonexistent file_path makes the
+        # real os.path.getsize() call raise FileNotFoundError (an OSError
+        # subclass) inside find_duplicate_scan's version-layer size check
+        # -- no mock, no monkeypatch.
+        md5 = 'a' * 32
+        result = scanning.find_duplicate_scan(
+            md5, 'apk', '/no/such/apk/file/at/all.apk')
+        self.assertIsNone(result)
+
+    def test_apk_package_version_missing_file_returns_empty(self):
+        # Real fault injection: a nonexistent path makes androguard's own
+        # file-open path raise, caught by _apk_package_version's own except.
+        pkg, ver = scanning._apk_package_version('/no/such/apk/file.apk')
+        self.assertEqual((pkg, ver), ('', ''))
+
+    def test_remove_orphan_upload_db_failure_is_caught(self):
+        # Real fault injection: StaticAnalyzerAndroid.objects.filter itself
+        # fails (a real DB round-trip error cannot be induced non-invasively
+        # against the live Postgres test DB) -- narrow, single-call
+        # monkeypatch, documented here.
+        from unittest import mock
+        with mock.patch.object(
+                StaticAnalyzerAndroid.objects, 'filter',
+                side_effect=RuntimeError('db error')):
+            scanning._remove_orphan_upload('deadbeef' * 4)  # must not raise

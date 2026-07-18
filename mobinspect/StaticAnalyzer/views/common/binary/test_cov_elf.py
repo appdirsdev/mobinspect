@@ -127,6 +127,23 @@ def variants(workdir):
     dartmin_p.write_bytes(_minimal_elf(b'\x00Dart_Cleanup\x00padding_string'))
     v['dartmin'] = dartmin_p
 
+    # --- genuinely unparseable "ELF" -> lief.parse() returns real None ---
+    broken_p = workdir / 'broken.so'
+    broken_p.write_bytes(b'not an elf file at all, just garbage bytes 123')
+    v['broken'] = broken_p
+
+    # --- real android.so + a real dynamic symbol whose name is raw,
+    # invalid-UTF-8 bytes (round-tripped through a real lief write +
+    # re-parse, exactly like the other lief-mutated variants above) ---
+    b = lief.parse(ANDROID_SO.as_posix())
+    bad_sym = lief.ELF.Symbol()
+    bad_sym.name = b'\xff\xfe_chk'
+    bad_sym.value = 0
+    b.add_dynamic_symbol(bad_sym)
+    badname_p = workdir / 'badname.so'
+    b.write(badname_p.as_posix())
+    v['badname'] = badname_p
+
     return v
 
 
@@ -314,3 +331,63 @@ def test_non_elf_returns_none():
 def test_nm_debug_symbol_stripped_real():
     # android.so is not stripped -> nm finds debug symbols
     assert nm_is_debug_symbol_stripped(ANDROID_SO.as_posix()) is False
+
+
+# --------------------------------------------------------------------------- #
+# Genuinely broken "ELF" (lief.parse() returns real None) -> every method     #
+# that touches self.elf directly (outside checksec()'s is_elf() gate) hits   #
+# its own except block via a real AttributeError on None, not a mock.        #
+# --------------------------------------------------------------------------- #
+def test_is_dart_and_has_canary_get_symbol_exception(variants):
+    c = _chk(variants['broken'])
+    assert c.elf is None
+    # is_dart() calls self.strings() first (real AttributeError on
+    # self.elf.strings -> caught -> falls back to strings_on_binary() on
+    # the real, if unparsable, file), then self.elf.get_symbol() per dart
+    # marker -> real AttributeError -> caught -> False (lines 281-282).
+    assert c.is_dart() is False
+    # has_canary()'s own get_symbol() try/except (lines 293-294).
+    assert c.has_canary() is False
+
+
+def test_strings_falls_back_on_broken_elf(variants):
+    # self.elf.strings raises (None) -> except -> strings_on_binary()
+    # fallback (lines 364-365); still returns a real list, never raises.
+    c = _chk(variants['broken'])
+    assert isinstance(c.strings(), list)
+
+
+def test_relro_exception_on_broken_elf(variants):
+    # self.elf.get(...) raises on None -> outer except -> NO_RELRO
+    # (lines 321-323).
+    c = _chk(variants['broken'])
+    assert c.relro() == NO_RELRO
+
+
+def test_is_symbols_stripped_double_exception_on_broken_elf(variants):
+    # self.elf.symtab_symbols raises on None -> outer except -> falls back
+    # to nm_is_debug_symbol_stripped() (lines 339-341); nm genuinely
+    # cannot parse this garbage file either (real non-zero exit ->
+    # subprocess.CalledProcessError) -> inner except -> True
+    # (lines 343-344).
+    c = _chk(variants['broken'])
+    assert c.is_symbols_stripped() is True
+
+
+def test_get_symbols_exception_on_broken_elf(variants):
+    # self.elf.symtab_symbols raises on None -> except -> [] (lines 379-380).
+    c = _chk(variants['broken'])
+    assert c.get_symbols() == []
+
+
+# --------------------------------------------------------------------------- #
+# fortify(): a real, non-UTF-8 dynamic symbol name (round-tripped through a  #
+# real lief write + re-parse) forces a genuine UnicodeDecodeError.           #
+# --------------------------------------------------------------------------- #
+def test_fortify_handles_real_undecodable_symbol_name(variants):
+    c = _chk(variants['badname'])
+    fort = c.fortify()
+    # The undecodable name (b'\xff\xfe_chk') still ends with '_chk' after
+    # decode(..., 'replace') substitutes the invalid lead bytes, so it is
+    # counted as fortified alongside android.so's genuine __strlen_chk etc.
+    assert any(isinstance(f, bytes) and f.endswith(b'_chk') for f in fort)

@@ -709,7 +709,7 @@ MANIFEST_DESC = {
                   ' the protection level of the permission should be checked.'
                   ' %s [Content Provider, targetSdkVersion >= 17]'),
         'level': 'info',
-        'description': ('The Content Provider(%s) would be exported if the '
+        'description': ('A%s %s would be exported if the '
                         'application ran on a device where the API level was'
                         ' less than 17. In that situation, it would still '
                         'be protected by a permission. However, the protection'
@@ -755,7 +755,7 @@ MANIFEST_DESC = {
                   ' a device where the the API level is less than 17'
                   ' %s [Content Provider, targetSdkVersion >= 17]'),
         'level': 'warning',
-        'description': ('The Content Provider (%s) would be exported if the'
+        'description': ('A%s %s would be exported if the'
                         ' application ran on a device where the the API '
                         'level was less than 17. In that situation, it'
                         ' would still be protected by a permission. '
@@ -779,7 +779,7 @@ MANIFEST_DESC = {
                   ' a device where the the API level is less than 17.'
                   ' %s [Content Provider, targetSdkVersion >= 17]'),
         'level': 'warning',
-        'description': ('The Content Provider(%s) would be exported if the'
+        'description': ('A%s %s would be exported if the'
                         ' application ran on a device where the the API '
                         'level was less than 17. In that situation, it'
                         ' would still be protected by a permission. However,'
@@ -801,7 +801,7 @@ MANIFEST_DESC = {
                   ' the application level. %s '
                   '[Content Provider, targetSdkVersion >= 17]'),
         'level': 'info',
-        'description': ('The Content Provider(%s) would be exported if the'
+        'description': ('A%s %s would be exported if the'
                         ' application ran on a device where the the API '
                         'level was less than 17. Nevertheless, it is '
                         'protected by a permission.'),
@@ -814,7 +814,7 @@ MANIFEST_DESC = {
                   ' permission should be checked.'
                   ' %s [Content Provider, targetSdkVersion >= 17]'),
         'level': 'info',
-        'description': ('The Content Provider(%s) would be exported if the'
+        'description': ('A%s %s would be exported if the'
                         ' application ran on a device where the API level was'
                         ' less than 17. In that situation, it would still be'
                         ' protected by a permission. However, the protection'
@@ -835,7 +835,7 @@ MANIFEST_DESC = {
                   ' a device where the the API level is less than 17.'
                   ' %s [Content Provider, targetSdkVersion >= 17]'),
         'level': 'warning',
-        'description': ('The Content Provider(%s) would be exported if the'
+        'description': ('A%s %s would be exported if the'
                         ' application ran on a device where the the API level'
                         ' was less than 17. In that situation, it would still'
                         ' be protected by a permission which is not defined '

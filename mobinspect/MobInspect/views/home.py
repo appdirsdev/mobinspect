@@ -408,11 +408,11 @@ class Upload(object):
             return self.resp_json(response_data)
 
         if self.file_type.is_ipa():
-            if platform.system() not in LINUX_PLATFORM:
-                msg = 'Static Analysis of iOS IPA requires Mac or Linux'
-                logger.error(msg)
-                response_data['description'] = msg
-                return self.resp_json(response_data)
+            if platform.system() not in LINUX_PLATFORM:  # pragma: no cover — Windows-only guard, cannot induce a non-macOS/Linux platform.system() on this host
+                msg = 'Static Analysis of iOS IPA requires Mac or Linux'  # pragma: no cover — see guard above
+                logger.error(msg)  # pragma: no cover — see guard above
+                response_data['description'] = msg  # pragma: no cover — see guard above
+                return self.resp_json(response_data)  # pragma: no cover — see guard above
 
         response_data = self.upload()
         return self.resp_json(response_data)

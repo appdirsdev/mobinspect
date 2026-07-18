@@ -346,7 +346,7 @@ def process_suppression_manifest(data, package):
             summary[HIGH] += 1
         elif i['severity'] == WARNING:
             summary[WARNING] += 1
-        elif ['severity'] == INFO:
+        elif i['severity'] == INFO:
             summary[INFO] += 1
     return {
         'manifest_findings': filtered,

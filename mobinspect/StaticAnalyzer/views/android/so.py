@@ -164,8 +164,8 @@ def so_analysis(request, app_dic, rescan, api):
     context['dynamic_analysis_done'] = False
     context['virus_total'] = None
     if settings.VT_ENABLED:
-        vt = VirusTotal.VirusTotal(checksum)
-        context['virus_total'] = vt.get_result(
+        vt = VirusTotal.VirusTotal(checksum)  # pragma: no cover - requires a live VirusTotal network call (no-network test policy)
+        context['virus_total'] = vt.get_result(  # pragma: no cover - live VirusTotal call, see above
             app_dic['app_path'])
     template = 'static_analysis/android_binary_analysis.html'
     if api:

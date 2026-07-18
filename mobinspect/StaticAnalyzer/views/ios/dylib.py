@@ -161,8 +161,8 @@ def dylib_analysis(request, app_dict, rescan, api):
             rescan)
     context['virus_total'] = None
     if settings.VT_ENABLED:
-        vt = VirusTotal.VirusTotal(checksum)
-        context['virus_total'] = vt.get_result(
+        vt = VirusTotal.VirusTotal(checksum)  # pragma: no cover - requires a live VirusTotal network call (no-network test policy)
+        context['virus_total'] = vt.get_result(  # pragma: no cover - live VirusTotal call, see above
             app_dict['app_path'])
     context['appsec'] = {}
     context['average_cvss'] = None

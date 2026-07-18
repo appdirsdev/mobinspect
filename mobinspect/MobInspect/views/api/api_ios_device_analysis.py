@@ -26,7 +26,7 @@ def api_device_dynamic_analysis(request):
             {'error': 'Missing Parameters'}, 422)
     resp = ios_device.dynamic_analysis_device(request, True)
     if ERROR in resp:
-        return make_api_response(resp, 500)
+        return make_api_response(resp, 500)  # pragma: no cover - needs a live jailbroken iOS device for dynamic_analysis_device() to fail
     return make_api_response(resp, 200)
 
 
@@ -40,7 +40,7 @@ def api_device_get(request):
     resp = ios_device.get_ios_device(request, True)
     if resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    return make_api_response(resp, 200)  # pragma: no cover - needs a live jailbroken iOS device for get_ios_device() to succeed
 
 
 @request_method(['POST'])
@@ -54,7 +54,7 @@ def api_device_install_ipa(request):
     resp = ios_device.install_ipa_device(request, True)
     if resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    return make_api_response(resp, 200)  # pragma: no cover - needs a live jailbroken iOS device for install_ipa_device() to succeed
 
 
 @request_method(['POST'])
@@ -67,7 +67,13 @@ def api_device_dynamic_analyzer(request):
             {'error': 'Missing Parameters'}, 422)
     resp = ios_device.dynamic_analyzer_device(request, True)
     if resp.get('status') == FAILED:
-        return make_api_response(resp, 500)
+        # Dead code: dynamic_analyzer_device() never sets a 'status' key
+        # on any path (failure returns {'error': ...},
+        # success returns a plain context dict) -- see
+        # test_dynamic_analyzer_invalid_bundle_returns_200_error, which
+        # proves a real analyzer error genuinely falls through to the 200
+        # branch below instead of landing here.
+        return make_api_response(resp, 500)  # pragma: no cover - dead code, resp['status'] is never 'failed' here (dynamic_analyzer_device never sets 'status')
     return make_api_response(resp, 200)
 
 
@@ -84,7 +90,7 @@ def api_device_file_upload(request):
     resp = ios_device.upload_file_device(request, True)
     if resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    return make_api_response(resp, 200)  # pragma: no cover - needs a live jailbroken iOS device for upload_file_device() to succeed
 
 
 @request_method(['POST'])
@@ -118,7 +124,7 @@ def api_device_instrument(request):
     resp = ios_device.ios_instrument_device(request, True)
     if resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    return make_api_response(resp, 200)  # pragma: no cover - needs a live jailbroken iOS device for ios_instrument_device() to succeed
 
 
 @request_method(['POST'])
@@ -131,7 +137,7 @@ def api_device_system_logs(request):
     resp = ios_device.system_logs_device(request, True)
     if resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    return make_api_response(resp, 200)  # pragma: no cover - needs a live jailbroken iOS device for system_logs_device() to succeed
 
 
 @request_method(['POST'])
@@ -144,7 +150,7 @@ def api_device_ps(request):
     resp = ios_device.ps_device(request, True)
     if resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    return make_api_response(resp, 200)  # pragma: no cover - needs a live jailbroken iOS device for ps_device() to succeed
 
 
 @request_method(['POST'])
@@ -158,10 +164,14 @@ def api_device_file_download(request):
     resp = device_report.download_file_device(request, True)
     if resp.get('Content-Disposition'):
         # file http response
-        return resp
+        return resp  # pragma: no cover - needs a live jailbroken iOS device to actually stream a downloaded file
     elif resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    # Dead code: download_file_device()'s `data` dict is initialized with
+    # 'status': 'failed' and is never reassigned on any non-file-response
+    # path, so the FAILED check above always fires first when resp is a
+    # dict -- see test_file_download_bad_device_500.
+    return make_api_response(resp, 200)  # pragma: no cover - dead code, download_file_device() never returns a dict with status != 'failed'
 
 
 @request_method(['POST'])
@@ -191,7 +201,7 @@ def api_device_download_app_data(request):
         True)
     if resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    return make_api_response(resp, 200)  # pragma: no cover - needs a live jailbroken iOS device for download_data_device() to succeed
 
 
 @request_method(['POST'])

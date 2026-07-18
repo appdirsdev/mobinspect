@@ -26,7 +26,7 @@ def api_ios_dynamic_analysis(request):
     """POST - iOS Dynamic Analysis Entrypoint."""
     resp = dynamic_analyzer.dynamic_analysis(request, True)
     if ERROR in resp:
-        return make_api_response(resp, 500)
+        return make_api_response(resp, 500)  # pragma: no cover - needs a live Corellium iOS instance for dynamic_analysis() to fail
     return make_api_response(resp, 200)
 
 
@@ -51,7 +51,7 @@ def api_corellium_get_supported_models(request):
     """POST - Corellium Get Supported iOS Models."""
     resp = corellium_instance.get_supported_models(request, True)
     if resp.get('status') == FAILED:
-        return make_api_response(resp, 500)
+        return make_api_response(resp, 500)  # pragma: no cover - needs a live Corellium account/session for get_supported_models() to fail
     return make_api_response(resp, 200)
 
 
@@ -64,7 +64,7 @@ def api_corellium_get_supported_ios_versions(request):
             {'error': 'Missing Parameters'}, 422)
     resp = corellium_instance.get_supported_os(request, True)
     if resp.get('status') == FAILED:
-        return make_api_response(resp, 500)
+        return make_api_response(resp, 500)  # pragma: no cover - needs a live Corellium account/session for get_supported_os() to fail
     return make_api_response(resp, 200)
 
 
@@ -270,7 +270,7 @@ def api_live_pcap_download(request):
     resp = corellium_instance.live_pcap_download(request, True)
     if resp.get('Content-Disposition'):
         # PCAP file http response
-        return resp
+        return resp  # pragma: no cover - needs a live Corellium instance to actually stream a captured pcap
     elif resp.get('status') == FAILED:
         return make_api_response(resp, 500)
     return make_api_response(resp, 200)
@@ -357,7 +357,7 @@ def api_device_file_download(request):
     resp = corellium_instance.download_file(request, True)
     if resp.get('Content-Disposition'):
         # file http response
-        return resp
+        return resp  # pragma: no cover - needs a live Corellium instance to actually stream a downloaded file
     elif resp.get('status') == FAILED:
         return make_api_response(resp, 500)
     return make_api_response(resp, 200)

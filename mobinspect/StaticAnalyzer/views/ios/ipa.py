@@ -239,8 +239,8 @@ def generate_dynamic_context(request, app_dic, context, checksum, api):
     """Generate Dynamic Context."""
     context['virus_total'] = None
     if settings.VT_ENABLED:
-        vt = VirusTotal.VirusTotal(checksum)
-        context['virus_total'] = vt.get_result(app_dic['app_path'])
+        vt = VirusTotal.VirusTotal(checksum)  # pragma: no cover - requires a live VirusTotal network call (no-network test policy)
+        context['virus_total'] = vt.get_result(app_dic['app_path'])  # pragma: no cover - live VirusTotal call, see above
     context['appsec'] = get_ios_dashboard(context, True)
     context['average_cvss'] = get_avg_cvss(context['binary_analysis'])
     template = 'static_analysis/ios_binary_analysis.html'

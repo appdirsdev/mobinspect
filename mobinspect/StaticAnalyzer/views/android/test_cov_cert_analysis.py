@@ -3,10 +3,12 @@
 
 Drives the real signed test_files/android.apk certificate through the real
 androguard parser, the real apksigner.jar, real apksigtool and real
-cryptography key parsing. No mocks, no monkeypatching.
+cryptography key parsing. No mocks, no monkeypatching (one narrow exception,
+noted at its call site below).
 """
 import os
 import shutil
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
@@ -31,6 +33,10 @@ from mobinspect.StaticAnalyzer.views.android.cert_analysis import (
 REPO_ROOT = Path(__file__).resolve().parents[4]
 APK_PATH = (REPO_ROOT / 'test_files' / 'android.apk').as_posix()
 TOOLS_DIR = (REPO_ROOT / 'mobinspect' / 'StaticAnalyzer' / 'tools').as_posix()
+APKTOOL_JAR = (REPO_ROOT / 'mobinspect' / 'StaticAnalyzer' / 'tools'
+               / 'apktool_2.10.0.jar').as_posix()
+APKSIGNER_JAR = (REPO_ROOT / 'mobinspect' / 'StaticAnalyzer' / 'tools'
+                 / 'apksigner.jar').as_posix()
 CHECKSUM = 'testcert0000000000000000000000ab'
 
 
@@ -283,3 +289,253 @@ class CertInfoTests(TestCase):
         # Missing required keys makes cert_info raise internally -> {}.
         result = cert_info({'md5': CHECKSUM}, {'min_sdk': None})
         self.assertEqual(result, {})
+
+
+class RealSigningScenarioTests(TestCase):
+    """Build real, deliberately-signed APK fixtures with keytool / jarsigner /
+    apktool / apksigner (all real tools, no mocks) to reach cert_analysis
+    branches the stock debug-signed test_files/android.apk cannot: a v2/v3
+    -only signed APK, a truly unsigned APK, and JAR-signed APKs whose
+    self-signed certificate deliberately uses MD5withRSA / SHA1withRSA so the
+    'Hash Algorithm: md5|sha1' branches in cert_info() fire for real.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.work = Path(tempfile.mkdtemp(prefix='real_sign_'))
+
+        def keystore(name, alias, sigalg):
+            path = cls.work / f'{name}.jks'
+            subprocess.run([
+                'keytool', '-genkeypair', '-keystore', path.as_posix(),
+                '-storepass', 'password', '-keypass', 'password',
+                '-alias', alias, '-dname', f'CN=Test {name}, OU=T, O=T, C=US',
+                '-validity', '3650', '-keyalg', 'RSA', '-keysize', '2048',
+                '-sigalg', sigalg,
+            ], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            return path
+
+        cls.sha1_ks = keystore('sha1', 'sha1key', 'SHA1withRSA')
+        cls.md5_ks = keystore('md5', 'md5key', 'MD5withRSA')
+        cls.v3_ks = keystore('v3', 'v3key', 'SHA256withRSA')
+
+        def strip_meta_inf(src, dst):
+            with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, 'w') as zout:
+                for item in zin.infolist():
+                    if item.filename.startswith('META-INF/'):
+                        continue
+                    zout.writestr(item, zin.read(item.filename))
+
+        # Truly unsigned APK (no META-INF at all).
+        cls.unsigned_apk = (cls.work / 'unsigned.apk').as_posix()
+        strip_meta_inf(APK_PATH, cls.unsigned_apk)
+
+        # JAR (v1)-signed with a SHA1withRSA cert, manifest digests forced to
+        # SHA-256 -> cert_info() sees 'Hash Algorithm: sha1' *and*
+        # 'SHA-256-Digest' in the same scan (the sha256_digest downgrade
+        # branch).
+        cls.sha1_sha256_apk = (cls.work / 'sha1_sha256.apk').as_posix()
+        strip_meta_inf(APK_PATH, cls.sha1_sha256_apk)
+        subprocess.run([
+            'jarsigner', '-keystore', cls.sha1_ks.as_posix(),
+            '-storepass', 'password', '-sigalg', 'SHA1withRSA',
+            '-digestalg', 'SHA-256', cls.sha1_sha256_apk, 'sha1key',
+        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        # JAR (v1)-signed with an MD5withRSA cert (MD5 manifest digest too).
+        cls.md5_apk = (cls.work / 'md5.apk').as_posix()
+        strip_meta_inf(APK_PATH, cls.md5_apk)
+        subprocess.run([
+            'jarsigner', '-keystore', cls.md5_ks.as_posix(),
+            '-storepass', 'password', '-sigalg', 'MD5withRSA',
+            '-digestalg', 'MD5', cls.md5_apk, 'md5key',
+        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        # v2/v3-only signed APK (no v1) with minSdkVersion raised to 24 via
+        # apktool decode/rebuild, so apksigner verify does not require v1.
+        decoded = cls.work / 'decoded'
+        subprocess.run([
+            'java', '-jar', APKTOOL_JAR, 'd', '-f', '-o', decoded.as_posix(),
+            APK_PATH,
+        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        yml = decoded / 'apktool.yml'
+        text = yml.read_text().replace('minSdkVersion: 15', 'minSdkVersion: 24')
+        yml.write_text(text)
+        cls.v3_apk = (cls.work / 'v3.apk').as_posix()
+        subprocess.run([
+            'java', '-jar', APKTOOL_JAR, 'b', decoded.as_posix(),
+            '-o', cls.v3_apk,
+        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        subprocess.run([
+            'java', '-jar', APKSIGNER_JAR, 'sign',
+            '--ks', cls.v3_ks.as_posix(), '--ks-pass', 'pass:password',
+            '--key-pass', 'pass:password', '--ks-key-alias', 'v3key',
+            '--v1-signing-enabled', 'false', '--v2-signing-enabled', 'true',
+            '--v3-signing-enabled', 'true', cls.v3_apk,
+        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        # v1+v2+v3 all signed with the same (low, original) minSdkVersion ->
+        # androguard reads real v2/v3 public keys (get_pub_key_details loop
+        # in get_cert_data) and cert_info's Janus WARNING-downgrade branch
+        # (v1 present *and* v2/v3 present *and* api_level < 27) fires.
+        cls.allsigned_apk = (cls.work / 'allsigned.apk').as_posix()
+        shutil.copy(APK_PATH, cls.allsigned_apk)
+        subprocess.run([
+            'java', '-jar', APKSIGNER_JAR, 'sign',
+            '--ks', cls.v3_ks.as_posix(), '--ks-pass', 'pass:password',
+            '--key-pass', 'pass:password', '--ks-key-alias', 'v3key',
+            '--v1-signing-enabled', 'true', '--v2-signing-enabled', 'true',
+            '--v3-signing-enabled', 'true', cls.allsigned_apk,
+        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.work, ignore_errors=True)
+        super().tearDownClass()
+
+    def test_v3_only_apk_signature_versions_and_apksigtool_block(self):
+        # Real apksigner detects v2+v3 (not v1) -> covers the v3=True branch
+        # in get_signature_versions (previously only v1 was ever exercised).
+        v1, v2, v3, v4 = get_signature_versions(
+            'rs1', self.v3_apk, TOOLS_DIR, True)
+        self.assertFalse(v1)
+        self.assertTrue(v2)
+        self.assertTrue(v3)
+
+        # apksigtool_cert's own APK Signing Block v2/v3 parser (used when
+        # androguard fails) walks a real signer entry: exercises the
+        # is_v2()/is_v3()/min_sdk/get_cert_details/get_pub_key_details loop.
+        out = apksigtool_cert('rs2', self.v3_apk, TOOLS_DIR)
+        self.assertTrue(out['signed'])
+        self.assertEqual(out['min_sdk'], 24)
+        self.assertIn('Binary is signed', out['cert_data'])
+
+    def test_cert_info_min_sdk_falls_back_to_apksigtool_min_sdk(self):
+        # man_dict min_sdk is falsy -> cert_info() falls through to
+        # cert_data['min_sdk'] (only ever populated by the apksigtool v3
+        # parser), reaching the `elif cert_data['min_sdk']:` branch.
+        app_dic = {
+            'md5': 'rs3',
+            'androguard_apk': None,
+            'app_path': self.v3_apk,
+            'app_dir': tempfile.mkdtemp(),
+            'tools_dir': TOOLS_DIR,
+        }
+        result = cert_info(app_dic, {'min_sdk': None})
+        self.assertIn('certificate_summary', result)
+        shutil.rmtree(app_dic['app_dir'], ignore_errors=True)
+
+    def test_apksigtool_signed_block_but_apksigner_fails(self):
+        # Narrow, single-call monkeypatch (per project rule 1): a real v2/v3
+        # signing block (parsed for real by apksigtool) combined with a
+        # forced apksigner.jar failure is otherwise impossible to produce
+        # deterministically -- a real APK that apksigner itself rejects
+        # while its signing-block bytes still parse structurally could not
+        # be built with the tools available in this environment. This
+        # reaches the 'apksigner.jar failed to get signature versions'
+        # fallback branch inside apksigtool_cert (av1/av2/av3/av4 used).
+        orig = subprocess.check_output
+
+        def fake_check_output(args, **kwargs):
+            if 'apksigner.jar' in ' '.join(args):
+                raise subprocess.CalledProcessError(1, args)
+            return orig(args, **kwargs)
+
+        subprocess.check_output = fake_check_output
+        try:
+            out = apksigtool_cert('rs4', self.v3_apk, TOOLS_DIR)
+        finally:
+            subprocess.check_output = orig
+        self.assertTrue(out['signed'])
+        # Versions were substituted from apksigtool's own av1..av4 reading
+        # (the last-processed signing-block pair is the v3 block).
+        self.assertFalse(out['v1'])
+        self.assertTrue(out['v3'])
+
+    def test_unsigned_apk_get_cert_data_not_signed_branch(self):
+        # A real APK with META-INF stripped -> androguard reports
+        # is_signed()=False, covering the 'not signed' branch of
+        # get_cert_data (as opposed to apksigtool_cert's own).
+        a = apk.APK(self.unsigned_apk)
+        self.assertFalse(a.is_signed())
+        out = get_cert_data('rs5', a, self.unsigned_apk, TOOLS_DIR)
+        self.assertFalse(out['signed'])
+        self.assertIn('Binary is not signed', out['cert_data'])
+        self.assertIn('Missing certificate', out['cert_data'])
+
+    def test_sha1_cert_plus_sha256_manifest_digest_hash_collision_warning(self):
+        # Real SHA1withRSA-signed cert (Hash Algorithm: sha1) + a manifest
+        # forced to SHA-256 digests -> the sha256_digest downgrade branch
+        # (HIGH -> WARNING, retitled) inside cert_info() fires for real.
+        # apksigner.jar itself refuses to verify SHA1withRSA (disabled
+        # algorithm), so cert_info naturally falls back to androguard's own
+        # is_signed_v1() reading -- no patch needed for that fallback.
+        app_dir = tempfile.mkdtemp()
+        with zipfile.ZipFile(self.sha1_sha256_apk) as z:
+            for name in z.namelist():
+                if name.startswith('META-INF/'):
+                    z.extract(name, app_dir)
+        app_dic = {
+            'md5': 'rs6',
+            'androguard_apk': apk.APK(self.sha1_sha256_apk),
+            'app_path': self.sha1_sha256_apk,
+            'app_dir': app_dir,
+            'tools_dir': TOOLS_DIR,
+        }
+        result = cert_info(app_dic, {'min_sdk': '21'})
+        titles = [t for _, _, t in result['certificate_findings']]
+        self.assertIn(
+            'Certificate algorithm might be '
+            'vulnerable to hash collision', titles)
+        shutil.rmtree(app_dir, ignore_errors=True)
+
+    def test_md5_cert_hash_collision_warning(self):
+        # Real MD5withRSA-signed cert -> 'Hash Algorithm: md5' branch.
+        app_dir = tempfile.mkdtemp()
+        with zipfile.ZipFile(self.md5_apk) as z:
+            for name in z.namelist():
+                if name.startswith('META-INF/'):
+                    z.extract(name, app_dir)
+        app_dic = {
+            'md5': 'rs7',
+            'androguard_apk': apk.APK(self.md5_apk),
+            'app_path': self.md5_apk,
+            'app_dir': app_dir,
+            'tools_dir': TOOLS_DIR,
+        }
+        result = cert_info(app_dic, {'min_sdk': '21'})
+        titles = [t for _, _, t in result['certificate_findings']]
+        self.assertIn(
+            'Certificate algorithm vulnerable to hash collision', titles)
+        shutil.rmtree(app_dir, ignore_errors=True)
+
+    def test_v1_plus_v2v3_signed_janus_warning_downgrade_and_v3_pubkeys(self):
+        # Real v1+v2+v3-signed APK with api_level (21) < ANDROID_8_1_LEVEL
+        # (27): the Janus finding's status is downgraded HIGH -> WARNING
+        # (get_cert_data reads the real v2/v3 public keys from androguard,
+        # covering the get_pub_key_details loop for that path too).
+        a = apk.APK(self.allsigned_apk)
+        out = get_cert_data('rs8', a, self.allsigned_apk, TOOLS_DIR)
+        self.assertTrue(out['v1'] and (out['v2'] or out['v3']))
+        self.assertIn('PublicKey Algorithm', out['cert_data'])
+
+        app_dir = tempfile.mkdtemp()
+        with zipfile.ZipFile(self.allsigned_apk) as z:
+            for name in z.namelist():
+                if name.startswith('META-INF/'):
+                    z.extract(name, app_dir)
+        app_dic = {
+            'md5': 'rs9',
+            'androguard_apk': a,
+            'app_path': self.allsigned_apk,
+            'app_dir': app_dir,
+            'tools_dir': TOOLS_DIR,
+        }
+        result = cert_info(app_dic, {'min_sdk': '21'})
+        janus = next(
+            f for f in result['certificate_findings']
+            if f[2] == 'Application vulnerable to Janus Vulnerability')
+        self.assertEqual(janus[0], 'warning')
+        self.assertGreaterEqual(result['certificate_summary']['warning'], 1)
+        shutil.rmtree(app_dir, ignore_errors=True)

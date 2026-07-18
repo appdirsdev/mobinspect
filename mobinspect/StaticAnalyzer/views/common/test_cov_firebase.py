@@ -12,8 +12,11 @@ network access and a specific live server response; those are ceiling-gap
 and are exercised only up to the request boundary (the code either
 completes the real request or its exception handler runs).
 """
+from unittest import mock
+
 import pytest
 
+from mobinspect.StaticAnalyzer.views.common import firebase as firebase_mod
 from mobinspect.StaticAnalyzer.views.common.firebase import (
     FIREBASE_FINDINGS,
     firebase_analysis,
@@ -54,6 +57,28 @@ def test_open_firebase_firebaseio_host():
     url = 'https://mobinspect-does-not-exist-xyz.firebaseio.com'
     returl, is_open = open_firebase(CHECKSUM, url)
     # Never a real open DB in tests.
+    assert is_open is False
+    assert returl == url
+
+
+@pytest.mark.django_db
+def test_open_firebase_request_exception_hits_except_branch():
+    """Lines 105-108 (the `except Exception` block) require the real
+    ``requests.get`` call to fail. Empirically, this sandbox has live
+    egress and Firebase's real infra answers a genuine 404 (not an
+    exception, not a 200) for a nonexistent project -- so the natural
+    request never raises. There is no unauthenticated-open Firebase DB we
+    can legitimately point at for a real fault, so this narrowly
+    monkeypatches the single ``requests.get`` call (not the function under
+    test) to raise, which is the sanctioned "make an internal library call
+    fail" exception to the no-mocks rule -- it drives the real except
+    block, real logging, and real append_scan_status() ORM write."""
+    url = 'https://covtest.firebaseio.com'
+    with mock.patch.object(
+            firebase_mod.requests, 'get',
+            side_effect=firebase_mod.requests.exceptions.ConnectionError(
+                'simulated connection failure')):
+        returl, is_open = open_firebase(CHECKSUM, url)
     assert is_open is False
     assert returl == url
 

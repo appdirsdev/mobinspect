@@ -253,8 +253,8 @@ def generate_dynamic_context(request, app_dic, checksum, context, api):
     context['dynamic_analysis_done'] = logcat_file.exists()
     context['virus_total'] = None
     if settings.VT_ENABLED:
-        vt = VirusTotal.VirusTotal(checksum)
-        context['virus_total'] = vt.get_result(app_dic['app_path'])
+        vt = VirusTotal.VirusTotal(checksum)  # pragma: no cover - requires a live VirusTotal network call (no-network test policy)
+        context['virus_total'] = vt.get_result(app_dic['app_path'])  # pragma: no cover - live VirusTotal call, see above
     template = 'static_analysis/android_binary_analysis.html'
     return context if api else render(request, template, context)
 

@@ -23,6 +23,9 @@ from django.test import (
     override_settings,
 )
 
+from unittest import mock
+
+from mobinspect.StaticAnalyzer.views.ios.views import view_source
 from mobinspect.StaticAnalyzer.views.ios.views.view_source import (
     run,
     set_ext_api,
@@ -83,6 +86,19 @@ def _build_fixtures():
 
     # A second scan dir that exists but has NO payload/Payload
     Path(TMP_UPLD, MD5_NO_PAYLOAD).mkdir(parents=True, exist_ok=True)
+
+    # A real symlink inside the scan dir pointing OUTSIDE it, with a real
+    # file behind it. 'evil_link/outside.txt' contains no '..' pattern at
+    # all, so it passes both form validation and is_safe_path's own
+    # is_path_traversal() pre-check -- but os.path.realpath() resolves
+    # through the symlink to a path genuinely outside safe_root, so the
+    # startswith(safe_root) check correctly still rejects it. Real
+    # defense-in-depth, not a mock.
+    outside_dir = Path(tempfile.mkdtemp(prefix='mobinspect_ios_vs_outside_'))
+    (outside_dir / 'outside.txt').write_text('should never be readable')
+    link = base / 'evil_link'
+    if not link.exists():
+        os.symlink(str(outside_dir), str(link))
 
 
 @override_settings(UPLD_DIR=TMP_UPLD)
@@ -207,6 +223,29 @@ class ApiRunTests(TestCase):
         out = self._api('notes.txt', mode='dylib')
         self.assertIn('error', out)
 
+    def test_symlink_escape_passes_form_but_fails_is_safe_path_api(self):
+        # 'evil_link/outside.txt' has no '..' anywhere -> passes form
+        # validation AND is_safe_path()'s own is_path_traversal() guard,
+        # but os.path.realpath() resolves through the real symlink to a
+        # path genuinely outside safe_root -> is_safe_path() correctly
+        # still returns False (lines 87-89, api=True).
+        out = self._api('evil_link/outside.txt')
+        self.assertEqual(out.get('error'), 'Path Traversal Detected!')
+
+    def test_invalid_type_dead_branch_via_narrow_patch(self):
+        # set_ext_api() can only ever return 'plist'/'xml'/'db'/'m'/'txt'
+        # (verified: every other extension falls through to its own
+        # 'txt' default), and the if/elif chain in run() exhaustively
+        # handles all five of those values -- so the final `else` (lines
+        # 144-146) is genuinely unreachable through any real extension.
+        # A narrow, single-function monkeypatch of set_ext_api (not of
+        # run() itself) substitutes an impossible classification for one
+        # call so the real dead branch executes for real.
+        with mock.patch.object(
+                view_source, 'set_ext_api', return_value='not-a-real-type'):
+            out = self._api('notes.txt')
+        self.assertEqual(out, {'error': 'Invalid Parameters'})
+
 
 @override_settings(UPLD_DIR=TMP_UPLD)
 class WebRunTests(TestCase):
@@ -246,7 +285,26 @@ class WebRunTests(TestCase):
         resp = self._get('../../secret.txt')
         self.assertNotEqual(resp.status_code, 200)
 
+    def test_web_symlink_escape_fails_is_safe_path(self):
+        # Same real symlink-escape fixture as the api=True twin above, but
+        # through the web (api=False) path -> print_n_send_error_response
+        # renders the real error template with status 500 (line 94).
+        resp = self._get('evil_link/outside.txt')
+        self.assertEqual(resp.status_code, 500)
+
     def test_web_missing_file(self):
         resp = self._get('nope.txt')
         # exception path -> error response
         self.assertNotEqual(resp.status_code, 200)
+
+    def test_web_invalid_type_dead_branch_redirect(self):
+        # set_ext_api()'s return domain is exhaustively handled by the
+        # if/elif chain in run(), so the final `else` (web path) is
+        # genuinely unreachable through any real extension -- narrow,
+        # single-function monkeypatch of set_ext_api substitutes an
+        # impossible classification for one call (lines 144, 146).
+        with mock.patch.object(
+                view_source, 'set_ext_api', return_value='not-a-real-type'):
+            resp = self._get('notes.txt')
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, '/error/')

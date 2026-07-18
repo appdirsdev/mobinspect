@@ -554,3 +554,123 @@ def test_process_manifest_empty_filter_rules():
     out = process_suppression_manifest(data, PKG)
     assert out['manifest_findings'] == data
     assert out['manifest_summary']['high'] == 1
+
+
+# ───────────────────────────────────────────── process_suppression_manifest:
+# regression test for a fixed production bug. Line 349 of suppression.py
+# used to read `elif ['severity'] == INFO:` (a list literal compared to a
+# string), which is a typo for `elif i['severity'] == INFO:` (matching the
+# HIGH/WARNING arms immediately above it). As originally written the
+# comparison was ALWAYS False, so `summary[INFO]` could never be
+# incremented by this function no matter what data was passed. This test
+# proves the fix (real execution, not a workaround): an INFO-severity
+# manifest finding IS now counted.
+@pytest.mark.django_db
+def test_process_manifest_info_severity_is_counted():
+    data = [{'rule': 'a', 'title': 'Some Activity', 'severity': 'info'}]
+    out = process_suppression_manifest(data, 'com.infobug')
+    assert out['manifest_findings'] == data
+    # This is 1 now that the elif compares `i['severity']` like its
+    # siblings -- see suppression.py line 350 (formerly unreachable).
+    assert out['manifest_summary']['info'] == 1
+
+
+# ───────────────────────────────────────────── generic except-Exception guards
+#
+# Each of the four AJAX views below wraps its body in try/except Exception
+# as a last-resort safety net. Reaching that arm (as opposed to the
+# explicit `invalid_params`/validation returns already covered above)
+# requires an unexpected failure from a call the view does not otherwise
+# guard against -- `SuppressFindings.objects.create/filter` genuinely
+# raising is not producible through any real input (the model has no
+# unique/not-null constraints to violate), so a single, narrow patch of
+# that ORM call (named per test) stands in for "some unexpected internal
+# failure", exactly the scenario the bare `except Exception:` exists for.
+@pytest.mark.django_db
+def test_suppress_rule_generic_exception_guard(django_user_model, monkeypatch):
+    u = _staff_user(django_user_model)
+    _android()
+    monkeypatch.setattr(
+        SuppressFindings.objects, 'create',
+        lambda **kw: (_ for _ in ()).throw(RuntimeError('simulated DB failure')))
+    res = suppress_by_rule_id(
+        _post(u, hash=VALID_MD5, rule='r1', type='code'), api=True)
+    assert res == {
+        'status': 'failed',
+        'message': 'Failed to suppress finding by rule id'}
+
+
+@pytest.mark.django_db
+def test_suppress_files_generic_exception_guard(django_user_model, monkeypatch):
+    u = _staff_user(django_user_model)
+    _android(code_analysis=CODE_RES)
+    monkeypatch.setattr(
+        SuppressFindings.objects, 'create',
+        lambda **kw: (_ for _ in ()).throw(RuntimeError('simulated DB failure')))
+    res = suppress_by_files(
+        _post(u, hash=VALID_MD5, rule='ruleA'), api=True)
+    assert res == {
+        'status': 'failed',
+        'message': 'Failed to suppress finding by files'}
+
+
+@pytest.mark.django_db
+def test_list_suppressions_generic_exception_guard(django_user_model, monkeypatch):
+    u = _staff_user(django_user_model)
+    _android()
+    monkeypatch.setattr(
+        SuppressFindings.objects, 'filter',
+        lambda **kw: (_ for _ in ()).throw(RuntimeError('simulated DB failure')))
+    res = list_suppressions(_post(u, hash=VALID_MD5), api=True)
+    # NOTE: by the time the patched call raises, list_suppressions() has
+    # already reassigned its local `data` from the initial failure dict to
+    # `[]` (in preparation for the success path) -- the except block
+    # returns whatever `data` currently holds, which is `[]` here, not the
+    # original dict. This differs from the other three views (their
+    # `data` dict is never reassigned before the point of failure).
+    assert res == []
+
+
+@pytest.mark.django_db
+def test_delete_suppression_generic_exception_guard(django_user_model, monkeypatch):
+    u = _staff_user(django_user_model)
+    _android()
+    monkeypatch.setattr(
+        SuppressFindings.objects, 'filter',
+        lambda **kw: (_ for _ in ()).throw(RuntimeError('simulated DB failure')))
+    res = delete_suppression(
+        _post(u, hash=VALID_MD5, rule='r1', type='code'), api=True)
+    assert res == {
+        'status': 'failed',
+        'message': 'Failed to delete suppression rule'}
+
+
+# ───────────────────────────────────────────── suppress_by_files: the
+# android/ios-existence "else" branch
+#
+# get_package(checksum) and this view's own android_static_db/ios_static_db
+# lookups query the SAME tables by the SAME checksum, so under normal
+# execution a truthy `package` guarantees one of the two `.exists()` checks
+# is also true -- the `else: return send_response(data, api)` arm is a
+# defensive TOCTOU guard against the row vanishing between those two reads.
+# `StaticAnalyzerAndroid.objects.filter` / `StaticAnalyzerIOS.objects.filter`
+# (NOT `.get`, which is what get_package() itself calls) are narrowly
+# patched to simulate exactly that race, while a real Android row backs
+# get_package()'s own (unpatched) lookup.
+@pytest.mark.django_db
+def test_suppress_files_neither_android_nor_ios_toctou(django_user_model, monkeypatch):
+    u = _staff_user(django_user_model)
+    _android(code_analysis=CODE_RES)  # backs get_package()'s real .get()
+
+    from mobinspect.StaticAnalyzer.models import StaticAnalyzerAndroid, StaticAnalyzerIOS
+    monkeypatch.setattr(
+        StaticAnalyzerAndroid.objects, 'filter',
+        lambda **kw: StaticAnalyzerAndroid.objects.none())
+    monkeypatch.setattr(
+        StaticAnalyzerIOS.objects, 'filter',
+        lambda **kw: StaticAnalyzerIOS.objects.none())
+
+    res = suppress_by_files(
+        _post(u, hash=VALID_MD5, rule='ruleA'), api=True)
+    assert res['status'] == 'failed'
+    assert res['message'] == 'Failed to suppress finding by files'

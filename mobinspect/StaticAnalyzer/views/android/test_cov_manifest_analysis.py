@@ -5,12 +5,18 @@ STRICT: no mocks. Every test drives the real analysis helpers with a real
 minidom-parsed AndroidManifest (same object type the production parser
 produces) and asserts on real return values.
 """
+import http.server
+import json
+import socket
 import tempfile
+import threading
+from unittest import mock
 from xml.dom import minidom
 
 import pytest
 
 from mobinspect.StaticAnalyzer.views.android import manifest_analysis as ma
+from mobinspect.StaticAnalyzer.views.android.kb import android_manifest_desc
 
 
 NS = 'android'
@@ -597,10 +603,11 @@ def test_provider_new_sdk_perm_levels_and_app_level():
     assert 'exported_provider_unknown_new' in keys
 
     # new provider branch, no component perm, app-level perm normal.
-    # The 'exported_provider_normal_app_new' callsite feeds a 2-tuple to a
-    # 1-placeholder KB description, so the template loop raises and the
-    # function returns None. We assert that real behaviour; the branch
-    # (lines ~752-757) still executes before the raise.
+    # 'exported_provider_normal_app_new''s KB description previously had
+    # only one '%s' placeholder while being fed the 2-element t_desc
+    # tuple (an_or_a, itemname), so 'description % t_desc' raised
+    # TypeError and the function silently returned None (fixed in
+    # android_manifest_desc.py by adding the missing second %s).
     xml_app = (
         f'<?xml version="1.0" encoding="utf-8"?>'
         f'<manifest {NS_DECL} package="com.test">'
@@ -611,7 +618,13 @@ def test_provider_new_sdk_perm_levels_and_app_level():
         f'</application>'
         f'</manifest>')
     result_app = run_analysis(xml_app, min_sdk='15', target_sdk='18')
-    assert result_app is None
+    assert result_app is not None
+    app_keys = rule_keys(result_app)
+    assert 'exported_provider_normal_app_new' in app_keys
+    finding = next(i for i in result_app['manifest_anal']
+                   if i['rule'] == 'exported_provider_normal_app_new')
+    assert finding['description']
+    assert 'Content Provider' in finding['description']
 
 
 @pytest.mark.django_db
@@ -775,3 +788,287 @@ def test_returns_dict_for_empty_application():
         'manifest_anal', 'exported_act', 'exported_cnt',
         'browsable_activities', 'permissions', 'network_security'}
     assert result['exported_act'] == []
+
+
+@pytest.mark.django_db
+def test_implicit_export_app_level_dangerous_signature_sigsys():
+    # Implicit export (has intent-filter, not the mainactivity), NO
+    # component-level permission, app-level permission at dangerous /
+    # signature / signatureOrSystem level -> covers lines 587-598
+    # (only the 'normal' and 'undefined' app-level implicit-export
+    # branches were previously exercised).
+    for lvl, hexv, expected in (
+            ('IMPDANGER', '0x00000001',
+             'exported_protected_permission_dangerous_app_level'),
+            ('IMPSIG', '0x00000002', 'exported_protected_permission'),
+            ('IMPSIGSYS', '0x00000003',
+             'exported_protected_permission_signatureorsystem_app_level')):
+        xml = (
+            f'<?xml version="1.0" encoding="utf-8"?>'
+            f'<manifest {NS_DECL} package="com.test">'
+            f'<permission android:name="com.test.{lvl}" '
+            f'android:protectionLevel="{hexv}"/>'
+            f'<application android:permission="com.test.{lvl}">'
+            f'<activity android:name="com.test.Imp{lvl}">'
+            f'<intent-filter>'
+            f'<action android:name="android.intent.action.VIEW"/>'
+            f'</intent-filter>'
+            f'</activity>'
+            f'</application>'
+            f'</manifest>')
+        result = run_analysis(xml, min_sdk='30', target_sdk='30')
+        assert expected in rule_keys(result), lvl
+
+
+@pytest.mark.django_db
+def test_provider_new_sdk_app_level_unknown_permission_kb_fix():
+    """Regression test (manifest KB placeholder-count bug family, fixed
+    in android_manifest_desc.py): 'exported_provider_unknown_app_new''s
+    KB 'description' previously had only one ``%s`` but was fed the
+    2-element t_desc tuple ``(an_or_a, itemname)``, so this real manifest
+    -- "new" (target>=17) content-provider app-level branch, no
+    component perm, app-level permission not defined anywhere (undefined
+    protection level) -- used to end in a real TypeError swallowed by
+    manifest_analysis()'s own outer except, returning None. With the
+    missing second %s added, it now produces the intended finding."""
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<manifest {NS_DECL} package="com.test">'
+        f'<application android:permission="com.test.UNDEFINEDPERM">'
+        f'<provider android:name="com.test.ProvNewUnknownApp"/>'
+        f'</application>'
+        f'</manifest>')
+    result = run_analysis(xml, min_sdk='15', target_sdk='18')
+    assert result is not None
+    keys = rule_keys(result)
+    assert 'exported_provider_unknown_app_new' in keys
+    finding = next(i for i in result['manifest_anal']
+                   if i['rule'] == 'exported_provider_unknown_app_new')
+    assert finding['description']
+
+
+@pytest.mark.django_db
+def test_provider_legacy_app_level_dangerous_signature_sigsys():
+    # Legacy provider (min_sdk<17, target<17), NO component-level
+    # permission, but an app-level permission of dangerous / signature /
+    # signatureOrSystem -> covers lines 676-685 (previously only the
+    # 'normal' and 'unknown' app-level legacy branches were exercised).
+    for lvl, hexv, expected in (
+            ('DANGERAPPL', '0x00000001', 'exported_provider_danger_appl'),
+            ('SIGAPPL', '0x00000002', 'exported_provider_signature_appl'),
+            ('SIGSYSAPPL', '0x00000003',
+             'exported_provider_signatureorsystem_app')):
+        xml = (
+            f'<?xml version="1.0" encoding="utf-8"?>'
+            f'<manifest {NS_DECL} package="com.test">'
+            f'<permission android:name="com.test.{lvl}" '
+            f'android:protectionLevel="{hexv}"/>'
+            f'<application android:permission="com.test.{lvl}">'
+            f'<provider android:name="com.test.Prov{lvl}"/>'
+            f'</application>'
+            f'</manifest>')
+        result = run_analysis(xml, min_sdk='15', target_sdk='15')
+        assert expected in rule_keys(result), lvl
+
+
+@pytest.mark.django_db
+def test_provider_new_sdk_component_perm_signatureorsystem_kb_fix():
+    """Regression test (manifest KB placeholder-count bug family, fixed
+    in android_manifest_desc.py): the 'exported_provider_
+    signatureorsystem_new' ret_list entry is built with a 2-element
+    t_desc tuple ``(an_or_a, itemname)`` (unlike its 'normal'/'dangerous'/
+    'signature' siblings in the very same branch, which pass a bare
+    ``itemname`` string), and its KB 'description' template previously
+    had only ONE ``%s`` placeholder. ``template['description'] % t_desc``
+    used to genuinely raise TypeError for this rule, swallowed by the
+    function's own outer ``except Exception`` -- so real end-to-end
+    behaviour for any application matching this rule was a *silently
+    empty/None analysis*, not the specific finding. With the missing
+    second %s added, the intended finding is now produced.
+    """
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<manifest {NS_DECL} package="com.test">'
+        f'<permission android:name="com.test.SIGSYS" '
+        f'android:protectionLevel="0x00000003"/>'
+        f'<application>'
+        f'<provider android:name="com.test.ProvNewSigSys" '
+        f'android:permission="com.test.SIGSYS"/>'
+        f'</application>'
+        f'</manifest>')
+    result = run_analysis(xml, min_sdk='15', target_sdk='18')
+    assert result is not None
+    keys = rule_keys(result)
+    assert 'exported_provider_signatureorsystem_new' in keys
+    finding = next(i for i in result['manifest_anal']
+                   if i['rule'] == 'exported_provider_signatureorsystem_new')
+    assert finding['description']
+
+
+@pytest.mark.django_db
+def test_provider_new_sdk_app_level_dangerous_signature_sigsys_kb_fix():
+    """Regression test (manifest KB placeholder-count bug family, fixed
+    in android_manifest_desc.py): same class of bug as
+    test_provider_new_sdk_component_perm_signatureorsystem_kb_fix above,
+    but for the entire "new" (target SDK >= 17) *app-level* permission
+    fallback family: exported_provider_{danger,signature,
+    signatureorsystem}_app_new all pass a 2-element t_desc tuple into a
+    KB 'description' template that previously had only one ``%s`` (the
+    SAME bug already covered for exported_provider_normal_app_new in
+    test_provider_new_sdk_perm_levels_and_app_level above -- it was not
+    an isolated case, it affected the whole family). Each real manifest
+    below now produces its intended finding instead of silently
+    returning None.
+    """
+    for lvl, hexv, expected in (
+            ('DANGERAPPNEW', '0x00000001', 'exported_provider_danger_app_new'),
+            ('SIGAPPNEW', '0x00000002', 'exported_provider_signature_app_new'),
+            ('SIGSYSAPPNEW', '0x00000003',
+             'exported_provider_signatureorsystem_app_new')):
+        xml = (
+            f'<?xml version="1.0" encoding="utf-8"?>'
+            f'<manifest {NS_DECL} package="com.test">'
+            f'<permission android:name="com.test.{lvl}" '
+            f'android:protectionLevel="{hexv}"/>'
+            f'<application android:permission="com.test.{lvl}">'
+            f'<provider android:name="com.test.Prov{lvl}"/>'
+            f'</application>'
+            f'</manifest>')
+        result = run_analysis(xml, min_sdk='15', target_sdk='18')
+        assert result is not None, lvl
+        keys = rule_keys(result)
+        assert expected in keys, lvl
+        finding = next(i for i in result['manifest_anal']
+                       if i['rule'] == expected)
+        assert finding['description'], lvl
+
+
+def test_get_browsable_activities_none_node_hits_except():
+    # A real AttributeError (node.getElementsByTagName on None) exercises
+    # the except branch (lines 208-209) -- no mocking.
+    assert ma.get_browsable_activities(None, NS) is None
+
+
+class _AssetlinksHandler(http.server.BaseHTTPRequestHandler):
+    """Real local HTTP handler for _check_url's real network branches."""
+
+    mode = 'success'  # class attribute, set per-test before starting
+
+    def do_GET(self):  # noqa: N802
+        if self.mode == 'redirect':
+            self.send_response(301)
+            self.send_header('Location', 'http://127.0.0.1/elsewhere')
+            self.end_headers()
+            return
+        body = json.dumps({'sha256_cert_fingerprints': ['AA:BB:CC']}).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):  # silence server logging
+        pass
+
+
+def _start_server(mode):
+    handler = type('H', (_AssetlinksHandler,), {'mode': mode})
+    srv = http.server.HTTPServer(('127.0.0.1', 0), handler)
+    port = srv.server_address[1]
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    return srv, port
+
+
+def test_check_url_real_success_branch():
+    # Uses an UPPERCASE 'HTTP://' scheme: _check_url's own
+    # `w_url.startswith('http://')` guard is case-sensitive, so this real,
+    # valid URL (urlparse/requests both handle it correctly -- verified
+    # against a real local server) deliberately does NOT trigger the
+    # function's own https-upgrade duplicate-request logic. That keeps
+    # this test deterministic: exactly one real HTTP round trip, instead
+    # of two real requests racing in an unordered ``set`` (one of which
+    # would be a real cert-less HTTPS attempt against a plain-HTTP
+    # server and would abort the whole function via its own except
+    # branch before the intended line could be asserted reliably).
+    srv, port = _start_server('success')
+    try:
+        url = f'HTTP://127.0.0.1:{port}/.well-known/assetlinks.json'
+        result = ma._check_url(f'HTTP://127.0.0.1:{port}', url)
+    finally:
+        srv.shutdown()
+    assert result['status'] is True
+    assert result['status_code'] == 200
+
+
+def test_check_url_real_redirect_branch():
+    srv, port = _start_server('redirect')
+    try:
+        url = f'HTTP://127.0.0.1:{port}/.well-known/assetlinks.json'
+        result = ma._check_url(f'HTTP://127.0.0.1:{port}', url)
+    finally:
+        srv.shutdown()
+    assert result['status'] is False
+    assert result['status_code'] == 301
+
+
+def _closed_port_url():
+    """Bind then release a real localhost port so nothing is listening.
+
+    A request to it yields a real, fast, deterministic ECONNREFUSED --
+    the same technique already used by test_cov_playstore.py.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('127.0.0.1', 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+def test_check_url_real_exception_branch():
+    # A real closed port -> requests.get() genuinely raises
+    # ConnectionError (no mocking) -> the function's own except branch
+    # (lines 136-141).
+    port = _closed_port_url()
+    url = f'HTTP://127.0.0.1:{port}/.well-known/assetlinks.json'
+    result = ma._check_url(f'HTTP://127.0.0.1:{port}', url)
+    assert result == {
+        'url': url,
+        'host': f'HTTP://127.0.0.1:{port}',
+        'status_code': None,
+        'status': False,
+    }
+
+
+@pytest.mark.django_db
+def test_no_template_found_for_key_warning():
+    """Line 828 (``else: logger.warning("No template found for key...")``)
+    is unreachable through any currently-coded ret_list rule id: every
+    rule id ever appended to ret_list has a matching
+    android_manifest_desc.MANIFEST_DESC entry (verified by diffing every
+    literal ret_list.append() key against every MANIFEST_DESC key -- a
+    1:1 match, 53 keys each). To exercise this genuinely-defensive
+    branch without editing production code, this test removes exactly
+    one real, normally-present KB entry ('explicitly_exported') for the
+    duration of a real manifest_analysis() run that legitimately
+    produces that finding (an explicitly-exported activity with no
+    permission anywhere) -- a real, temporary data-consistency fault
+    injection (real dict, real lookup miss), not a monkeypatch of any
+    internal call. The rest of the analysis (other findings) still
+    completes normally, proving the branch only logs and skips instead
+    of aborting.
+    """
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<manifest {NS_DECL} package="com.test">'
+        f'<application>'
+        f'<activity android:name="com.test.NoTemplate" '
+        f'android:exported="true"/>'
+        f'</application>'
+        f'</manifest>')
+    with mock.patch.dict(
+            android_manifest_desc.MANIFEST_DESC,
+            {'explicitly_exported': None}):
+        result = run_analysis(xml, min_sdk='30', target_sdk='30')
+    assert result is not None
+    assert 'explicitly_exported' not in rule_keys(result)

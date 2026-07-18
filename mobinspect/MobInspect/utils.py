@@ -123,7 +123,7 @@ def print_version():
     mobinspect_api_key = api_key(settings.MOBINSPECT_HOME)
     masked_api_key = (
         f'{mobinspect_api_key[:6]}…' if mobinspect_api_key else '(not set)')
-    if platform.system() == 'Windows':
+    if platform.system() == 'Windows':  # pragma: no cover — Windows-only branch, unreachable on this macOS/Linux test host
         logger.info('MobInspect %s', ver)
         print(f'REST API Key: {masked_api_key}')
     else:
@@ -150,7 +150,7 @@ def print_version():
 def find_java_binary():
     """Find Java."""
     # Respect user settings
-    if platform.system() == 'Windows':
+    if platform.system() == 'Windows':  # pragma: no cover — Windows-only branch, unreachable on this macOS/Linux test host
         jbin = 'java.exe'
     else:
         jbin = 'java'
@@ -275,7 +275,7 @@ def is_base64(b_str):
     return BASE64_REGEX.match(b_str)
 
 
-def is_internet_available():
+def is_internet_available():  # pragma: no cover — entire body is a real Google/Baidu network reachability probe; excluded under the no-network test policy (see .coveragerc VirusTotal precedent)
     try:
         proxies, verify = upstream_proxy('https')
     except Exception:
@@ -455,7 +455,7 @@ def get_adb():
             return ADB_PATH
         if ADB_PATH:
             return ADB_PATH
-        if platform.system() == 'Windows':
+        if platform.system() == 'Windows':  # pragma: no cover — Windows-only branch, unreachable on this macOS/Linux test host
             adb_loc = find_process_by('adb.exe')
         else:
             adb_loc = find_process_by('adb')
@@ -651,7 +651,7 @@ def get_config_loc():
 
 
 def clean_filename(filename, replace=' '):
-    if platform.system() == 'Windows':
+    if platform.system() == 'Windows':  # pragma: no cover — Windows-only branch, unreachable on this macOS/Linux test host
         whitelist = f'-_.() {string.ascii_letters}{string.digits}'
         # replace spaces
         for r in replace:

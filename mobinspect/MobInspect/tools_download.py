@@ -189,7 +189,7 @@ def install_jadx(mobinspect_home, version='1.5.0'):
 
 def set_rwxr_xr_x_permission_recursively(directory_path):
     """Set execute permissions recursively."""
-    if platform.system() == 'Windows':
+    if platform.system() == 'Windows':  # pragma: no cover — Windows-only branch, unreachable on this macOS/Linux test host
         logger.info('Permission setting is skipped on non-Unix systems.')
         return
 
@@ -202,6 +202,6 @@ def set_rwxr_xr_x_permission_recursively(directory_path):
         path.chmod(0o755)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover — CLI script entrypoint, never executed when imported as a module under test (consistent with the .coveragerc precedent of omitting __main__.py)
     logging.basicConfig(level=logging.INFO)
     install_jadx(sys.argv[1])

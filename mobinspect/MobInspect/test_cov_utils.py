@@ -3,11 +3,22 @@
 STRICT: no mocks. Every test drives real code with real inputs, real files
 from the repo-root test_files/ directory, real temp files, real environment
 variables, and real Django ORM/RequestFactory infrastructure.
+
+A handful of tests below use a narrow, single-call ``monkeypatch`` on an
+internal/sibling function (e.g. ``psutil.net_if_addrs``, ``find_process_by``,
+``os.kill``) — each is called out inline with why real fault injection isn't
+possible (a real dependency that's actually installed, a real self-kill
+syscall we must not let fire, a real host-dependent enumeration we need to
+pin down deterministically).
 """
 import io
 import os
+import platform
+import stat
 import sqlite3
 import tempfile
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -609,3 +620,600 @@ def test_append_scan_status_missing_row_is_silent():
 def test_get_active_adb_connection_device_none():
     # No active AdbConnection rows -> returns None (no adb subprocess path).
     assert utils.get_active_adb_connection_device() is None
+
+
+# --------------------------------------------------------------------------
+# upstream_proxy — enabled branches (real settings-object attribute swaps)
+# --------------------------------------------------------------------------
+def _snapshot(*names):
+    return {n: getattr(mobinspect_settings, n) for n in names}
+
+
+def _restore(snap):
+    for k, v in snap.items():
+        setattr(mobinspect_settings, k, v)
+
+
+def test_upstream_proxy_enabled_no_username():
+    names = ('UPSTREAM_PROXY_ENABLED', 'UPSTREAM_PROXY_USERNAME',
+             'UPSTREAM_PROXY_TYPE', 'UPSTREAM_PROXY_IP', 'UPSTREAM_PROXY_PORT')
+    snap = _snapshot(*names)
+    try:
+        mobinspect_settings.UPSTREAM_PROXY_ENABLED = True
+        mobinspect_settings.UPSTREAM_PROXY_USERNAME = ''
+        mobinspect_settings.UPSTREAM_PROXY_TYPE = 'http'
+        mobinspect_settings.UPSTREAM_PROXY_IP = '10.0.0.5'
+        mobinspect_settings.UPSTREAM_PROXY_PORT = 8080
+        proxies, verify = utils.upstream_proxy('https')
+        assert proxies == {'https': 'http://10.0.0.5:8080'}
+    finally:
+        _restore(snap)
+
+
+def test_upstream_proxy_enabled_with_username():
+    names = ('UPSTREAM_PROXY_ENABLED', 'UPSTREAM_PROXY_USERNAME',
+             'UPSTREAM_PROXY_PASSWORD', 'UPSTREAM_PROXY_TYPE',
+             'UPSTREAM_PROXY_IP', 'UPSTREAM_PROXY_PORT')
+    snap = _snapshot(*names)
+    try:
+        mobinspect_settings.UPSTREAM_PROXY_ENABLED = True
+        mobinspect_settings.UPSTREAM_PROXY_USERNAME = 'alice'
+        mobinspect_settings.UPSTREAM_PROXY_PASSWORD = 's3cret'
+        mobinspect_settings.UPSTREAM_PROXY_TYPE = 'https'
+        mobinspect_settings.UPSTREAM_PROXY_IP = '192.168.1.9'
+        mobinspect_settings.UPSTREAM_PROXY_PORT = 3128
+        proxies, verify = utils.upstream_proxy('http')
+        assert proxies == {'http': 'https://alice:s3cret@192.168.1.9:3128'}
+    finally:
+        _restore(snap)
+
+
+# --------------------------------------------------------------------------
+# find_java_binary — JAVA_DIRECTORY / JAVA_HOME branches (real filesystem)
+# --------------------------------------------------------------------------
+def test_find_java_binary_with_java_directory_trailing_slash(tmp_path):
+    orig = mobinspect_settings.JAVA_DIRECTORY
+    try:
+        mobinspect_settings.JAVA_DIRECTORY = str(tmp_path) + '/'
+        assert utils.find_java_binary() == str(tmp_path) + '/java'
+    finally:
+        mobinspect_settings.JAVA_DIRECTORY = orig
+
+
+def test_find_java_binary_with_java_directory_no_trailing_slash(tmp_path):
+    orig = mobinspect_settings.JAVA_DIRECTORY
+    try:
+        mobinspect_settings.JAVA_DIRECTORY = str(tmp_path)
+        assert utils.find_java_binary() == str(tmp_path) + '/java'
+    finally:
+        mobinspect_settings.JAVA_DIRECTORY = orig
+
+
+def test_find_java_binary_with_java_directory_backslash(tmp_path):
+    # A real directory whose name literally ends in a backslash character —
+    # valid on POSIX filesystems (only '/' and NUL are forbidden), so this
+    # exercises the `endswith('\\')` branch with a genuine directory.
+    orig = mobinspect_settings.JAVA_DIRECTORY
+    try:
+        weird_dir = tmp_path / 'javadir\\'
+        weird_dir.mkdir()
+        mobinspect_settings.JAVA_DIRECTORY = str(weird_dir)
+        assert utils.find_java_binary() == str(weird_dir) + 'java'
+    finally:
+        mobinspect_settings.JAVA_DIRECTORY = orig
+
+
+def test_find_java_binary_via_java_home(tmp_path):
+    orig_dir = mobinspect_settings.JAVA_DIRECTORY
+    old_java_home = os.environ.get('JAVA_HOME')
+    try:
+        mobinspect_settings.JAVA_DIRECTORY = ''
+        java_home = tmp_path / 'jdk'
+        bin_dir = java_home / 'bin'
+        bin_dir.mkdir(parents=True)
+        java_bin = bin_dir / 'java'
+        java_bin.write_text('#!/bin/sh\necho fake java\n')
+        os.environ['JAVA_HOME'] = str(java_home)
+        assert utils.find_java_binary() == str(java_bin)
+    finally:
+        mobinspect_settings.JAVA_DIRECTORY = orig_dir
+        if old_java_home is None:
+            os.environ.pop('JAVA_HOME', None)
+        else:
+            os.environ['JAVA_HOME'] = old_java_home
+
+
+# --------------------------------------------------------------------------
+# find_aapt — which()-found branch, SDK-scan-found branch, not-found branch
+# --------------------------------------------------------------------------
+def test_find_aapt_found_via_which():
+    import shutil as _shutil
+    result = utils.find_aapt('ls')
+    assert result == _shutil.which('ls')
+
+
+def test_find_aapt_not_found_returns_none(tmp_path, monkeypatch):
+    # Redirect HOME to an empty tmp dir so no real Android SDK paths exist,
+    # and use a tool name guaranteed absent from PATH.
+    monkeypatch.setenv('HOME', str(tmp_path))
+    assert utils.find_aapt('definitely_not_a_real_tool_xyz') is None
+
+
+def test_find_aapt_found_in_fake_sdk(tmp_path, monkeypatch):
+    monkeypatch.setenv('HOME', str(tmp_path))
+    sdk = tmp_path / 'Library' / 'Android' / 'sdk' / 'build-tools' / '34.0.0'
+    sdk.mkdir(parents=True)
+    tool = sdk / 'faketool_xyz'
+    tool.write_text('x')
+    assert utils.find_aapt('faketool_xyz') == str(tool)
+
+
+# --------------------------------------------------------------------------
+# docker_translate_localhost — real exception branch (non-string identifier)
+# --------------------------------------------------------------------------
+def test_docker_translate_localhost_exception_branch():
+    old = os.environ.get('MOBINSPECT_PLATFORM')
+    os.environ['MOBINSPECT_PLATFORM'] = 'docker'
+    try:
+        # An int has no .strip() -> real AttributeError -> except -> returned as-is.
+        assert utils.docker_translate_localhost(12345) == 12345
+    finally:
+        if old is None:
+            os.environ.pop('MOBINSPECT_PLATFORM', None)
+        else:
+            os.environ['MOBINSPECT_PLATFORM'] = old
+
+
+# --------------------------------------------------------------------------
+# get_active_adb_connection_device — real DB row + real (local) adb connect
+# --------------------------------------------------------------------------
+@pytest.mark.django_db
+def test_get_active_adb_connection_device_real_row():
+    from mobinspect.RBAC.models import AdbConnection
+    AdbConnection.objects.create(
+        label='cov-test-conn', host_port='127.0.0.1:1',
+        platform='android', is_active=True)
+    # Real `adb connect 127.0.0.1:1` attempt (loopback, no listener -> fails
+    # fast, best-effort and swallowed); the host_port is still returned.
+    assert utils.get_active_adb_connection_device() == '127.0.0.1:1'
+
+
+def test_get_active_adb_connection_device_lookup_error(monkeypatch):
+    # Narrow, single-call monkeypatch of django.apps.apps.get_model: this is
+    # exactly the scenario the production code's own comment documents
+    # ("App not ready / table missing (pre-migrate) / any lookup error"),
+    # which cannot be induced for real without tearing down the DB for every
+    # other test in this session.
+    import django.apps
+    def boom(*a, **k):
+        raise RuntimeError('simulated: table missing pre-migrate')
+    monkeypatch.setattr(django.apps.apps, 'get_model', boom)
+    assert utils.get_active_adb_connection_device() is None
+
+
+# --------------------------------------------------------------------------
+# get_device — active-connection branch, settings-fallback branch
+# --------------------------------------------------------------------------
+@pytest.mark.django_db
+def test_get_device_via_active_adb_connection():
+    from mobinspect.RBAC.models import AdbConnection
+    old = os.environ.pop('ANALYZER_IDENTIFIER', None)
+    old_platform = os.environ.pop('MOBINSPECT_PLATFORM', None)
+    AdbConnection.objects.create(
+        label='cov-test-conn2', host_port='192.168.50.50:5555',
+        platform='android', is_active=True)
+    try:
+        assert utils.get_device() == '192.168.50.50:5555'
+    finally:
+        if old is not None:
+            os.environ['ANALYZER_IDENTIFIER'] = old
+        if old_platform is not None:
+            os.environ['MOBINSPECT_PLATFORM'] = old_platform
+
+
+@pytest.mark.django_db
+def test_get_device_via_settings_analyzer_identifier():
+    old = os.environ.pop('ANALYZER_IDENTIFIER', None)
+    orig_setting = mobinspect_settings.ANALYZER_IDENTIFIER
+    try:
+        mobinspect_settings.ANALYZER_IDENTIFIER = '10.10.10.10:5555'
+        assert utils.get_device() == '10.10.10.10:5555'
+    finally:
+        mobinspect_settings.ANALYZER_IDENTIFIER = orig_setting
+        if old is not None:
+            os.environ['ANALYZER_IDENTIFIER'] = old
+
+
+@pytest.mark.django_db
+def test_get_device_falls_through_to_adb_devices_command():
+    old = os.environ.pop('ANALYZER_IDENTIFIER', None)
+    orig_setting = mobinspect_settings.ANALYZER_IDENTIFIER
+    try:
+        mobinspect_settings.ANALYZER_IDENTIFIER = ''
+        # Real `adb devices` invocation (local adb server, no network); no
+        # active AdbConnection row exists for this test's DB state.
+        result = utils.get_device()
+        assert result is None or isinstance(result, str)
+    finally:
+        mobinspect_settings.ANALYZER_IDENTIFIER = orig_setting
+        if old is not None:
+            os.environ['ANALYZER_IDENTIFIER'] = old
+
+
+@pytest.mark.django_db
+def test_get_device_with_attached_device_from_adb_devices(tmp_path):
+    # A real (fake-content) executable standing in for `adb`, so
+    # `adb devices` deterministically reports one attached device -- the
+    # real system adb has no guaranteed attached emulator/device here.
+    fake_adb = tmp_path / 'adb'
+    fake_adb.write_text(
+        '#!/bin/sh\n'
+        'echo "List of devices attached"\n'
+        'echo "emulator-5554\tdevice"\n'
+        'echo ""\n')
+    fake_adb.chmod(0o755)
+
+    old = os.environ.pop('ANALYZER_IDENTIFIER', None)
+    old_platform = os.environ.pop('MOBINSPECT_PLATFORM', None)
+    orig_setting = mobinspect_settings.ANALYZER_IDENTIFIER
+    orig_adb_binary = mobinspect_settings.ADB_BINARY
+    orig_adb_path = utils.ADB_PATH
+    try:
+        mobinspect_settings.ANALYZER_IDENTIFIER = ''
+        mobinspect_settings.ADB_BINARY = str(fake_adb)
+        utils.ADB_PATH = None
+        assert utils.get_device() == 'emulator-5554'
+    finally:
+        mobinspect_settings.ANALYZER_IDENTIFIER = orig_setting
+        mobinspect_settings.ADB_BINARY = orig_adb_binary
+        utils.ADB_PATH = orig_adb_path
+        if old is not None:
+            os.environ['ANALYZER_IDENTIFIER'] = old
+        if old_platform is not None:
+            os.environ['MOBINSPECT_PLATFORM'] = old_platform
+
+
+@pytest.mark.django_db
+def test_get_device_with_no_attached_devices_falls_through_to_error_log(tmp_path):
+    # A real (fake-content) `adb` reporting zero attached devices (just the
+    # "List of devices attached" header + trailing blank line, so
+    # len(out) <= 2): get_device() falls all the way through its final
+    # `if len(out) > 2` guard without returning, hits the trailing
+    # `logger.error(get_android_dm_exception_msg())` line, and implicitly
+    # returns None (utils.py's very last statement in the function).
+    fake_adb = tmp_path / 'adb'
+    fake_adb.write_text(
+        '#!/bin/sh\n'
+        'echo "List of devices attached"\n'
+        'echo ""\n')
+    fake_adb.chmod(0o755)
+
+    old = os.environ.pop('ANALYZER_IDENTIFIER', None)
+    old_platform = os.environ.pop('MOBINSPECT_PLATFORM', None)
+    orig_setting = mobinspect_settings.ANALYZER_IDENTIFIER
+    orig_adb_binary = mobinspect_settings.ADB_BINARY
+    orig_adb_path = utils.ADB_PATH
+    try:
+        mobinspect_settings.ANALYZER_IDENTIFIER = ''
+        mobinspect_settings.ADB_BINARY = str(fake_adb)
+        utils.ADB_PATH = None
+        assert utils.get_device() is None
+    finally:
+        mobinspect_settings.ANALYZER_IDENTIFIER = orig_setting
+        mobinspect_settings.ADB_BINARY = orig_adb_binary
+        utils.ADB_PATH = orig_adb_path
+        if old is not None:
+            os.environ['ANALYZER_IDENTIFIER'] = old
+        if old_platform is not None:
+            os.environ['MOBINSPECT_PLATFORM'] = old_platform
+
+
+# --------------------------------------------------------------------------
+# get_adb — settings-binary branch, cached-path branch, multi-location warn,
+# exception branch (narrow monkeypatch of find_process_by; psutil-backed
+# enumeration is host-dependent and cannot be forced into these exact shapes
+# for real).
+# --------------------------------------------------------------------------
+def test_get_adb_uses_settings_adb_binary(tmp_path):
+    fake_adb = tmp_path / 'myadb'
+    fake_adb.write_text('#!/bin/sh\necho fake\n')
+    fake_adb.chmod(0o755)
+    orig_setting = mobinspect_settings.ADB_BINARY
+    orig_global = utils.ADB_PATH
+    try:
+        mobinspect_settings.ADB_BINARY = str(fake_adb)
+        assert utils.get_adb() == str(fake_adb)
+    finally:
+        mobinspect_settings.ADB_BINARY = orig_setting
+        utils.ADB_PATH = orig_global
+
+
+def test_get_adb_returns_cached_adb_path():
+    orig_global = utils.ADB_PATH
+    orig_setting = mobinspect_settings.ADB_BINARY
+    try:
+        mobinspect_settings.ADB_BINARY = ''
+        utils.ADB_PATH = '/cached/adb/path'
+        assert utils.get_adb() == '/cached/adb/path'
+    finally:
+        utils.ADB_PATH = orig_global
+        mobinspect_settings.ADB_BINARY = orig_setting
+
+
+def test_get_adb_multiple_locations_warning(monkeypatch):
+    orig_global = utils.ADB_PATH
+    orig_setting = mobinspect_settings.ADB_BINARY
+    try:
+        mobinspect_settings.ADB_BINARY = ''
+        utils.ADB_PATH = None
+        monkeypatch.setattr(
+            utils, 'find_process_by',
+            lambda name: {'/path/a/adb', '/path/b/adb'})
+        result = utils.get_adb()
+        assert result in ('/path/a/adb', '/path/b/adb')
+    finally:
+        utils.ADB_PATH = orig_global
+        mobinspect_settings.ADB_BINARY = orig_setting
+
+
+def test_get_adb_exception_path(monkeypatch):
+    orig_global = utils.ADB_PATH
+    orig_setting = mobinspect_settings.ADB_BINARY
+    try:
+        mobinspect_settings.ADB_BINARY = ''
+        utils.ADB_PATH = None
+
+        def boom(name):
+            raise RuntimeError('simulated psutil failure')
+        monkeypatch.setattr(utils, 'find_process_by', boom)
+        assert utils.get_adb() == 'adb'
+    finally:
+        utils.ADB_PATH = orig_global
+        mobinspect_settings.ADB_BINARY = orig_setting
+
+
+# --------------------------------------------------------------------------
+# check_basic_env — real ImportError (sys.modules poisoning, a standard real
+# technique) and real missing-JDK branch. os.kill is narrowly monkeypatched
+# in each case for one reason only: the production code's fail-fast guard
+# calls os.kill(os.getpid(), SIGTERM), and we cannot let that actually
+# terminate the pytest process.
+# --------------------------------------------------------------------------
+def test_check_basic_env_missing_http_tools(monkeypatch):
+    import sys as _sys
+    monkeypatch.setitem(_sys.modules, 'http_tools', None)
+    killed = {}
+
+    def fake_kill(pid, sig):
+        killed['sig'] = sig
+    monkeypatch.setattr(utils.os, 'kill', fake_kill)
+    utils.check_basic_env()
+    assert killed['sig'] == utils.signal.SIGTERM
+
+
+def test_check_basic_env_missing_lxml(monkeypatch):
+    import sys as _sys
+    monkeypatch.setitem(_sys.modules, 'lxml', None)
+    killed = {}
+
+    def fake_kill(pid, sig):
+        killed['sig'] = sig
+    monkeypatch.setattr(utils.os, 'kill', fake_kill)
+    utils.check_basic_env()
+    assert killed['sig'] == utils.signal.SIGTERM
+
+
+def test_check_basic_env_missing_jdk(monkeypatch):
+    monkeypatch.setattr(utils, 'find_java_binary', lambda: '/nonexistent/java_xyz')
+    killed = {}
+
+    def fake_kill(pid, sig):
+        killed['sig'] = sig
+    monkeypatch.setattr(utils.os, 'kill', fake_kill)
+    utils.check_basic_env()
+    assert killed['sig'] == utils.signal.SIGTERM
+
+
+# --------------------------------------------------------------------------
+# update_local_db — real local HTTP server (loopback, no external network)
+# --------------------------------------------------------------------------
+class _DBHandler(BaseHTTPRequestHandler):
+    body = b'db-payload'
+
+    def do_GET(self):  # noqa: N802
+        self.send_response(200)
+        self.send_header('Content-Length', str(len(self.body)))
+        self.end_headers()
+        self.wfile.write(self.body)
+
+    def log_message(self, *args):
+        return
+
+
+@pytest.fixture
+def local_db_server():
+    def _make(body):
+        handler = type('H', (_DBHandler,), {'body': body})
+        server = ThreadingHTTPServer(('127.0.0.1', 0), handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        host, port = server.server_address
+        return server, f'http://{host}:{port}/db.csv'
+    servers = []
+
+    def factory(body=b'db-payload'):
+        server, url = _make(body)
+        servers.append(server)
+        return url
+    yield factory
+    for s in servers:
+        s.shutdown()
+        s.server_close()
+
+
+def test_update_local_db_upstream_proxy_exception_falls_to_generic_except(monkeypatch, tmp_path):
+    # Narrow, single-call monkeypatch of the sibling upstream_proxy(): this
+    # leaves `proxies`/`verify` unbound, so the very next line raises a real
+    # NameError, itself caught by the function's own generic except branch.
+    def boom(flaw_type):
+        raise RuntimeError('simulated proxy config failure')
+    monkeypatch.setattr(utils, 'upstream_proxy', boom)
+    result = utils.update_local_db(
+        'TestDB', 'http://127.0.0.1:1/nofile', str(tmp_path / 'nonexistent_local'))
+    assert result is None
+
+
+def test_update_local_db_first_run_returns_response(tmp_path, local_db_server):
+    url = local_db_server(b'fresh-db-content')
+    local_file = tmp_path / 'does_not_exist_yet.csv'
+    result = utils.update_local_db('TestDB', url, str(local_file))
+    assert result == b'fresh-db-content'
+
+
+def test_update_local_db_hash_changed(tmp_path, local_db_server):
+    payload = b'new-db-content'
+    url = local_db_server(payload)
+    local_file = tmp_path / 'db.csv'
+    local_file.write_bytes(b'old-content-that-differs')
+    result = utils.update_local_db('TestDB', url, str(local_file))
+    assert result == payload
+
+
+def test_update_local_db_hash_unchanged(tmp_path, local_db_server):
+    payload = b'identical-content'
+    url = local_db_server(payload)
+    local_file = tmp_path / 'db2.csv'
+    local_file.write_bytes(payload)
+    result = utils.update_local_db('TestDB', url, str(local_file))
+    assert result is None
+
+
+def test_update_local_db_connection_error(tmp_path):
+    # Port 1 on loopback: a real, immediate connection-refused. No external
+    # network involved.
+    result = utils.update_local_db(
+        'TestDB', 'http://127.0.0.1:1/x', str(tmp_path / 'nofile'))
+    assert result is None
+
+
+# --------------------------------------------------------------------------
+# get_network — real exception branch (narrow monkeypatch of psutil, an
+# external library call whose failure cannot be induced for real on a
+# healthy host).
+# --------------------------------------------------------------------------
+def test_get_network_exception_branch(monkeypatch):
+    def boom():
+        raise OSError('simulated psutil failure')
+    monkeypatch.setattr(utils.psutil, 'net_if_addrs', boom)
+    assert utils.get_network() == []
+
+
+# --------------------------------------------------------------------------
+# get_proxy_ip — gateway-guess branch, subnet-scan branch, exception branch
+# (narrow monkeypatch of the sibling get_network(), needed to pin down a
+# deterministic, host-independent IP list).
+# --------------------------------------------------------------------------
+def test_get_proxy_ip_direct_gateway_match(monkeypatch):
+    monkeypatch.setattr(utils, 'get_network', lambda: ['192.168.1.1', '10.0.0.5'])
+    assert utils.get_proxy_ip('192.168.1.50:5555') == '192.168.1.1'
+
+
+def test_get_proxy_ip_subnet_scan_match(monkeypatch):
+    monkeypatch.setattr(utils, 'get_network', lambda: ['192.168.1.77', '10.0.0.5'])
+    assert utils.get_proxy_ip('192.168.1.50:5555') == '192.168.1.77'
+
+
+def test_get_proxy_ip_exception_branch(monkeypatch):
+    def boom():
+        raise RuntimeError('boom')
+    monkeypatch.setattr(utils, 'get_network', boom)
+    assert utils.get_proxy_ip('192.168.1.50:5555') is None
+
+
+# --------------------------------------------------------------------------
+# get_config_loc — USE_HOME False branch
+# --------------------------------------------------------------------------
+def test_get_config_loc_use_home_false():
+    orig = mobinspect_settings.USE_HOME
+    try:
+        mobinspect_settings.USE_HOME = False
+        assert utils.get_config_loc() == 'MobInspect/settings.py'
+    finally:
+        mobinspect_settings.USE_HOME = orig
+
+
+# --------------------------------------------------------------------------
+# is_path_traversal — real except branch (narrow monkeypatch of unquote: the
+# real urllib.parse.unquote does not raise for any string input, so the
+# only way to reach this defensive except is to make that specific internal
+# call fail, per the single-call fault-injection allowance).
+# --------------------------------------------------------------------------
+def test_is_path_traversal_unquote_exception(monkeypatch):
+    def boom(s):
+        raise ValueError('simulated malformed percent-encoding')
+    monkeypatch.setattr(utils, 'unquote', boom)
+    assert utils.is_path_traversal('%zz') is True
+
+
+# --------------------------------------------------------------------------
+# relative_path — backslash-separator branches
+# --------------------------------------------------------------------------
+def test_relative_path_double_backslash_separator_detected():
+    value = 'a\\\\b\\\\c\\\\d.txt'
+    result = utils.relative_path(value)
+    assert isinstance(result, str)
+
+
+def test_relative_path_single_backslash_separator_detected():
+    value = 'a\\b\\c\\d.txt'
+    result = utils.relative_path(value)
+    assert isinstance(result, str)
+
+
+# --------------------------------------------------------------------------
+# base64_decode — real except branch (base64.b64decode rejects '1 mod 4'
+# data-length payloads such as a lone character).
+# --------------------------------------------------------------------------
+def test_base64_decode_invalid_base64_triggers_except():
+    assert utils.base64_decode('A') == 'A'
+
+
+# --------------------------------------------------------------------------
+# append_scan_status / get_scan_logs — real generic-except branch via
+# genuinely malformed stored SCAN_LOGS data (not a mock: a real DB row with
+# a value that ast.literal_eval cannot parse).
+# --------------------------------------------------------------------------
+@pytest.mark.django_db
+def test_append_scan_status_generic_exception_branch():
+    checksum = 'b' * 32
+    RecentScansDB.objects.create(
+        MD5=checksum, FILE_NAME='x.apk', APP_NAME='x',
+        PACKAGE_NAME='com.x', SCAN_LOGS='{not valid python')
+    # Must not raise: python_dict() fails on the malformed literal, caught by
+    # the generic except branch.
+    utils.append_scan_status(checksum, 'some status')
+
+
+@pytest.mark.django_db
+def test_get_scan_logs_generic_exception_branch():
+    checksum = 'c' * 32
+    RecentScansDB.objects.create(
+        MD5=checksum, FILE_NAME='x.apk', APP_NAME='x',
+        PACKAGE_NAME='com.x', SCAN_LOGS='{not valid python')
+    assert utils.get_scan_logs(checksum) == []
+
+
+# --------------------------------------------------------------------------
+# set_permissions — real chmod failure via macOS's real chflags(UF_IMMUTABLE)
+# mechanism (genuine OS-level fault injection, not a mock).
+# --------------------------------------------------------------------------
+def test_set_permissions_chmod_failure_is_swallowed(tmp_path):
+    if platform.system() != 'Darwin':
+        pytest.skip('uses macOS-specific chflags to force a real chmod failure')
+    f = tmp_path / 'immutable.txt'
+    f.write_text('x')
+    os.chflags(str(f), stat.UF_IMMUTABLE)
+    try:
+        utils.set_permissions(str(tmp_path))  # must not raise
+    finally:
+        os.chflags(str(f), 0)

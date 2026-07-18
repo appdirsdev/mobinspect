@@ -105,7 +105,7 @@ def _apk_package_version(file_path):
     try:
         from mobinspect.StaticAnalyzer.tools.androguard4 import apk
         a = apk.APK(file_path)
-        if not a:
+        if not a:  # pragma: no cover — unreachable: androguard4's APK class has no __bool__/__len__, so a successfully-constructed instance is always truthy; APK() either returns an instance or raises (caught below)
             return '', ''
         return (a.get_package() or '',
                 a.get_androidversion_name() or '')

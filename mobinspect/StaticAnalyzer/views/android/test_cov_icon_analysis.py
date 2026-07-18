@@ -7,6 +7,7 @@ samples, real SVG files through svgutils, and the real Django test DB
 (append_scan_status issues a real ORM query).
 """
 import io
+import os
 import tempfile
 import zipfile
 from pathlib import Path
@@ -370,6 +371,22 @@ class GetIconApkResTests(TestCase):
             self.assertTrue(out.endswith('ic_launcher.png'))
             self.assertTrue((Path(tmp) / 'res').exists())
 
+    def test_apktool_res_fallback_copytree_exception_swallowed(self):
+        # A real, read-only app_dir makes copytree's real mkdir('res') fail
+        # with a genuine PermissionError, exercising the inner except
+        # (the outer function still completes and returns '' -- no crash).
+        with tempfile.TemporaryDirectory() as tmp:
+            apk_res = Path(tmp) / 'apktool_out' / 'res' / 'mipmap-hdpi'
+            apk_res.mkdir(parents=True)
+            (apk_res / 'ic_launcher.png').write_bytes(PNG_BYTES)
+            os.chmod(tmp, 0o555)
+            try:
+                out = get_icon_apk_res(self._base(tmp))
+                self.assertEqual(out, '')
+                self.assertFalse((Path(tmp) / 'res').exists())
+            finally:
+                os.chmod(tmp, 0o755)
+
 
 class GetIconApkTests(TestCase):
 
@@ -495,6 +512,13 @@ class GetIconSvgFromXmlTests(TestCase):
             xpath.parent.mkdir(parents=True)
             xpath.write_text('<adaptive-icon></adaptive-icon>')
             self.assertIsNone(get_icon_svg_from_xml(app_dir, icon_rel))
+
+    def test_fallback_itself_raises_is_swallowed(self):
+        # A non-Path app_dir makes the outer try's `app_dir / ...` raise a
+        # real TypeError (caught by the outer except); the fallback block
+        # performs the exact same `app_dir / ...` operation and raises the
+        # same real TypeError again, exercising the nested except.
+        self.assertIsNone(get_icon_svg_from_xml(12345, 'whatever.xml'))
 
 
 class ConvertAxmlToXmlTests(TestCase):

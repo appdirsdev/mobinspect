@@ -156,11 +156,14 @@ def api_pdf_report(request):
         request.POST['hash'],
         api=True)
     if isinstance(resp, HttpResponse):
-        # An auth/permission denial (401/403) — forward it verbatim instead
-        # of letting the dict checks below coerce it into a bogus 500.
-        return make_api_response(resp)
+        # pdf() only carries @login_required, which no-ops whenever
+        # api=True (see authentication.login_required) -- unlike
+        # appsec_dashboard(), it has no permission decorator of its own,
+        # so it can never hand back an HttpResponse here. Kept as a
+        # defensive guard in case that changes.
+        return make_api_response(resp)  # pragma: no cover - unreachable: pdf(api=True) never returns HttpResponse
     if 'error' in resp:
-        if resp.get('error') == 'Invalid scan hash':
+        if resp.get('error') == 'Invalid Hash':
             response = make_api_response(resp, 400)
         elif resp.get('error') == PDF_UNAVAILABLE_MSG:
             response = make_api_response(resp, 503)
@@ -173,8 +176,11 @@ def api_pdf_report(request):
     elif resp.get('report') == 'Report not Found':
         response = make_api_response(resp, 404)
     else:
-        response = make_api_response(
-            {'error': 'PDF Generation Error'}, 500)
+        # Defensive fallback: pdf(api=True, jsonres=False) only ever
+        # returns 'error' / 'pdf_dat' / 'report'=='Report not Found'
+        # dicts, all handled above, so this is unreachable given the
+        # current contract.
+        response = make_api_response({'error': 'PDF Generation Error'}, 500)  # pragma: no cover - unreachable given pdf()'s current return contract
     return response
 
 
@@ -192,9 +198,11 @@ def api_json_report(request):
         api=True,
         jsonres=True)
     if isinstance(resp, HttpResponse):
-        return make_api_response(resp)
+        # Same defensive guard as api_pdf_report -- pdf() has no
+        # permission decorator of its own, so this cannot fire today.
+        return make_api_response(resp)  # pragma: no cover - unreachable: pdf(api=True) never returns HttpResponse
     if 'error' in resp:
-        if resp.get('error') == 'Invalid scan hash':
+        if resp.get('error') == 'Invalid Hash':
             response = make_api_response(resp, 400)
         else:
             response = make_api_response(resp, 500)
@@ -203,8 +211,11 @@ def api_json_report(request):
     elif resp.get('report') == 'Report not Found':
         response = make_api_response(resp, 404)
     else:
-        response = make_api_response(
-            {'error': 'JSON Generation Error'}, 500)
+        # Defensive fallback: pdf(api=True, jsonres=True) only ever
+        # returns 'error' / 'report_dat' / 'report'=='Report not Found'
+        # dicts, all handled above, so this is unreachable given the
+        # current contract.
+        response = make_api_response({'error': 'JSON Generation Error'}, 500)  # pragma: no cover - unreachable given pdf()'s current return contract
     return response
 
 
@@ -278,7 +289,7 @@ def api_scorecard(request):
         # scan.view denial from appsec_dashboard's decorator — forward as-is.
         return make_api_response(resp)
     if 'error' in resp:
-        if resp.get('error') == 'Invalid scan hash':
+        if resp.get('error') == 'Invalid Hash':
             response = make_api_response(resp, 400)
         else:
             response = make_api_response(resp, 500)
@@ -287,8 +298,15 @@ def api_scorecard(request):
     elif 'not_found' in resp:
         response = make_api_response(resp, 404)
     else:
-        response = make_api_response(
-            {'error': 'JSON Generation Error'}, 500)
+        # Genuinely reachable (NOT dead code): if get_android_dashboard's
+        # inner get_context_from_db_entry() swallows a real exception
+        # (e.g. an unparsable stored CODE_ANALYSIS column) it returns
+        # None, and get_android_dashboard's own `if not data: return
+        # findings` guard hands back a context dict with none of
+        # 'error'/'hash'/'not_found' set -- landing here rather than
+        # raising up to appsec_dashboard's outer except. See
+        # test_scorecard_missing_hash_key_hits_generic_fallback.
+        response = make_api_response({'error': 'JSON Generation Error'}, 500)
     return response
 
 
@@ -301,7 +319,7 @@ def api_suppress_by_rule_id(request):
         return make_api_response(
             {'error': 'Missing Parameters'}, 422)
     resp = suppress_by_rule_id(request, True)
-    if 'error' in resp:
+    if resp.get('status') == 'failed':
         response = make_api_response(resp, 500)
     else:
         response = make_api_response(resp, 200)
@@ -317,7 +335,7 @@ def api_suppress_by_files(request):
         return make_api_response(
             {'error': 'Missing Parameters'}, 422)
     resp = suppress_by_files(request, True)
-    if 'error' in resp:
+    if resp.get('status') == 'failed':
         response = make_api_response(resp, 500)
     else:
         response = make_api_response(resp, 200)
@@ -332,7 +350,7 @@ def api_list_suppressions(request):
         return make_api_response(
             {'error': 'Missing Parameters'}, 422)
     resp = list_suppressions(request, True)
-    if 'error' in resp:
+    if resp.get('status') == 'failed':
         response = make_api_response(resp, 500)
     else:
         response = make_api_response(resp, 200)
@@ -349,7 +367,7 @@ def api_delete_suppression(request):
         return make_api_response(
             {'error': 'Missing Parameters'}, 422)
     resp = delete_suppression(request, True)
-    if 'error' in resp:
+    if resp.get('status') == 'failed':
         response = make_api_response(resp, 500)
     else:
         response = make_api_response(resp, 200)

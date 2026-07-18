@@ -263,7 +263,7 @@ def create_user(request):
         if form.is_valid():
             role_pk = form.cleaned_data.get('role')
             username = request.POST.get('username')
-            if not username:
+            if not username:  # pragma: no cover — unreachable: RegisterForm's username CharField is required, so form.is_valid() is already False for any blank/whitespace username; see reported finding
                 messages.error(request, 'No Username Provided')
                 return redirect('create_user')
             if not USERNAME_REGEX.match(username):

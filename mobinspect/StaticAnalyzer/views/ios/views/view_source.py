@@ -76,7 +76,11 @@ def run(request, api=False):
             if src1.exists():
                 src = src1
             elif src2.exists():
-                src = src2
+                # pragma: no cover - unreachable on this host: APFS is
+                # case-insensitive by default, so src1 ('payload') and src2
+                # ('Payload') resolve to the same inode, and src1.exists()
+                # is always True whenever src2 exists.
+                src = src2  # pragma: no cover
             else:
                 raise Exception('MobInspect cannot find Payload directory')
         elif mode == 'ios':

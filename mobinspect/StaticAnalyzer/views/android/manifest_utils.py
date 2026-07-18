@@ -263,11 +263,11 @@ def extract_manifest_data(app_dic):
             cat.append(category.getAttribute(f'{ns}:name'))
 
         for application in applications:
-            try:
-                icon_path = application.getAttribute(f'{ns}:icon')
-                icons.append(icon_path)
-            except Exception:
-                continue  # No icon attribute?
+            # minidom's Element.getAttribute() returns '' for a missing
+            # attribute, it never raises -- so there is no exception here
+            # to guard against.
+            icon_path = application.getAttribute(f'{ns}:icon')
+            icons.append(icon_path)
 
         android_permission_tags = ('com.google.', 'android.', 'com.google.')
         for permission in permissions:

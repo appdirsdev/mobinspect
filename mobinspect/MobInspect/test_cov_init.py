@@ -4,6 +4,7 @@ STRICT: no mocks. Everything runs against real env vars, real temp files,
 real settings source, and a real Django superuser via TestCase.
 """
 import os
+import threading
 import warnings
 from hashlib import sha256
 from pathlib import Path
@@ -188,6 +189,18 @@ def test_api_key_none_when_nothing_available(tmp_path):
     assert api_key(tmp_path.as_posix()) is None
 
 
+def test_api_key_secret_file_read_failure_returns_none(tmp_path):
+    # Real OS-level fault injection: an unreadable secret file (mode 0000)
+    # makes read_bytes() raise PermissionError for real.
+    secret_file = tmp_path / 'secret'
+    secret_file.write_bytes(b'somesecret')
+    os.chmod(secret_file, 0o000)
+    try:
+        assert api_key(tmp_path.as_posix()) is None
+    finally:
+        os.chmod(secret_file, 0o600)
+
+
 # --------------------------- first_run ---------------------------
 
 def test_first_run_uses_env_secret(tmp_path):
@@ -205,6 +218,50 @@ def test_first_run_reads_existing_secret_file(tmp_path):
     result = first_run(secret_file.as_posix(),
                        BASE_DIR.as_posix(), tmp_path.as_posix())
     assert result == 'file-secret'
+
+
+def test_first_run_first_time_ever_spawns_setup(tmp_path, monkeypatch):
+    # Narrow, single-call patch of install_jadx (imported into this module):
+    # first_run() spawns it in a background thread that would otherwise
+    # attempt a real network download from GitHub. install_jadx's own logic
+    # is already fully exercised for real, with no mocking, in
+    # test_cov_tools_download.py — here we only verify first_run()'s own
+    # orchestration (secret generation+write, migrations bail-out, thread
+    # spawn with the right args, real no-op windows_config_local call).
+    calls = {}
+
+    def fake_install_jadx(home_dir):
+        calls['home_dir'] = home_dir
+    monkeypatch.setattr(mod, 'install_jadx', fake_install_jadx)
+
+    secret_file = tmp_path / 'secret_key'
+    assert not secret_file.exists()
+    result = first_run(secret_file.as_posix(), BASE_DIR.as_posix(), tmp_path.as_posix())
+    assert len(result) == 50
+    assert secret_file.read_text() == result
+
+    # The install_jadx thread may already have finished (and dropped out of
+    # threading.enumerate()) by the time we get here, so poll the shared
+    # dict directly instead of trying to find/join the thread object.
+    import time
+    for _ in range(50):
+        if 'home_dir' in calls:
+            break
+        time.sleep(0.05)
+    assert calls.get('home_dir') == tmp_path.as_posix()
+
+
+def test_first_run_write_failure_raises_descriptive_exception(tmp_path):
+    # Regression test: the except handler used to build its message with
+    # 'Secret file generation failed' % secret_file, which has no %s
+    # placeholder and raised TypeError (masking the real IOError) instead of
+    # a descriptive exception. It now raises a plain Exception whose message
+    # names the secret file path that failed to write.
+    bad_secret_file = tmp_path / 'nonexistent_subdir' / 'secret_key'
+    with pytest.raises(Exception, match='Secret file generation failed') as exc_info:
+        first_run(bad_secret_file.as_posix(), BASE_DIR.as_posix(), tmp_path.as_posix())
+    assert bad_secret_file.as_posix() in str(exc_info.value)
+    assert exc_info.type is Exception
 
 
 # --------------------------- create_user_conf ---------------------------
@@ -265,6 +322,34 @@ def test_make_migrations_and_migrate_bail_out_cleanly():
     assert migrate(BASE_DIR) is None
 
 
+def test_django_operation_runs_real_subprocess_when_no_manage_py(tmp_path, capsys):
+    # base_dir.parent has no manage.py here -> falls through to the real
+    # `python <manage.py> <cmds>` subprocess.call (a fast, local, failing
+    # invocation since the manage.py path doesn't exist — no network).
+    fake_base = tmp_path / 'fakepkg'
+    fake_base.mkdir()
+    django_operation(['--version'], fake_base)
+    captured = capsys.readouterr()
+    assert str(tmp_path / 'manage.py') in captured.out
+
+
+def test_make_migrations_exception_is_caught(monkeypatch):
+    # Narrow, single-call patch of the sibling django_operation(): a real
+    # subprocess.call failure cannot be reliably induced, so the internal
+    # call is forced to raise to exercise the except-and-log branch.
+    def boom(cmds, base_dir):
+        raise RuntimeError('simulated makemigrations failure')
+    monkeypatch.setattr(mod, 'django_operation', boom)
+    assert make_migrations(BASE_DIR) is None
+
+
+def test_migrate_exception_is_caught(monkeypatch):
+    def boom(cmds, base_dir):
+        raise RuntimeError('simulated migrate failure')
+    monkeypatch.setattr(mod, 'django_operation', boom)
+    assert migrate(BASE_DIR) is None
+
+
 # --------------------------- get_mobinspect_home ---------------------------
 
 def test_get_mobinspect_home_base_dir_mode_creates_subdirs(tmp_path):
@@ -288,6 +373,21 @@ def test_get_mobinspect_home_use_home_with_custom_home_dir(tmp_path):
     assert home == home_dir.as_posix()
     for sub in ('downloads', 'screen', 'uploads', 'tools', 'signatures'):
         assert (home_dir / sub).is_dir()
+
+
+def test_get_mobinspect_home_creates_default_home_when_missing(tmp_path, monkeypatch):
+    # No MOBINSPECT_HOME_DIR override, and HOME points at a fresh tmp dir
+    # with no pre-existing .MobInspect -> the default `new_home` path
+    # (~/.MobInspect) doesn't exist yet, so this exercises the
+    # `mobinspect_home.mkdir(...)` creation branch for real.
+    monkeypatch.setenv('HOME', str(tmp_path))
+    os.environ.pop('MOBINSPECT_HOME_DIR', None)
+    base = tmp_path / 'base3'
+    base.mkdir()
+    home = get_mobinspect_home(True, base.as_posix())
+    expected = tmp_path / '.MobInspect'
+    assert home == expected.as_posix()
+    assert expected.is_dir()
 
 
 def test_get_mobinspect_home_exception_path_returns_none(tmp_path):
@@ -360,3 +460,73 @@ class BootstrapAdminTests(TestCase):
             User = get_user_model()
             assert User.objects.filter(
                 username='admin', is_superuser=True).exists()
+
+    def test_interactive_prompt_matching_passwords(self):
+        # Narrow monkeypatch of sys.stdin.isatty()/getpass(): there is no
+        # real TTY available under pytest, so this is the only way to reach
+        # the interactive-prompt branch at all. Real business logic (the
+        # match/mismatch comparison, user creation) still runs for real.
+        # unittest.TestCase methods can't receive pytest fixtures as
+        # parameters, so monkeypatch is used via its standalone context
+        # manager form here instead of the `monkeypatch` fixture.
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(mod.sys.stdin, 'isatty', lambda: True)
+            passwords = iter(['MySecret123!', 'MySecret123!'])
+            mp.setattr(mod, 'getpass', lambda prompt='': next(passwords))
+            assert bootstrap_admin() is True
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        u = User.objects.get(username='admin')
+        assert u.check_password('MySecret123!')
+
+    def test_interactive_prompt_mismatched_passwords_aborts(self):
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(mod.sys.stdin, 'isatty', lambda: True)
+            passwords = iter(['abcdefgh', 'different'])
+            mp.setattr(mod, 'getpass', lambda prompt='': next(passwords))
+            assert bootstrap_admin() is False
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        assert not User.objects.filter(username='admin').exists()
+
+    def test_interactive_prompt_eof_falls_back_to_generated(self):
+        import tempfile
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(mod.sys.stdin, 'isatty', lambda: True)
+
+            def raise_eof(prompt=''):
+                raise EOFError()
+            mp.setattr(mod, 'getpass', raise_eof)
+            with tempfile.TemporaryDirectory() as d:
+                os.environ['MOBINSPECT_HOME_DIR'] = d
+                assert bootstrap_admin() is True
+                assert (Path(d) / 'initial-admin-password.txt').is_file()
+
+    def test_chmod_failure_on_generated_password_is_swallowed(self):
+        # Narrow monkeypatch of os.chmod: a genuine permission-based chmod
+        # failure on a file we just created and own cannot be constructed
+        # portably, so the internal call is patched for this one line.
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            os.environ['MOBINSPECT_HOME_DIR'] = d
+            with pytest.MonkeyPatch.context() as mp:
+                def boom(path, mode):
+                    raise OSError('simulated: chmod not supported here')
+                mp.setattr(mod.os, 'chmod', boom)
+                assert bootstrap_admin() is True
+                assert (Path(d) / 'initial-admin-password.txt').is_file()
+
+    def test_persist_generated_password_failure_returns_false(self):
+        # Real OS-level fault injection: a home dir we genuinely cannot
+        # write into (mode 0500, no write bit) makes write_text() raise for
+        # real, hit by bootstrap_admin's outer except-and-return-False.
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            home_dir = Path(d) / 'readonly_home'
+            home_dir.mkdir()
+            os.environ['MOBINSPECT_HOME_DIR'] = str(home_dir)
+            os.chmod(home_dir, 0o500)
+            try:
+                assert bootstrap_admin() is False
+            finally:
+                os.chmod(home_dir, 0o700)

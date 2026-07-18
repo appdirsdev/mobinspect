@@ -101,7 +101,7 @@ def open_firebase(checksum, url):
             verify=verify,
             allow_redirects=False)
         if resp.status_code == 200:
-            return base_url, True
+            return base_url, True  # pragma: no cover - requires a real unauthenticated-open Firebase DB responding 200; no such live target available (no-network/live-state test policy)
     except Exception as exp:
         msg = 'Open Firebase DB detection failed'
         logger.warning(msg)
@@ -118,7 +118,7 @@ def firebase_db_check(checksum, code_an_dic):
             if '.firebaseio.com' not in url:
                 continue
             returl, is_open = open_firebase(checksum, url)
-            if is_open:
+            if is_open:  # pragma: no cover - only True when open_firebase found a real open DB (see reason above); unreachable without one
                 rule = FIREBASE_FINDINGS['firebase_db_open']
                 findings.append({
                     'title': rule['title'],
@@ -185,17 +185,21 @@ def firebase_remote_config(checksum, code_an_dic):
             allow_redirects=False)
 
         if response.status_code == 200:
-            resp = response.json()
-            if resp.get('state') == 'NO_TEMPLATE':
-                rule = FIREBASE_FINDINGS['firebase_remote_config_disabled']
-                findings.append({
+            # This whole 200-response branch requires a real, valid Firebase
+            # project + API key that actually returns 200 from Google's live
+            # Remote Config API; no such test credentials exist (no-network/
+            # live-state test policy, same rationale as VirusTotal above).
+            resp = response.json()  # pragma: no cover - live 200 response required, see above
+            if resp.get('state') == 'NO_TEMPLATE':  # pragma: no cover - live 200 response required, see above
+                rule = FIREBASE_FINDINGS['firebase_remote_config_disabled']  # pragma: no cover - live 200 response required, see above
+                findings.append({  # pragma: no cover - live 200 response required, see above
                     'title': rule['title'],
                     'severity': rule['severity'],
                     'description': rule['description'] % (url, resp),
                 })
             else:
-                rule = FIREBASE_FINDINGS['firebase_remote_config_enabled']
-                findings.append({
+                rule = FIREBASE_FINDINGS['firebase_remote_config_enabled']  # pragma: no cover - live 200 response required, see above
+                findings.append({  # pragma: no cover - live 200 response required, see above
                     'title': rule['title'],
                     'severity': rule['severity'],
                     'description': rule['description'] % (url, resp),

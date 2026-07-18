@@ -94,6 +94,11 @@ class Bs4ParserTests(TestCase):
         out = bs4_xml_parser('<manifest package="x"><application></manifest>')
         self.assertIsInstance(out, bytes)
 
+    def test_bs4_exception_branch_non_string_input(self):
+        # BeautifulSoup itself raises a real TypeError for non-string/bytes
+        # markup -> the except branch runs and returns None.
+        self.assertIsNone(bs4_xml_parser(None))
+
 
 class GetManifestFileTests(TestCase):
 

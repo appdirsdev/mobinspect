@@ -182,7 +182,7 @@ class EnqueuedTask(models.Model):
     app_name = models.CharField(max_length=255, default='')
 
     def __str__(self):
-        return f'{self.name} ({self.status})'
+        return f'{self.file_name} ({self.status})'
 
 
 class AIEnrichment(models.Model):

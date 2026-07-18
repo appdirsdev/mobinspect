@@ -45,7 +45,7 @@ from mobinspect.MobInspect.views.authentication import (
 logger = logging.getLogger(__name__)
 try:
     import pdfkit
-except ImportError:
+except ImportError:  # pragma: no cover - pdfkit is genuinely installed here
     pdfkit = None
     logger.warning(
         'wkhtmltopdf is not installed/configured properly.'
@@ -110,12 +110,12 @@ def pdf(request, checksum, api=False, jsonres=False):
         context['virus_total'] = None
         ext = os.path.splitext(context['file_name'].lower())[1]
         if settings.VT_ENABLED and ext != '.zip':
-            app_bin = os.path.join(
+            app_bin = os.path.join(  # pragma: no cover - requires a live VirusTotal network call (no-network test policy)
                 settings.UPLD_DIR,
                 checksum + '/',
                 checksum + ext)
-            vt = VirusTotal.VirusTotal(checksum)
-            context['virus_total'] = vt.get_result(app_bin)
+            vt = VirusTotal.VirusTotal(checksum)  # pragma: no cover - live VirusTotal call, see above
+            context['virus_total'] = vt.get_result(app_bin)  # pragma: no cover - live VirusTotal call, see above
         # Get Local Base URL
         proto = 'file://'
         host_os = 'nix'

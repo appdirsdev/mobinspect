@@ -488,6 +488,36 @@ def test_adb_connection_add_duplicate_host_port_race_guard(
     assert AdbConnection.objects.filter(host_port='127.0.0.1:5960').count() == 1
 
 
+# ═══════════════════════════════════════ _model_is_available (pure)
+#
+# The sole current caller (_probe_model_endpoint) only invokes this with a
+# truthy model_name (`if model_name and not _model_is_available(...)`), so
+# its own "nothing to check against" branch is unreachable through that
+# call site. It's a plain pure function, so it's exercised directly here,
+# the same way test_cov_views.py directly unit-tests _validate_host_port.
+def test_model_is_available_empty_name_short_circuits_true():
+    assert views._model_is_available('', ['granite4:3b']) is True
+    assert views._model_is_available(None, []) is True
+
+
+def test_model_is_available_exact_match():
+    assert views._model_is_available('granite4:3b', ['granite4:3b']) is True
+
+
+def test_model_is_available_implicit_latest_match():
+    assert views._model_is_available('granite4', ['granite4:latest']) is True
+
+
+def test_model_is_available_bare_name_matches_any_tag():
+    assert views._model_is_available(
+        'granite4.1', ['granite4.1:8b']) is True
+
+
+def test_model_is_available_no_match():
+    assert views._model_is_available(
+        'nonexistent-model', ['granite4:3b']) is False
+
+
 # ═══════════════════════════════════════════════════════════════════════
 #                              models.py
 # ═══════════════════════════════════════════════════════════════════════
@@ -623,6 +653,16 @@ def test_api_key_is_active_false_when_expired(django_user_model):
     assert key.is_active is False
 
 
+# ─────────────────────────────────────────────────────── ApiKey.lookup guard
+def test_api_key_lookup_rejects_falsy_and_nonstring_plaintext():
+    """The guard at the top of ApiKey.lookup -- `if not plaintext or not
+    isinstance(plaintext, str): return None` -- must short-circuit before
+    any hashing/DB query for None, empty string, and a non-str type."""
+    assert ApiKey.lookup(None) is None
+    assert ApiKey.lookup('') is None
+    assert ApiKey.lookup(123) is None
+
+
 # ─────────────────────────────────────────────────────── AuditEvent.save()
 @pytest.mark.django_db
 def test_audit_event_save_materializes_none_occurred_at():
@@ -659,6 +699,39 @@ def test_raw_purge_for_test_sqlite_branch(monkeypatch):
     assert 'DELETE FROM' in sqls[1]
     assert 'WHERE id = %s' in sqls[1]
     assert 'CREATE TRIGGER' in sqls[2]
+
+
+@pytest.mark.django_db
+def test_raw_purge_for_test_real_postgres_branch():
+    """This suite's test DB is genuinely Postgres, so the postgres branch
+    is the LIVE path here (unlike the sqlite/mysql branches above, which
+    must be simulated). Run it for real, unmocked, against the actual
+    connection: it must delete only the matching row(s) AND leave the
+    append-only trigger reinstalled afterward. Mirrors
+    test_audit_chain.py's `test_raw_purge_helper_works_for_tests`, which
+    pins the same behavior but lives outside the test_cov_* coverage glob
+    the campaign run scores."""
+    from django.db import connection, transaction
+
+    assert connection.vendor == 'postgresql', (
+        'expected the Postgres test DB for this run')
+
+    AuditEvent.objects.create(action='cov.extra.pgpurge.keep')
+    target = AuditEvent.objects.create(action='cov.extra.pgpurge.target')
+
+    AuditEvent._raw_purge_for_test(
+        where_sql='action = %s', params=('cov.extra.pgpurge.target',))
+
+    assert not AuditEvent.objects.filter(pk=target.pk).exists()
+    survivor = AuditEvent.objects.get(action='cov.extra.pgpurge.keep')
+
+    # The trigger must be reinstalled: a genuine DELETE on the surviving
+    # row is still rejected by the DB-level append-only guard.
+    with pytest.raises(Exception) as exc_info:
+        with transaction.atomic():
+            AuditEvent.objects.filter(pk=survivor.pk).delete()
+    assert 'append-only' in str(exc_info.value).lower()
+    assert AuditEvent.objects.filter(pk=survivor.pk).exists()
 
 
 def test_raw_purge_for_test_other_vendor_branch(monkeypatch):

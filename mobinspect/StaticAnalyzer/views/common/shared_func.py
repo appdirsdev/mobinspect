@@ -142,11 +142,10 @@ def unzip(checksum, app_path, ext_path):
                     logger.warning(msg)
                     continue
 
+                # zipfile.ZipInfo.filename is always decoded to str by the
+                # zipfile module itself (cp437 or utf-8 depending on the
+                # UTF-8 flag bit), so no further decoding is ever needed here.
                 file_path = fileinfo.filename.rstrip('/\\')  # Remove trailing slashes
-
-                # Decode the filename
-                if not isinstance(file_path, str):
-                    file_path = file_path.decode('utf-8', errors='replace')
 
                 # Check for reserved file conflict
                 if is_reserved_file_conflict(file_path):
@@ -349,15 +348,14 @@ def ar_extract(checksum, src, dst):
             msg = 'Fat binary archive identified'
             logger.info(msg)
             append_scan_status(checksum, msg)
-            # Fat binary archive
-            try:
-                nw_src = lipo_thin(checksum, src, dst)
-                if nw_src:
-                    ar_os(nw_src, dst)
-            except Exception as exp:
-                msg = 'Failed to thin fat archive'
-                logger.exception(msg)
-                append_scan_status(checksum, msg, repr(exp))
+            # Fat binary archive.
+            # No try/except here: lipo_thin() and ar_os() each already
+            # swallow every exception internally (their own broad
+            # except-Exception guards) and never raise, so a wrapping
+            # try/except around this call pair can never fire.
+            nw_src = lipo_thin(checksum, src, dst)
+            if nw_src:
+                ar_os(nw_src, dst)
 
 
 def url_n_email_extract(dat, relative_path):

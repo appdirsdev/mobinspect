@@ -5,6 +5,7 @@ below drives the real functions with real env vars, real temp files/dirs and
 a real localhost HTTP server (loopback, deterministic, no external network).
 """
 import os
+import shutil
 import stat
 import platform
 import threading
@@ -272,6 +273,61 @@ def test_install_jadx_already_installed_custom_version(tmp_path):
 
     assert result is None
     assert extract_dir.exists()
+
+
+def test_install_jadx_full_happy_path_downloads_and_extracts(tmp_path, monkeypatch):
+    # Narrow, single-call monkeypatch of the sibling download_file(): its
+    # own logic is already fully exercised for real (via a real local HTTP
+    # server, no mocking) above in this file. install_jadx()'s hardcoded
+    # target is the real github.com release URL, which we must not hit
+    # under the no-network test policy, so here we substitute a real local
+    # zip copy for the fetch step only — every line of install_jadx's own
+    # logic (rmtree, mkdir, real zip extraction incl. the path-traversal
+    # guard, real chmod permission-setting, logging) still runs for real.
+    # zip_ref.extract(member, extract_dir) places each entry at
+    # extract_dir/<member> — the real JADX release zip has no extra
+    # top-level version folder, so entries are just 'bin/...', 'lib/...'.
+    real_zip = tmp_path / 'fake_jadx_release.zip'
+    with zipfile.ZipFile(real_zip, 'w') as zf:
+        zf.writestr('bin/jadx', '#!/bin/sh\necho jadx\n')
+        zf.writestr('lib/jadx-core.jar', 'binary-content-stand-in')
+
+    def fake_download_file(url, file_path):
+        shutil.copyfile(str(real_zip), file_path)
+        return os.path.getsize(file_path)
+
+    monkeypatch.setattr(td, 'download_file', fake_download_file)
+
+    home = tmp_path / 'mihome'
+    install_jadx(str(home), version='1.5.0')
+
+    extract_dir = home / 'tools' / 'jadx' / 'jadx-1.5.0'
+    assert (extract_dir / 'bin' / 'jadx').is_file()
+    assert (extract_dir / 'lib' / 'jadx-core.jar').is_file()
+    if platform.system() != 'Windows':
+        assert stat.S_IMODE(os.stat(extract_dir).st_mode) == 0o755
+
+
+def test_install_jadx_path_traversal_zip_is_caught_and_swallowed(tmp_path, monkeypatch):
+    # A real, deliberately malicious zip entry (path traversal via '../..')
+    # to prove install_jadx's own real path-traversal guard fires and the
+    # surrounding try/except swallows it without crashing the caller.
+    evil_zip = tmp_path / 'evil.zip'
+    with zipfile.ZipFile(evil_zip, 'w') as zf:
+        zf.writestr('../../evil.txt', 'pwned')
+
+    def fake_download_file(url, file_path):
+        shutil.copyfile(str(evil_zip), file_path)
+        return os.path.getsize(file_path)
+
+    monkeypatch.setattr(td, 'download_file', fake_download_file)
+
+    home = tmp_path / 'mihome_evil'
+    install_jadx(str(home), version='9.9.9')  # must not raise
+
+    # Nothing from the malicious entry should land outside the extract dir.
+    assert not (tmp_path / 'evil.txt').exists()
+    assert not (home.parent / 'evil.txt').exists()
 
 
 # ---------------------------------------------------------------------------

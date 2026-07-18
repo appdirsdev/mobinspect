@@ -745,6 +745,23 @@ def test_both_roles_configured_false_with_no_rows():
 
 
 @pytest.mark.django_db
+def test_both_roles_configured_false_when_model_lookup_fails(monkeypatch):
+    """The 'rbac.ModelIntegration' model genuinely exists in this real app
+    registry, so its LookupError guard can't be hit through any real
+    input. Narrow, single-call monkeypatch of `django.apps.apps.get_model`
+    (not of _both_roles_configured itself) makes the real Django app
+    registry API raise for real, driving the real except branch
+    (lines 193-194)."""
+    from django.apps import apps as django_apps
+
+    def _raise_lookup(*a, **k):
+        raise LookupError('simulated: no such app/model')
+
+    monkeypatch.setattr(django_apps, 'get_model', _raise_lookup)
+    assert views._both_roles_configured() is False
+
+
+@pytest.mark.django_db
 def test_both_roles_configured_false_with_only_one_role():
     ModelIntegration.objects.create(
         role=ModelIntegration.ROLE_GENERATE,
@@ -968,6 +985,31 @@ def test_ai_run_falls_back_to_recent_for_an_unsafe_referer(admin_client, monkeyp
         HTTP_REFERER='http://evil.example.com/phish')
     assert resp.status_code == 302
     assert reverse('recent') in resp.url
+
+
+@pytest.mark.django_db
+@override_settings(MOBINSPECT_AI_ENABLED=True)
+def test_ai_run_invalid_checksum_via_direct_call(ai_admin):
+    """URL routing itself enforces ^[0-9a-f]{32}$ on `checksum` (same as
+    ai_report's direct-call twin above), so the is_md5() False branch
+    inside ai_run can't be reached through the real router with a
+    malformed value. Call the (still fully decorated) view directly with
+    a RequestFactory POST request -- messages.error() needs a real
+    storage backend attached since MessageMiddleware never ran, so a
+    real FallbackStorage is attached (not a mock of messages itself)
+    (lines 250-251)."""
+    from django.contrib.messages.storage.fallback import FallbackStorage
+
+    rf = RequestFactory()
+    req = rf.post('/ai/run/not-a-checksum/')
+    req.user = ai_admin
+    req.session = {}
+    req._messages = FallbackStorage(req)
+    resp = views.ai_run(req, 'not-a-checksum<script>')
+    assert resp.status_code == 302
+    assert reverse('recent') in resp.url
+    stored = list(req._messages)
+    assert any('Invalid scan reference' in str(m) for m in stored)
 
 
 # ═══════════════════════════ ai_tags.ai_run_status wrapper tag

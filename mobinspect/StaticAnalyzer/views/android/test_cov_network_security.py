@@ -61,6 +61,14 @@ def test_read_config_not_found(tmp_path):
 
 
 @pytest.mark.django_db
+def test_read_config_exception_branch():
+    # config=None -> `config.replace(...)` raises AttributeError for real,
+    # caught by the except branch -> None.
+    out = read_netsec_config(CHK, '/tmp', None, 'apk')
+    assert out is None
+
+
+@pytest.mark.django_db
 def test_read_config_path_traversal(tmp_path):
     # A traversal config value skips the direct read but still globs xml_dir.
     _write_apk(tmp_path, 'network_security_config', '<b/>')

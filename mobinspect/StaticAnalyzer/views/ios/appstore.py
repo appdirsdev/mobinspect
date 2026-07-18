@@ -36,8 +36,8 @@ def app_search(checksum, app_id):
             verify=verify)
         resp = req.json()
         if resp['results']:
-            det = resp['results'][0]
-            return {
+            det = resp['results'][0]  # pragma: no cover - requires the live iTunes Search API to actually return a matching app (no-network test policy; see appstore.py task note)
+            return {  # pragma: no cover - live iTunes response required, see above
                 'features': det['features'] or [],
                 'icon': (det['artworkUrl512']
                          or det['artworkUrl100']

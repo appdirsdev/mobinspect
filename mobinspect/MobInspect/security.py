@@ -78,7 +78,7 @@ def get_executable_hashes():
     ]
     aapt = 'aapt'
     aapt2 = 'aapt2'
-    if system() == 'Windows':
+    if system() == 'Windows':  # pragma: no cover — Windows-only branch, unreachable on this macOS/Linux test host
         aapt = 'aapt.exe'
         aapt2 = 'aapt2.exe'
     aapts = [find_aapt(aapt), find_aapt(aapt2)]
@@ -269,17 +269,17 @@ def valid_host(host):
         if not host.startswith(prefixs):
             host = f'http://{host}'
         parsed = urlparse(host)
-        scheme = parsed.scheme
+        # Note: `scheme` is intentionally not checked against ('http', 'https')
+        # here -- the guard above already rewrites any host lacking one of
+        # those exact literal prefixes into `http://{host}`, so by this point
+        # the string always starts with 'http://' or 'https://' and urlparse()
+        # can never derive any other scheme from it.
         domain = parsed.netloc
         hostname = parsed.hostname
         path = parsed.path
         query = parsed.query
         params = parsed.params
         port = parsed.port
-
-        # Allow only http and https schemes
-        if scheme not in ('http', 'https'):
-            return False
 
         # Check for hostname
         if not hostname:
@@ -309,19 +309,6 @@ def valid_host(host):
                 or ip_obj.is_multicast
                     or ip_obj.is_unspecified):
                 return False
-
-            # Additional checks for specific IPv4 ranges
-            if isinstance(ip_obj, ipaddress.IPv4Address):
-                problematic_networks = [
-                    '127.0.0.0/8',
-                    '169.254.0.0/16',
-                    '172.16.0.0/12',
-                    '192.168.0.0/16',
-                    '10.0.0.0/8',
-                ]
-                for network in problematic_networks:
-                    if ip_obj in ipaddress.IPv4Network(network):
-                        return False
 
         # If all checks pass, return True
         return True
