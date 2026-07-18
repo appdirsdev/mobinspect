@@ -13,9 +13,12 @@ No Android device / emulator is available in this environment, so we only
 exercise the *reachable* request-validation and no-device error branches:
 
   * Missing / partial required params  -> HTTP 422 ("Missing Parameters")
-  * Well-formed request but invalid hash / bad action / disallowed adb
-    subcommand -> the analyzer returns an error dict which the wrapper
-    surfaces as HTTP 500 (or a 403 RBAC pass-through).
+  * Well-formed request but invalid hash / bad action -> the analyzer
+    returns an error dict which the wrapper surfaces as HTTP 500 (or a
+    403 RBAC pass-through).
+  * A disallowed adb subcommand -> the allowlist denial is a *security*
+    denial, not a server error, and the wrapper surfaces it as HTTP 403
+    (or, if the RBAC `dynamic.adb.shell` gate denies first, also 403).
   * Two pure-filesystem endpoints (frida script listing / frida logs)
     that legitimately return HTTP 200 without any device.
 
@@ -268,13 +271,33 @@ class AndroidDynamicApiTests(TestCase):
         """A subcommand off the allowlist is denied.
 
         Either the RBAC dynamic.adb.shell gate denies first (403
-        pass-through) or the allowlist rejects it (500 'denied'). Both are
-        real reachable branches of the wrapper; accept either.
+        pass-through) or the allowlist rejects it (also 403, mapped from
+        the underlying {'status': 'denied'} dict). Both are real reachable
+        branches of the wrapper and both now converge on 403 -- a security
+        denial must never be reported as a 500 server error.
         """
         resp = self._post(
             '/api/v1/android/adb_command',
             {'cmd': 'totally_not_an_allowed_subcommand'})
-        self.assertIn(resp.status_code, (403, 500))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_adb_execute_disallowed_cmd_denied_body_403(self):
+        """Regression test for the status-code bug: execute_adb() returns
+        {'status': 'denied'} for a non-allowlisted adb subcommand, and the
+        wrapper must map that to HTTP 403 (a security denial), not 500.
+
+        The admin user here is a real superuser, so it clears the RBAC
+        `dynamic.adb.shell` permission gate for real and reaches the
+        allowlist check inside `execute_adb` itself -- this isolates the
+        allowlist-denial branch from the RBAC-passthrough branch exercised
+        above.
+        """
+        resp = self._post(
+            '/api/v1/android/adb_command',
+            {'cmd': 'rm -rf /'})
+        self.assertEqual(resp.status_code, 403)
+        body = self._json(resp)
+        self.assertEqual(body.get('status'), 'denied')
 
     def test_root_ca_bad_action_500(self):
         resp = self._post(

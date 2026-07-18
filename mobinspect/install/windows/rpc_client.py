@@ -91,8 +91,10 @@ def binskim(sample, signature):
     # Check challenge
     _check_challenge(signature)
 
-    # Check if param is a md5 to prevent attacks (we only use lower-case)
-    if len(re.findall(r'([a-f\d]{32})', sample)) == 0:
+    # Check if param is a md5 to prevent attacks (we only use lower-case).
+    # fullmatch (not findall/search) so an md5 embedded in a longer,
+    # attacker-controlled string (e.g. path traversal) is rejected too.
+    if re.fullmatch(r'[a-f\d]{32}', sample) is None:
         return 'Wrong Input!'
 
     # Set params for execution of binskim
@@ -128,6 +130,13 @@ def binscope(sample, signature):
     """Run binscope against an sample file."""
     # Check challenge
     _check_challenge(signature)
+
+    # Check if param is a md5 to prevent attacks (we only use lower-case).
+    # binskim() has always had this check; it was missing here even though
+    # `sample` is concatenated into a path and a subprocess argv exactly
+    # the same way.
+    if re.fullmatch(r'[a-f\d]{32}', sample) is None:
+        return 'Wrong Input!'
 
     # Set params for execution of binskim
 

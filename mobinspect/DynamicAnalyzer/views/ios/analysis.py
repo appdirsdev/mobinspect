@@ -86,7 +86,17 @@ def ios_api_analysis(app_dir):
             encoding='utf-8',
             errors='ignore').splitlines()
         for line in data:
-            parsed = json.loads(line)
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                parsed = json.loads(line)
+            except json.JSONDecodeError:
+                # A single corrupt/partial line (e.g. a truncated write from
+                # a crashed Frida hook) must not blank out every other
+                # already-parsed and yet-to-be-parsed entry in the dump.
+                logger.warning('Skipping malformed dump line: %r', line)
+                continue
             if parsed.get('cookies'):
                 dump['cookies'] = parsed['cookies']
             elif parsed.get('crypto'):

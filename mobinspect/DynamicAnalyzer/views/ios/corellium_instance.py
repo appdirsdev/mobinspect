@@ -425,7 +425,12 @@ def setup_environment(request, checksum, api=False):
         if failed:
             return send_response(failed, api)
         ca = CorelliumAgentAPI(instance_id)
-        if not ca.agent_ready():
+        if ca.agent_ready() is not True:
+            # agent_ready() returns True/False on a normal API response, but
+            # a truthy *error string* on an API-level failure (see
+            # CorelliumAgentAPI.agent_ready) -- an `is not True` check (not a
+            # bare truthiness check) is required so that error string doesn't
+            # get mistaken for readiness.
             data['message'] = (
                 f'Agent is not ready with {instance_id}'
                 ', please wait.')
@@ -481,8 +486,11 @@ def run_app(request, api=False):
             data['message'] = 'Invalid iOS Bundle id'
             return send_response(data, api)
         ca = CorelliumAgentAPI(instance_id)
-        if (ca.agent_ready()
-                and ca.unlock_device()
+        # agent_ready()/unlock_device() return a truthy *error string* on an
+        # API-level failure, not just True/False -- a bare truthiness check
+        # would treat that error as success. Compare explicitly.
+        if (ca.agent_ready() is True
+                and ca.unlock_device() == OK
                 and ca.run_app(bundle_id) == OK):
             data['status'] = OK
             data['message'] = 'App Started'
@@ -511,8 +519,10 @@ def stop_app(request, api=False):
             data['message'] = 'Invalid iOS Bundle id'
             return send_response(data, api)
         ca = CorelliumAgentAPI(instance_id)
-        if (ca.agent_ready()
-                and ca.unlock_device()
+        # See run_app() above: agent_ready()/unlock_device() can return a
+        # truthy error string on failure, so compare explicitly.
+        if (ca.agent_ready() is True
+                and ca.unlock_device() == OK
                 and ca.stop_app(bundle_id) == OK):
             data['status'] = OK
             data['message'] = 'App Killed'
@@ -541,7 +551,9 @@ def remove_app(request, api=False):
             data['message'] = 'Invalid iOS Bundle id'
             return send_response(data, api)
         ca = CorelliumAgentAPI(instance_id)
-        if (ca.agent_ready()
+        # See run_app() above: agent_ready() can return a truthy error
+        # string on failure, so compare explicitly.
+        if (ca.agent_ready() is True
                 and ca.remove_app(bundle_id) == OK):
             data['status'] = OK
             data['message'] = 'App uninstalled'

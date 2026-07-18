@@ -12,6 +12,7 @@ from mobinspect.DynamicAnalyzer.views.ios.device import (
 
 
 FAILED = 'failed'
+DENIED = 'denied'
 ERROR = 'error'
 DEVICE_ID = 'device_id'
 BUNDLE_ID = 'bundle_id'
@@ -104,7 +105,13 @@ def api_device_ssh_execute(request):
     resp = ios_device.ssh_execute_device(request, True)
     if resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    if resp.get('status') == DENIED:
+        # SSH allowlist rejection is a security denial, not a server
+        # error/success -- surface it as 403 (the non-API/web path
+        # already does this via HttpResponse(..., status=403) inside
+        # ssh_execute_device()).
+        return make_api_response(resp, 403)
+    return make_api_response(resp, 200)  # pragma: no cover - needs a live jailbroken iOS device for ssh_execute_device() to complete a real command and return 'ok'
 
 
 @request_method(['POST'])

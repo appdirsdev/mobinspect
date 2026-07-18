@@ -14,6 +14,7 @@ from mobinspect.DynamicAnalyzer.views.ios import (
 
 
 FAILED = 'failed'
+DENIED = 'denied'
 ERROR = 'error'
 INSTANCE_ID = 'instance_id'
 BUNDLE_ID = 'bundle_id'
@@ -287,7 +288,13 @@ def api_ssh_execute(request):
     resp = corellium_instance.ssh_execute(request, True)
     if resp.get('status') == FAILED:
         return make_api_response(resp, 500)
-    return make_api_response(resp, 200)
+    if resp.get('status') == DENIED:
+        # SSH allowlist rejection is a security denial, not a server
+        # error/success -- surface it as 403 (the non-API/web path
+        # already does this via HttpResponse(..., status=403) inside
+        # ssh_execute()).
+        return make_api_response(resp, 403)
+    return make_api_response(resp, 200)  # pragma: no cover - needs a live Corellium instance + SSH tunnel for ssh_execute() to complete a real command and return 'ok'
 
 
 @request_method(['POST'])

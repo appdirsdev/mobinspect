@@ -513,12 +513,17 @@ def binscope(checksum, name, bin_an_dic, run_local=False, app_dir=None):
         response = proxy.binscope(name, _get_token())
 
     res = response[response.find('<'):]
-    config = etree.XMLParser(  # pylint: disable-msg=E1101
+    # NOTE: named xml_parser_cfg, not `config` -- `global config` above
+    # (declared for the run_local branch) makes `config` refer to the
+    # module-level configparser for this whole function; reusing that
+    # name here used to silently clobber the module-global config
+    # (used by binskim()'s run_local branch) with this etree.XMLParser.
+    xml_parser_cfg = etree.XMLParser(  # pylint: disable-msg=E1101
         remove_blank_text=True,
         resolve_entities=False,
     )
     xml_file = etree.XML(bytes(res, 'utf-8', 'ignore'),
-                         config)  # pylint: disable-msg=E1101
+                         xml_parser_cfg)  # pylint: disable-msg=E1101
 
     for item in xml_file.find('items').getchildren():
         if item.find('issueType') is not None:
@@ -539,6 +544,17 @@ def binscope(checksum, name, bin_an_dic, run_local=False, app_dir=None):
                     desc = item.find('Information').text
                 elif item.find('diagnostic') is not None:
                     status = 'Info'
+                    desc = item.find('diagnostic').text
+                else:
+                    desc = 'No description provided by analysing tool.'
+            else:
+                # e.g. NOT_APPLICABLE/ERROR/WARN. Without this branch,
+                # status/desc kept the previous item's values (or were
+                # undefined on the first item), mislabeling this result.
+                status = 'Info'
+                if item.find('Information') is not None:
+                    desc = item.find('Information').text
+                elif item.find('diagnostic') is not None:
                     desc = item.find('diagnostic').text
                 else:
                     desc = 'No description provided by analysing tool.'

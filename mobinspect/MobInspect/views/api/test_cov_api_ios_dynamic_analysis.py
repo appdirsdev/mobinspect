@@ -382,18 +382,20 @@ def test_get_app_container_path_existing_file_returns_200(
 
 
 @pytest.mark.django_db
-def test_ssh_execute_denied_command_returns_200(rf, superuser, api_key):
-    """A command not on the SSH allowlist returns a 'denied' status (200).
+def test_ssh_execute_denied_command_returns_403(rf, superuser, api_key):
+    """A command not on the SSH allowlist is a security denial -> 403.
 
-    'rm -rf /' is not in SSH_CMD_ALLOWLIST, so the underlying helper
-    returns {'status': 'denied', ...} which is neither FAILED nor an
-    HttpResponse -> the view returns it with 200.
+    Regression test: 'rm -rf /' is not in SSH_CMD_ALLOWLIST, so the
+    underlying helper returns {'status': 'denied', ...} *before*
+    common_check()/any Corellium network call. The wrapper must map that
+    to HTTP 403, not treat it as a 200 success (the bug this pins down)
+    or a 500 server error.
     """
     request = _authed_post(
         rf, superuser, api_key,
         {'instance_id': VALID_INSTANCE, 'cmd': 'rm -rf /'})
     resp = mod.api_ssh_execute(request)
-    assert resp.status_code == 200
+    assert resp.status_code == 403
     assert _body(resp)['status'] == 'denied'
 
 

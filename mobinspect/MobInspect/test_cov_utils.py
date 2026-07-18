@@ -105,6 +105,25 @@ def test_cmd_injection_check():
     assert utils.cmd_injection_check('cleaninput') is False
 
 
+def test_cmd_injection_check_backtick_and_dollar_paren():
+    """Regression: backtick / $() command substitution must be caught.
+
+    cmd_injection_check() is the sole gate on the `url` parameter of
+    DynamicAnalyzer.views.android.tests_common.start_deeplink(), which
+    hands the value unescaped to `adb shell am start ... -d <url>`. adb
+    joins all trailing argv tokens into a single string and runs it via
+    the device's default shell, so backtick / $(...) command
+    substitution in the URL is real remote command injection on the
+    connected Android device -- the same class of bug the existing
+    breakers (`;`, `&&`, `|`) already guard against. Before the fix,
+    both assertions below failed (bypassed the filter).
+    """
+    assert utils.cmd_injection_check('http://x`reboot`') is True
+    assert utils.cmd_injection_check('http://x$(reboot)') is True
+    assert utils.cmd_injection_check('http://x%60reboot%60') is True
+    assert utils.cmd_injection_check('http://x%24%28reboot%29') is True
+
+
 def test_strict_package_check():
     assert utils.strict_package_check('com.example.app')
     # starts with a digit -> no regex match -> None

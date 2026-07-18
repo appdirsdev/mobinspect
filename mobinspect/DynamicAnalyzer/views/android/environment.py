@@ -238,7 +238,16 @@ class Environment:
             ca_obj = crypto.load_certificate(crypto.FILETYPE_PEM, pem.read())
             md = md5(ca_obj.get_subject().der()).digest()
             ret = (md[0] | (md[1] << 8) | (md[2] << 16) | md[3] << 24)
-            ca_file_hash = hex(ret).lstrip('0x')
+            # Must be exactly 8 lowercase hex digits, zero-padded, to match
+            # the OpenSSL/Android c_rehash subject-hash naming convention
+            # (see /system/etc/security/cacerts/<hash>.0 below). hex(ret)
+            # does not zero-pad, and str.lstrip('0x') strips *any* leading
+            # '0' or 'x' character (not just the literal "0x" prefix), so
+            # both would silently truncate the hash whenever `ret`'s
+            # leading hex digit(s) are 0 -- producing a filename Android
+            # will never look up, so the pushed root CA is silently never
+            # trusted (breaks TLS interception with no visible error).
+            ca_file_hash = format(ret, '08x')
             ca_file = os.path.join('/system/etc/security/cacerts/',
                                    ca_construct.format(ca_file_hash))
             pem.close()

@@ -235,13 +235,16 @@ def test_ssh_execute_allowed_cmd_bad_device_500(rf, superuser):
     assert _body(resp)['status'] == 'failed'
 
 
-def test_ssh_execute_denied_cmd_returns_200(rf, superuser):
-    # A command not on the allowlist yields a {'status': 'denied'} dict
-    # (not 'failed'), so the wrapper returns 200.
+def test_ssh_execute_denied_cmd_returns_403(rf, superuser):
+    # Regression test: a command not on the SSH allowlist yields a
+    # {'status': 'denied'} dict *before* any device connection is
+    # attempted (device-independent branch). The wrapper must map that
+    # security denial to HTTP 403, not report it as a 200 success (the
+    # bug this pins down) or a 500 server error.
     req = _authed(
         rf.post('/', {'device_id': BAD_DEVICE, 'cmd': 'rm -rf /'}), superuser)
     resp = mod.api_device_ssh_execute(req)
-    assert resp.status_code == 200
+    assert resp.status_code == 403
     assert _body(resp)['status'] == 'denied'
 
 

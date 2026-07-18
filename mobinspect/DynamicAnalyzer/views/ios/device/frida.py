@@ -119,7 +119,7 @@ class FridaIOSDevice(Frida):
                     self.bundle_id = bundle_id
                 try:
                     front = self.frida_device.get_frontmost_application()
-                    if front or front.pid != _PID:
+                    if front and front.pid != _PID:
                         # Not the front most app.
                         # Get the pid of the front most app
                         logger.warning('Front most app has PID %s', front.pid)

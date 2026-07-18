@@ -665,11 +665,20 @@ def clean_filename(filename, replace=' '):
 
 
 def cmd_injection_check(data):
-    """OS Cmd Injection from Commix."""
+    """OS Cmd Injection from Commix.
+
+    Callers use this to gate values that end up as an unescaped argument
+    to `adb shell ...` (e.g. DynamicAnalyzer start_deeplink's URL param).
+    adb's `shell` subcommand joins all trailing argv tokens with a space
+    and hands the resulting single string to the device's default shell,
+    so backtick and `$(` command substitution are just as exploitable as
+    the separator/redirection breakers below and MUST be listed too.
+    """
     breakers = [
         ';', '%3B', '&', '%26', '&&',
         '%26%26', '|', '%7C', '||',
         '%7C%7C', '%0a', '%0d%0a',
+        '`', '%60', '$(', '%24%28',
     ]
     return any(i in data for i in breakers)
 

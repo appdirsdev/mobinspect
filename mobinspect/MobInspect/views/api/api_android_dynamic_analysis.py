@@ -144,7 +144,12 @@ def api_adb_execute(request):
         return denied
     if resp['status'] == 'ok':
         return make_api_response(resp, 200)
-    return make_api_response(resp, 500)
+    if resp['status'] == 'denied':
+        # ADB allowlist rejection is a security denial, not a server
+        # error -- surface it as 403 (the non-API/web path already does
+        # this via HttpResponse(..., status=403) inside execute_adb()).
+        return make_api_response(resp, 403)
+    return make_api_response(resp, 500)  # pragma: no cover - execute_adb() has no code path that returns a dict with any status other than 'ok'/'denied' (subprocess failures are swallowed internally and still resolve to 'ok')
 
 
 @request_method(['POST'])
