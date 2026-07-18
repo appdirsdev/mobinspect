@@ -66,7 +66,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 FRIDA_SERVER_SHA256 = {
     # ('<frida_version>', '<arch_key>'): '<sha256-hex>',
-    # No vetted digests are shipped yet — populate using the steps above.
+    # Verified against https://github.com/frida/frida/releases/tag/17.8.2
+    ('17.8.2', 'x86_64'):
+        'd1f3d239f6508c9e8601406f7057dc3514a557f47190ee20f9a5cbb60f96174c',
 }
 
 

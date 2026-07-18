@@ -1,0 +1,3 @@
+# Vetted frida-server binaries are large (~110MB) and deployed as artifacts,
+# not committed. The SHA-256 pin in server_update.py is the committed record.
+frida-server-*
