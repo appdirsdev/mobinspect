@@ -1,4 +1,3 @@
-from datetime import datetime
 from enum import Enum
 
 from django.db import models
@@ -27,7 +26,7 @@ class RecentScansDB(models.Model):
     PACKAGE_NAME = models.CharField(max_length=260, default='')
     VERSION_NAME = models.CharField(max_length=50, default='')
     MD5 = models.CharField(max_length=32, default='', primary_key=True)
-    TIMESTAMP = models.DateTimeField(default=datetime.now)
+    TIMESTAMP = models.DateTimeField(default=timezone.now)
     SCAN_LOGS = models.TextField(default=[])
 
 

@@ -6,6 +6,8 @@ role edits, permission denials, key creation, etc.).
 """
 import logging
 
+from django.db import transaction
+
 from mobinspect.RBAC.models import AuditEvent
 
 logger = logging.getLogger('mobinspect.MobInspect')
@@ -15,17 +17,30 @@ def record(
     request, action,
     target_type='', target_id='', metadata=None, actor=None,
 ):
-    """Record an audit event. Best-effort — never raises."""
+    """Record an audit event. Best-effort — never raises.
+
+    The create() runs inside its own ``transaction.atomic()`` savepoint.
+    Without it, a real DB error raised by create() while THIS call is
+    nested inside a caller's already-open ``atomic()`` block would still
+    be swallowed by the except below, but would leave the connection's
+    ``needs_rollback`` flag set — poisoning the caller's outer
+    transaction so its very next query raises
+    ``TransactionManagementError``, even though no Python exception ever
+    escaped this function. The nested atomic() gives Django a savepoint
+    boundary to roll back to on exit, clearing the flag and containing
+    the damage to this call alone.
+    """
     try:
-        AuditEvent.objects.create(
-            actor=actor or _request_user(request),
-            action=action,
-            target_type=target_type or '',
-            target_id=str(target_id or '')[:80],
-            metadata=metadata or {},
-            ip_address=_client_ip(request),
-            user_agent=(_header(request, 'User-Agent') or '')[:400],
-        )
+        with transaction.atomic():
+            AuditEvent.objects.create(
+                actor=actor or _request_user(request),
+                action=action,
+                target_type=target_type or '',
+                target_id=str(target_id or '')[:80],
+                metadata=metadata or {},
+                ip_address=_client_ip(request),
+                user_agent=(_header(request, 'User-Agent') or '')[:400],
+            )
     except Exception as e:  # noqa: BLE001
         # Never let audit failure break the request.
         logger.warning('audit event %r failed: %s', action, e)
@@ -44,18 +59,20 @@ def record_anon(
     can correlate without false-attributing the event to whoever happens
     to hold the session.
 
-    Best-effort — never raises.
+    Best-effort — never raises. See record()'s docstring for why the
+    create() is wrapped in its own transaction.atomic() savepoint.
     """
     try:
-        AuditEvent.objects.create(
-            actor=None,
-            action=action,
-            target_type=target_type or '',
-            target_id=str(target_id or '')[:80],
-            metadata=metadata or {},
-            ip_address=_client_ip(request),
-            user_agent=(_header(request, 'User-Agent') or '')[:400],
-        )
+        with transaction.atomic():
+            AuditEvent.objects.create(
+                actor=None,
+                action=action,
+                target_type=target_type or '',
+                target_id=str(target_id or '')[:80],
+                metadata=metadata or {},
+                ip_address=_client_ip(request),
+                user_agent=(_header(request, 'User-Agent') or '')[:400],
+            )
     except Exception as e:  # noqa: BLE001
         # Never let audit failure break the request.
         logger.warning('anon audit event %r failed: %s', action, e)

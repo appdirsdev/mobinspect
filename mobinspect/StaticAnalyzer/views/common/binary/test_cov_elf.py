@@ -385,9 +385,17 @@ def test_get_symbols_exception_on_broken_elf(variants):
 # real lief write + re-parse) forces a genuine UnicodeDecodeError.           #
 # --------------------------------------------------------------------------- #
 def test_fortify_handles_real_undecodable_symbol_name(variants):
+    # REGRESSION TEST for a fixed production bug: fortify() used to
+    # compute a decoded/replaced `function_name` purely to test
+    # `.endswith('_chk')`, then append the original, untouched
+    # `function.name` instead -- so a non-UTF-8 symbol name (this real,
+    # lief-round-tripped b'\xff\xfe_chk' dynamic symbol) leaked a raw
+    # `bytes` object into a list otherwise made of `str`, which then
+    # also leaked into the human-readable f-string description built
+    # from this list in checksec(). Every entry must now be `str`, and
+    # the undecodable name must still end with '_chk' after
+    # decode(..., 'replace') substitutes the invalid lead bytes.
     c = _chk(variants['badname'])
     fort = c.fortify()
-    # The undecodable name (b'\xff\xfe_chk') still ends with '_chk' after
-    # decode(..., 'replace') substitutes the invalid lead bytes, so it is
-    # counted as fortified alongside android.so's genuine __strlen_chk etc.
-    assert any(isinstance(f, bytes) and f.endswith(b'_chk') for f in fort)
+    assert fort and all(isinstance(f, str) for f in fort)
+    assert any(f.endswith('_chk') and '�' in f for f in fort)

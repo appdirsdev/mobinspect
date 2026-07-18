@@ -21,6 +21,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import warnings
 from pathlib import Path
 from unittest import mock
 
@@ -42,10 +43,10 @@ def _extract_real_macho_object(tmp):
     Confirmed via direct lief inspection: is_pie=False (object files are
     never position-independent executables), has_nx=True, and its
     symbol types are all clean/valid lief enum members (unlike a
-    DWARF-debug-info-carrying executable, which can carry raw N_OSO
-    symbol-type ints lief doesn't map to an enum member -- see the
-    is_symbols_stripped() manual-fallback test below and the suspected
-    bug it surfaces).
+    DWARF-debug-info-carrying executable, which can carry STAB symbols
+    whose masked lief ``Symbol.type`` is a raw int lief doesn't map to
+    an enum member -- see the ``raw_type``-based fix in
+    ``is_symbols_stripped()`` and the regression test below).
     """
     lib_path = os.path.join(SAMPLES_DIR, 'macho_static_lib.a')
     subprocess.run(['ar', 'x', lib_path], cwd=tmp, check=True)
@@ -173,16 +174,6 @@ class MachoChecksecCompiledBinaryTests(SimpleTestCase):
         # N_SECT/0x0e) trigger the "found a debug-capable symbol" early
         # return (lines 276, 279, 282-283, 288-289 and the early
         # `return False`).
-        #
-        # NOTE: a real *executable* compiled with -g (carrying DWARF
-        # debug info, e.g. self.rpath_debug_bin) hits a genuine bug in
-        # this exact fallback instead: some of its symbols report a raw
-        # lief SYMBOL_TYPE int (e.g. 4 -- N_OSO) that isn't a valid enum
-        # member, so `i.type.value` raises `AttributeError: 'int' object
-        # has no attribute 'value'` uncaught (reproduced directly;
-        # reported in the coverage summary, not fixed here). Using the
-        # plain .o object file avoids that bug and exercises the
-        # intended, working branch.
         tmp = tempfile.mkdtemp()
         real_obj = _extract_real_macho_object(tmp)
         chk = MachOChecksec(real_obj, real_obj.name)
@@ -190,25 +181,36 @@ class MachoChecksecCompiledBinaryTests(SimpleTestCase):
             stripped = chk.is_symbols_stripped()
         self.assertFalse(stripped)
 
-    def test_suspected_bug_debug_binary_raises_in_manual_fallback(self):
-        # SUSPECTED PRODUCTION BUG (documented, not fixed): when objdump
-        # is unavailable and the target is a real executable carrying
-        # DWARF debug info (any binary built with -g), is_symbols_stripped
-        # ()'s manual fallback can raise `AttributeError: 'int' object
-        # has no attribute 'value'` for symbols whose lief SYMBOL_TYPE is
-        # a raw, non-enum int (observed value 4, i.e. N_OSO) -- this
-        # exception is NOT caught anywhere (is_symbols_stripped's own
-        # try/except only wraps the objdump call), so it propagates out
-        # of checksec() entirely, and callers like library_analysis()
-        # swallow the WHOLE per-file analysis as a generic failure
-        # instead of just the symbol-stripped flag. This would occur in
+    def test_symbols_stripped_manual_fallback_handles_dwarf_stab_symbols(self):
+        # REGRESSION TEST for a fixed production bug: when objdump is
+        # unavailable and the target is a real executable carrying DWARF
+        # debug info (any binary built with -g, e.g. self.rpath_debug_bin),
+        # the manual fallback's N_STAB check used to read `i.type.value`.
+        # lief's `Symbol.type` is documented as `n_type & N_TYPE` -- the
+        # n_type byte with the N_STAB bits already masked OFF -- so a) the
+        # `& 0xe0` check could never detect a stab entry through it, and
+        # b) many real STAB byte values (e.g. N_SO 0x64, N_OSO 0x66) mask
+        # down to a raw int lief's TYPE enum does not define (4, 6),
+        # which made lief emit `RuntimeWarning: 4 is not a valid TYPE.`
+        # and return a plain int lacking `.value`, raising uncaught
+        # `AttributeError: 'int' object has no attribute 'value'`. That
+        # propagated out of checksec() entirely, so callers like
+        # library_analysis() would fail the WHOLE per-file analysis
+        # instead of just the symbol-stripped flag -- reproducible in
         # production whenever objdump is missing from PATH (e.g. a
         # minimal container image) and the binary retains debug info.
-        with mock.patch.dict(os.environ, {'PATH': ''}):
-            with self.assertRaises(AttributeError):
-                MachOChecksec(
+        #
+        # Fixed by reading `i.raw_type` (the untouched, full n_type byte)
+        # instead of `i.type.value`. This asserts: no crash, no warning,
+        # and the correct answer (real debug info present -> not
+        # stripped).
+        with warnings.catch_warnings():
+            warnings.simplefilter('error')
+            with mock.patch.dict(os.environ, {'PATH': ''}):
+                stripped = MachOChecksec(
                     Path(self.rpath_debug_bin),
                     'rpath_debug').is_symbols_stripped()
+        self.assertFalse(stripped)
 
     def test_symbols_stripped_manual_fallback_tail_fallthrough(self):
         # Same real objdump-unavailable fault, but on a genuinely fully

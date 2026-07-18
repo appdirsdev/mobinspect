@@ -136,10 +136,17 @@ def api_delete_scan(request):
         return make_api_response(
             {'error': 'Missing Parameters'}, 422)
     resp = delete_scan(request, True)
-    if 'error' in resp:
-        response = make_api_response(resp, 500)
-    else:
+    # delete_scan() signals every non-exception failure (invalid hash,
+    # scan not found, async task still in progress) via {'deleted': <msg>}
+    # with msg != 'yes' -- it never sets an 'error' key on those paths
+    # (that key only appears from the outer bare `except Exception`).
+    # Checking 'error' in resp here left this branch dead for the common
+    # failure cases, so callers got a 200 with a failure message in the
+    # body instead of an error status.
+    if resp.get('deleted') == 'yes':
         response = make_api_response(resp, 200)
+    else:
+        response = make_api_response(resp, 500)
     return response
 
 

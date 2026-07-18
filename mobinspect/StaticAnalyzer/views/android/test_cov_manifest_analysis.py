@@ -429,11 +429,13 @@ def test_data_secret_codes_and_ports():
 @pytest.mark.django_db
 def test_grant_uri_permission_branches_execute():
     # Exercises the grant-uri-permission branches (pathPrefix/path/pathPattern).
-    # The 'improper_provider_permission' KB template has a real formatting
-    # bug (its 'name' string has no %s but is fed a tuple), so the template
-    # loop raises and manifest_analysis returns None. We assert that real
-    # behaviour rather than mocking around it; the grant-uri branch lines
-    # still execute before the raise.
+    # Regression test for a sibling of the exported_provider_*_new KB
+    # placeholder bug: 'improper_provider_permission'['name'] previously had
+    # no %s while the call site fed it a 1-tuple, so `name % t_name` raised
+    # TypeError inside the broad except in manifest_analysis() and the whole
+    # function silently returned None (losing every manifest finding, not
+    # just this rule). Assert the real, fixed behaviour: analysis completes
+    # and each grant-uri-permission misconfiguration yields a real finding.
     xml = (
         f'<?xml version="1.0" encoding="utf-8"?>'
         f'<manifest {NS_DECL} package="com.test">'
@@ -446,7 +448,26 @@ def test_grant_uri_permission_branches_execute():
         f'</application>'
         f'</manifest>')
     result = run_analysis(xml, min_sdk='30', target_sdk='30')
-    assert result is None
+    assert result is not None
+    findings = [
+        item for item in result['manifest_anal']
+        if item['rule'] == 'improper_provider_permission']
+    assert len(findings) == 3
+    names = {f['name'] for f in findings}
+    assert names == {
+        'Improper Content Provider Permissions [pathPrefix=/]',
+        'Improper Content Provider Permissions [path=/]',
+        'Improper Content Provider Permissions [path=*]',
+    }
+    titles = {f['title'] for f in findings}
+    assert titles == {
+        'Improper Content Provider Permissions [pathPrefix=/]',
+        'Improper Content Provider Permissions [path=/]',
+        'Improper Content Provider Permissions [path=*]',
+    }
+    for f in findings:
+        assert f['severity'] == 'warning'
+        assert 'Content providers may contain sensitive' in f['description']
 
 
 @pytest.mark.django_db
@@ -1072,3 +1093,40 @@ def test_no_template_found_for_key_warning():
         result = run_analysis(xml, min_sdk='30', target_sdk='30')
     assert result is not None
     assert 'explicitly_exported' not in rule_keys(result)
+
+
+@pytest.mark.django_db
+def test_manifest_analysis_outer_exception_handler_returns_none(monkeypatch):
+    """Lines 863-866: the outer ``except Exception as exp:`` of
+    manifest_analysis() (log + append_scan_status + implicit ``return
+    None``). This used to be covered only incidentally, by a since-fixed
+    KB TypeError; now that every KB placeholder bug is fixed, nothing in
+    a normal run reaches this branch any more, so it needs a dedicated,
+    real fault injection.
+
+    Narrow-monkeypatch exactly ONE internal call -- the real
+    ``network_security.analysis`` sub-call, which is the very last
+    statement executed inside the try block (it builds part of the
+    returned ``man_an_dic``) -- to raise a genuine RuntimeError. Every
+    other line of manifest_analysis() up to that point still runs for
+    real against a real minidom-parsed manifest; only this one sub-call
+    is replaced, and it is forced to actually raise (not just return a
+    canned value), so the outer except genuinely fires.
+    """
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError('forced network_security.analysis failure')
+
+    monkeypatch.setattr(ma.network_security, 'analysis', _boom)
+
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<manifest {NS_DECL} package="com.test">'
+        f'<application>'
+        f'<activity android:name="com.test.Plain" '
+        f'android:exported="true"/>'
+        f'</application>'
+        f'</manifest>')
+    result = run_analysis(xml, min_sdk='30', target_sdk='30')
+    # The outer except swallows the RuntimeError, logs it, records scan
+    # status, and the function implicitly returns None.
+    assert result is None

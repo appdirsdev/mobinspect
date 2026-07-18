@@ -26,14 +26,14 @@ pytestmark = pytest.mark.django_db
 # block marks the connection `needs_rollback` even once the exception is
 # caught locally (by record()'s own try/except) -- the block itself must
 # still see and clear that flag or every later query in the SAME
-# transaction raises TransactionManagementError. Wrapping the call in an
-# explicit nested `transaction.atomic()` here gives Django a savepoint
-# boundary to roll back to on exit (Atomic.__exit__ checks
-# `connection.needs_rollback` directly, independent of whether a Python
-# exception actually propagated), which both proves the exact failure
-# mode and keeps the rest of this test (and the suite's shared seeded
-# data) intact. This is itself a real, worth-flagging edge case in
-# record()/record_anon()'s "never raises" contract -- see report notes.
+# transaction raises TransactionManagementError. record() / record_anon()
+# guard against this themselves by running their create() inside a nested
+# `transaction.atomic()` savepoint (see audit.py docstrings), so wrapping
+# the call in an explicit outer `transaction.atomic()` here both proves
+# the exact failure mode this repo used to be exposed to and keeps the
+# rest of this test (and the suite's shared seeded data) intact. The
+# transaction-poisoning regression tests below assert the fix directly:
+# a follow-up query in the SAME outer atomic block must still succeed.
 def test_record_swallows_serialization_failure():
     """A `set` inside metadata is not JSON-serializable -> the real
     Postgres INSERT really raises TypeError while encoding the JSONField;
@@ -56,6 +56,49 @@ def test_record_anon_swallows_serialization_failure():
             None, 'cov.audit.anon.unserializable',
             metadata={'bad': {1, 2, 3}},
         )
+    assert AuditEvent.objects.count() == before
+
+
+# ───────────────────────────────────── transaction-poisoning regression
+#
+# Real bug (fixed): record()/record_anon() used to call
+# `AuditEvent.objects.create(...)` bare inside their try/except. If that
+# create() raised a REAL DB error (not just a Python-level TypeError)
+# while already nested inside a caller's OPEN `transaction.atomic()`
+# block, the except swallowed the Python exception but Django's
+# connection still had `needs_rollback` set -- so the very NEXT ORM
+# query issued in that same atomic block raised
+# TransactionManagementError, breaking the caller even though record()
+# itself "never raised". `action` is stored in a `varchar(80)` column
+# (see AuditEvent.action) and is NOT length-truncated the way
+# `target_id` is, so an over-length action string reaches Postgres
+# untouched and trips a genuine `DataError: value too long for type
+# character varying(80)` -- a real constraint failure, no mocking.
+#
+# The fix wraps each create() in its own nested `transaction.atomic()`
+# savepoint so a failure there rolls back only that savepoint, leaving
+# the caller's outer transaction (and its `needs_rollback` flag) clean.
+def test_record_db_error_does_not_poison_callers_transaction():
+    before = AuditEvent.objects.count()
+    with transaction.atomic():
+        # action exceeds the varchar(80) column limit -> real Postgres
+        # DataError raised deep inside AuditEvent.objects.create().
+        audit.record(None, 'x' * 200)
+        # The regression: before the fix, this follow-up query -- still
+        # inside the SAME outer atomic block -- would raise
+        # TransactionManagementError even though record() swallowed its
+        # own exception and logged a warning instead of raising.
+        count = AuditEvent.objects.count()
+    assert count == before  # the oversized row was never persisted
+    assert AuditEvent.objects.count() == before
+
+
+def test_record_anon_db_error_does_not_poison_callers_transaction():
+    before = AuditEvent.objects.count()
+    with transaction.atomic():
+        audit.record_anon(None, 'y' * 200)
+        count = AuditEvent.objects.count()
+    assert count == before
     assert AuditEvent.objects.count() == before
 
 

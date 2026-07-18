@@ -354,7 +354,13 @@ class ELFChecksec:
             else:
                 function_name = function.name
             if function_name.endswith('_chk'):
-                fortified_funcs.append(function.name)
+                # Store the decoded name (function_name), not the raw
+                # function.name -- otherwise a non-UTF-8 symbol name
+                # leaks a raw `bytes` object into this list (and into
+                # the human-readable f-string description built from
+                # it below) instead of the same decoded/replaced
+                # string used to make the match.
+                fortified_funcs.append(function_name)
         return fortified_funcs
 
     def strings(self):

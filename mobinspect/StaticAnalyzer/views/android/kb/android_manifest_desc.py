@@ -193,7 +193,7 @@ MANIFEST_DESC = {
                         'Content providers may contain sensitive '
                         'information about an app and therefore '
                         'should not be shared.'),
-        'name': 'Improper Content Provider Permissions',
+        'name': 'Improper Content Provider Permissions [%s]',
     },
     'dialer_code_found': {
         'title': ('Dailer Code: %s Found'

@@ -286,7 +286,7 @@ class MachOChecksec:
                     # stripped and unstripped binaries
                     # also ignore radr://5614542
                     continue
-                if (i.type.value & 0xe0) > 0 or i.type.value in (0x0e, 0x1e):
+                if (i.raw_type & 0xe0) > 0 or i.raw_type in (0x0e, 0x1e):
                     # N_STAB set or 14, 30
 
                     # N_STAB	0xe0  /* if any of these bits set,
@@ -297,6 +297,20 @@ class MachOChecksec:
                     # some of the N_STAB bits set and if any
                     # of these bits are set then it is a
                     # symbolic debugging entry (a stab).
+                    #
+                    # lief's `Symbol.type` is documented as
+                    # "nlist_xx.n_type & N_TYPE" -- i.e. already
+                    # masked down to the 4-bit N_TYPE field, so the
+                    # N_STAB bits (0xe0) checked here can never be
+                    # set on it, and a masked STAB byte frequently
+                    # collides with a raw N_TYPE value lief's TYPE
+                    # enum does not define (observed: 4, 6), which
+                    # made lief warn ("RuntimeWarning: 4 is not a
+                    # valid TYPE.") and return a plain int lacking
+                    # `.value`, raising AttributeError here. Use
+                    # `raw_type` -- the untouched, full n_type byte
+                    # -- which is what this nlist.h-based check
+                    # actually needs.
 
                     # Identified a debugging symbol
                     return False

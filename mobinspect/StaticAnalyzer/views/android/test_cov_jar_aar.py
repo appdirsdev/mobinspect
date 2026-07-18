@@ -101,3 +101,29 @@ class ObfuscatedCheckTests(TestCase):
         obfuscated_check('oc3', None, code_an_dic)
         finding = code_an_dic['findings']['aar_class_obfuscation']
         self.assertEqual(finding['files'], {})
+
+    def test_extracts_nested_jar_when_out_dir_absent(self):
+        # Dedicated, deterministic test for the `unzip(checksum, j, out)`
+        # extraction call inside the `for j in app_dir.rglob('*.jar')`
+        # loop. This line is skipped whenever `<name>_out` already exists
+        # (`if not out.exists()`), which is flaky under a shared upload
+        # dir left over from a prior scan. To make this deterministic,
+        # use a fresh tempfile.mkdtemp() app_dir of our own -- never the
+        # shared android.aar sample used elsewhere -- and drop a small
+        # but real nested .jar (a genuine zip containing one real .class
+        # entry) into it, so `<name>_out` is guaranteed not to pre-exist.
+        app_dir = Path(tempfile.mkdtemp())
+        jar_path = app_dir / 'nested.jar'
+        with zipfile.ZipFile(jar_path, 'w') as zf:
+            zf.writestr('Nested.class', b'\xca\xfe\xba\xbe fake class bytes')
+        out_dir = app_dir / 'nested.jar_out'
+        self.assertFalse(out_dir.exists())
+
+        code_an_dic = {'findings': {}}
+        obfuscated_check('oc4', app_dir.as_posix(), code_an_dic)
+
+        # The real unzip() call ran (line 254) and extracted the nested
+        # jar into a freshly created `<name>_out` directory.
+        self.assertTrue(out_dir.exists())
+        self.assertTrue(out_dir.is_dir())
+        self.assertTrue((out_dir / 'Nested.class').exists())

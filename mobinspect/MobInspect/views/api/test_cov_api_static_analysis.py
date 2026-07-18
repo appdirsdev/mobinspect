@@ -141,12 +141,63 @@ class ApiStaticValidationTests(TestCase):
         resp = self.post('/api/v1/delete_scan')
         self.assertEqual(resp.status_code, 422)
 
-    def test_delete_not_found_is_ok(self):
-        # delete_scan returns {'deleted': ...} (no 'error') even when the
-        # scan is absent, so the api layer reports 200.
+    def test_delete_not_found_returns_500(self):
+        # Regression: delete_scan() reports a missing scan as
+        # {'deleted': 'Scan not found in Database'} (no 'error' key --
+        # that key is only ever set by the outer bare `except Exception`).
+        # api_delete_scan used to check 'error' in resp, which is always
+        # False here, so a real "nothing to delete" failure came back as
+        # an HTTP 200. It must now key off resp['deleted'] != 'yes'.
         resp = self.post('/api/v1/delete_scan', {'hash': ABSENT_MD5})
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(
+            resp.json()['deleted'], 'Scan not found in Database')
+
+    def test_delete_invalid_hash_returns_500(self):
+        # Same contract-drift sibling: an invalid (non-MD5) hash trips
+        # delete_scan()'s own regex check, returning {'deleted': 'Invalid
+        # scan hash'} -- still no 'error' key, still must not be a 200.
+        resp = self.post('/api/v1/delete_scan', {'hash': NON_MD5})
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(resp.json()['deleted'], 'Invalid scan hash')
+
+    def test_delete_scan_in_progress_returns_500(self):
+        # A real EnqueuedTask that hasn't completed (and hasn't timed
+        # out) makes delete_scan() refuse the delete via
+        # {'deleted': 'A scan can only be deleted after it is
+        # completed'} -- again no 'error' key, so this must 500 too,
+        # not fall through to a false-positive 200.
+        md5 = 'e' * 32
+        RecentScansDB.objects.create(MD5=md5, SCAN_TYPE='apk')
+        task = EnqueuedTask.objects.create(
+            task_id='in-progress-task',
+            checksum=md5,
+            file_name='inprogress.apk',
+            app_name='In Progress App',
+        )
+        try:
+            resp = self.post('/api/v1/delete_scan', {'hash': md5})
+            self.assertEqual(resp.status_code, 500)
+            self.assertEqual(
+                resp.json()['deleted'],
+                'A scan can only be deleted after it is completed')
+        finally:
+            task.delete()
+            RecentScansDB.objects.filter(MD5=md5).delete()
+
+    def test_delete_scan_success_returns_200(self):
+        # Real happy path: a genuine scan row + upload dir, deleted for
+        # real, confirms the 'deleted' == 'yes' branch still reports 200.
+        md5 = 'f' * 32
+        RecentScansDB.objects.create(MD5=md5, SCAN_TYPE='apk')
+        upload_dir = os.path.join(settings.UPLD_DIR, md5)
+        os.makedirs(upload_dir, exist_ok=True)
+        with open(os.path.join(upload_dir, 'placeholder.txt'), 'w') as fh:
+            fh.write('x')
+        resp = self.post('/api/v1/delete_scan', {'hash': md5})
         self.assertEqual(resp.status_code, 200)
-        self.assertIn('deleted', resp.json())
+        self.assertEqual(resp.json()['deleted'], 'yes')
+        self.assertFalse(RecentScansDB.objects.filter(MD5=md5).exists())
 
     def test_delete_scan_filesystem_error_returns_500(self):
         # delete_scan() only ever returns {'deleted': ...} on every
