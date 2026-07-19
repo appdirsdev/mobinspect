@@ -45,6 +45,14 @@
       {% endif %}
     {% endcan_any %}
 
+    {% can_any 'scan.view' 'scan.view_own' %}
+      {% if cur == 'list_tasks' %}
+        {% include "components/sidebar_item.html" with url='list_tasks' icon='activity' label='Scan queue' active=True %}
+      {% else %}
+        {% include "components/sidebar_item.html" with url='list_tasks' icon='activity' label='Scan queue' active=False %}
+      {% endif %}
+    {% endcan_any %}
+
     {% can 'analytics.view' %}
       {% if cur == 'dashboard' %}
         {% include "components/sidebar_item.html" with url='analytics:dashboard' icon='bar-chart-3' label='Analytics' active=True %}
