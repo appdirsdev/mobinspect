@@ -185,9 +185,9 @@
     <div class="card-header"><h2 class="text-h4 flex items-center gap-3"><span class="mi-icon-chip">{% icon "info" size=16 %}</span> App information</h2></div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Publisher</span><span class="text-text-primary truncate">{{ publisher_name }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Version</span><span class="text-text-primary">{{ app_version }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Arch</span><span class="text-text-primary font-mono">{{ architecture }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Publisher</span><span class="text-text-primary truncate">{{ publisher_name|default_if_none:"" }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Version</span><span class="text-text-primary">{{ app_version|default_if_none:"" }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-24 flex-shrink-0">Arch</span><span class="text-text-primary font-mono">{{ architecture|default_if_none:"" }}</span></div>
       {% if virus_total and virus_total.items|length > 9 %}
         <div class="flex items-baseline gap-2 pt-2 border-t border-border-subtle">
           <span class="text-text-tertiary w-24 flex-shrink-0">VirusTotal</span>
@@ -227,14 +227,19 @@
   <div class="card mi-glass card-hover" data-reveal>
     <div class="card-header"><h2 class="text-h4 flex items-center gap-3"><span class="mi-icon-chip">{% icon "file-text" size=16 %}</span> XML manifest</h2></div>
     <div class="card-body space-y-2 text-small">
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Compiler</span><span class="text-text-primary">{{ compiler_version }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">VS version</span><span class="text-text-primary">{{ visual_studio_version }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">VS edition</span><span class="text-text-primary">{{ visual_studio_edition }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Target OS</span><span class="text-text-primary">{{ target_os }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">APPX DLL ver.</span><span class="text-text-primary">{{ appx_dll_version }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Proj GUID</span><span class="font-mono text-mono text-text-secondary truncate">{{ proj_guid }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Opti tool</span><span class="text-text-primary">{{ opti_tool }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Target run</span><span class="text-text-primary">{{ target_run }}</span></div>
+      {% comment %} Each value comes from an XML attribute/element lookup that can
+         legitimately return None (attribute or element text absent from
+         AppxManifest.xml) even though the backend's dict default is '' —
+         default_if_none restores that intended blank state instead of
+         showing the literal text "None". {% endcomment %}
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Compiler</span><span class="text-text-primary">{{ compiler_version|default_if_none:"" }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">VS version</span><span class="text-text-primary">{{ visual_studio_version|default_if_none:"" }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">VS edition</span><span class="text-text-primary">{{ visual_studio_edition|default_if_none:"" }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Target OS</span><span class="text-text-primary">{{ target_os|default_if_none:"" }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">APPX DLL ver.</span><span class="text-text-primary">{{ appx_dll_version|default_if_none:"" }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Proj GUID</span><span class="font-mono text-mono text-text-secondary truncate">{{ proj_guid|default_if_none:"" }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Opti tool</span><span class="text-text-primary">{{ opti_tool|default_if_none:"" }}</span></div>
+      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Target run</span><span class="text-text-primary">{{ target_run|default_if_none:"" }}</span></div>
     </div>
   </div>
 
@@ -468,6 +473,8 @@
               {% else %}<span class="badge badge-critical">{{ log.exception|truncatechars:80 }}</span>{% endif %}
             </td>
           </tr>
+        {% empty %}
+          <tr><td colspan="3" class="px-4 py-6 text-center text-text-tertiary italic">No scan logs recorded.</td></tr>
         {% endfor %}
       </tbody>
     </table>

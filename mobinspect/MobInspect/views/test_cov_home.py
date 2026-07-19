@@ -329,6 +329,18 @@ class HomeViewsRealTests(TestCase):
         # print_n_send_error_response renders an error page (not a redirect).
         self.assertNotEqual(resp.status_code, 302)
 
+    def test_search_missing_query_key_get(self):
+        # No 'query' key at all (not just empty) -- the Django test Client
+        # re-raises view exceptions, so this would error out on a KeyError
+        # regression; it must instead degrade to the same "no query"
+        # error path as an empty query.
+        resp = self.client.get('/search')
+        self.assertNotEqual(resp.status_code, 302)
+
+    def test_search_missing_query_key_post(self):
+        resp = self.client.post('/search', {})
+        self.assertNotEqual(resp.status_code, 302)
+
     def test_search_md5_match_redirects(self):
         md5 = '2' * 32
         _mk_recent(md5, ANALYZER='static_analyzer')
@@ -926,6 +938,15 @@ class HomeGapCoverageTests(TestCase):
         self.assertNotIn('22' * 16, md5s)
 
     # ---------------------------------------------------------- download_apk
+    def test_download_apk_missing_package_param(self):
+        # No 'package' key at all -- must not raise a KeyError (the Django
+        # test Client re-raises view exceptions, so a regression here
+        # would error the test rather than just fail an assertion).
+        resp = self.client.post('/download_scan/', {})
+        self.assertEqual(resp.status_code, 400)
+        data = json.loads(resp.content)
+        self.assertEqual(data['status'], 'failed')
+
     def test_download_apk_no_result(self):
         # Invalid package name -> fails strict_package_check regardless of
         # whether the sandbox has outbound internet (mirrors the existing

@@ -178,10 +178,10 @@
     <div class="card-header"><h2 class="text-h4 flex items-center gap-2"><span class="mi-chip inline-flex items-center justify-center w-7 h-7 rounded-md bg-chart-amber/15 text-chart-amber">{% icon "info" size=14 %}</span> App information</h2></div>
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Package</span><span class="font-mono text-mono text-text-primary truncate">{{ package_name }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Main activity</span><span class="font-mono text-mono text-text-secondary truncate">{{ main_activity }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">SDK</span><span class="text-text-primary">{{ min_sdk }} – {{ max_sdk }} (target {{ target_sdk }})</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Version</span><span class="text-text-primary">{{ version_name }} <span class="text-text-tertiary">({{ version_code }})</span></span></div>
+      {% if package_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Package</span><span class="font-mono text-mono text-text-primary truncate">{{ package_name }}</span></div>{% endif %}
+      {% if main_activity %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Main activity</span><span class="font-mono text-mono text-text-secondary truncate">{{ main_activity }}</span></div>{% endif %}
+      {% if min_sdk %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">SDK</span><span class="text-text-primary">{{ min_sdk }} – {{ max_sdk|default:"—" }} (target {{ target_sdk|default:"?" }})</span></div>{% endif %}
+      {% if version_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Version</span><span class="text-text-primary">{{ version_name }} {% if version_code %}<span class="text-text-tertiary">({{ version_code }})</span>{% endif %}</span></div>{% endif %}
     </div>
   </div>
 </section>

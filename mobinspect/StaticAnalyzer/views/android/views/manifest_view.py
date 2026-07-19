@@ -51,6 +51,8 @@ def run(request, checksum):
             }
             template = 'general/view.html'
             return render(request, template, context)
+        return print_n_send_error_response(
+            request, 'Invalid checksum or manifest type')
     except Exception:
         logger.exception('Viewing AndroidManifest.xml')
         return print_n_send_error_response(

@@ -21,7 +21,8 @@
   
   function escapeHtml(unsafe)
   {
-    return unsafe
+    if (unsafe === null || unsafe === undefined) return '';
+    return String(unsafe)
          .replace(/&/g, "&amp;")
          .replace(/</g, "&lt;")
          .replace(/>/g, "&gt;")
@@ -40,8 +41,14 @@
       success : function(json){ on_success(json) },
       error : function(xhr, ajaxOptions, thrownError) {
         console.log(xhr.responseText);
-        if (thrownError === 'Forbidden')
+        if (thrownError === 'Forbidden') {
           forbidden();
+        } else {
+          // Network failure, timeout, non-2xx, or malformed JSON: previously
+          // silent (console.log only) — surface it so the user isn't left
+          // wondering why nothing happened.
+          Swal.fire('Error', 'Request failed. Please try again.', 'error');
+        }
       }
     });
   }
@@ -142,7 +149,7 @@ function list_suppressions(){
         var tbl = $('#sup_table').DataTable();
         tbl.clear().draw();
           $(function() {
-              $.each(json.message, function(i, item) {
+              $.each(json.message || [], function(i, item) {
                 typ = item.SUPPRESS_TYPE
                 rule_ids = get_rules(typ, item.SUPPRESS_RULE_ID)
                 files = get_files(typ, item.SUPPRESS_FILES)

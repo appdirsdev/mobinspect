@@ -199,12 +199,12 @@
     <div class="card-body space-y-2 text-small">
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App name</span><span class="text-text-primary truncate">{{ app_name }}</span></div>
       <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">App type</span><span class="text-text-primary">{{ app_type }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Identifier</span><span class="font-mono text-mono text-text-primary truncate">{{ bundle_id }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">SDK name</span><span class="text-text-primary">{{ sdk_name }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Version</span><span class="text-text-primary">{{ app_version }} <span class="text-text-tertiary">(build {{ build }})</span></span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Platform version</span><span class="text-text-primary">{{ platform }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Min OS version</span><span class="text-text-primary">{{ min_os_version }}</span></div>
-      <div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Supported platforms</span><span class="text-text-secondary">{% for pl in bundle_supported_platforms %}{{pl}}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+      {% if bundle_id %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Identifier</span><span class="font-mono text-mono text-text-primary truncate">{{ bundle_id }}</span></div>{% endif %}
+      {% if sdk_name %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">SDK name</span><span class="text-text-primary">{{ sdk_name }}</span></div>{% endif %}
+      {% if app_version %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Version</span><span class="text-text-primary">{{ app_version }} {% if build %}<span class="text-text-tertiary">(build {{ build }})</span>{% endif %}</span></div>{% endif %}
+      {% if platform %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Platform version</span><span class="text-text-primary">{{ platform }}</span></div>{% endif %}
+      {% if min_os_version %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Min OS version</span><span class="text-text-primary">{{ min_os_version }}</span></div>{% endif %}
+      {% if bundle_supported_platforms %}<div class="flex items-baseline gap-2"><span class="text-text-tertiary w-32 flex-shrink-0">Supported platforms</span><span class="text-text-secondary">{% for pl in bundle_supported_platforms %}{{pl}}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
     </div>
   </div>
 

@@ -122,7 +122,11 @@ class Swipe {
 	  }				
 	}
 	
-	addListeners() {	
+	addListeners() {
+	  // Guard against a missing/null target (e.g. getElementById() returned
+	  // null): without this, addEventListener on null throws and aborts the
+	  // rest of the enclosing script.
+	  if (!this.elem) return;
 	  this.elem.addEventListener("touchstart", e => this.down(e));
 	  this.elem.addEventListener("mousedown", e => this.down(e));
 	  this.elem.addEventListener("touchmove", e => this.move(e));

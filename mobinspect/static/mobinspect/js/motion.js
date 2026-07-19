@@ -28,6 +28,10 @@
   const DUR = { fast: 120, base: 200, slow: 320 };
 
   function play(el, keyframes, options) {
+    // fadeIn/fadeUp/scaleIn are exported on window.MI.motion for any caller
+    // to use directly with a single element — guard against a missing one
+    // so a null/undefined target doesn't throw and kill the caller's script.
+    if (!el) return;
     if (PREFERS_REDUCED) {
       // Collapse to opacity-only fade.
       const last = keyframes[keyframes.length - 1];

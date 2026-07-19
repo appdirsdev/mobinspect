@@ -36,7 +36,15 @@
   }
 
   function get() {
-    const v = localStorage.getItem(STORAGE_KEY);
+    // localStorage can throw (private browsing / blocked storage / sandboxed
+    // iframe) — don't let that exception escape and break the caller (e.g.
+    // Alpine's x-data init on the theme toggle).
+    let v;
+    try {
+      v = localStorage.getItem(STORAGE_KEY);
+    } catch (e) {
+      v = null;
+    }
     // Default (no stored choice yet) is 'dark' — matches the inline
     // no-flicker bootstrap in mi_theme.py; must stay in sync with it.
     return VALID.includes(v) ? v : 'dark';
@@ -44,7 +52,12 @@
 
   function set(value) {
     if (!VALID.includes(value)) return;
-    localStorage.setItem(STORAGE_KEY, value);
+    try {
+      localStorage.setItem(STORAGE_KEY, value);
+    } catch (e) {
+      // Storage unavailable — still apply the theme for this page load,
+      // it just won't persist across reloads.
+    }
     apply(value);
   }
 

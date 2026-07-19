@@ -1,5 +1,10 @@
 {% block content %}
 {% load static %}
+{% comment %} These AppxManifest-derived fields can resolve to Python None (XML
+   attribute/element absent from the manifest) even though the backend's dict
+   default is '' — default_if_none restores that intended blank state instead
+   of the PDF showing the literal text "None" for a missing manifest field. {% endcomment %}
+{% with publisher_name=publisher_name|default_if_none:"" app_version=app_version|default_if_none:"" architecture=architecture|default_if_none:"" compiler_version=compiler_version|default_if_none:"" visual_studio_version=visual_studio_version|default_if_none:"" visual_studio_edition=visual_studio_edition|default_if_none:"" target_os=target_os|default_if_none:"" appx_dll_version=appx_dll_version|default_if_none:"" proj_guid=proj_guid|default_if_none:"" opti_tool=opti_tool|default_if_none:"" target_run=target_run|default_if_none:"" %}
 <!doctype html>
 <html>
   <head>
@@ -809,4 +814,5 @@
     </article>
   </body>
 </html>
+{% endwith %}
 {% endblock %}

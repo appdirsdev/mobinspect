@@ -278,6 +278,22 @@ class GenericCompareTests(TestCase):
         self.assertEqual(ctx['apkid']['only_first'], {})
         self.assertEqual(ctx['apkid']['only_second'], {})
 
+    def test_corrupted_stored_analysis_returns_graceful_error(self):
+        # get_context_from_db_entry() fails closed (returns None) when a
+        # stored JSON/repr column can't be parsed -- e.g. MANIFEST_ANALYSIS
+        # holding a malformed literal. Regression: generic_compare() used to
+        # subscript that None directly (`db_context['package_name']`),
+        # raising an unhandled TypeError instead of a graceful error.
+        row1 = _first_app_row(ERR_HASH_1)
+        row1['MANIFEST_ANALYSIS'] = 'not a valid python literal {{{'
+        StaticAnalyzerAndroid.objects.create(**row1)
+        StaticAnalyzerAndroid.objects.create(**_second_app_row(ERR_HASH_2))
+
+        resp = generic_compare(
+            self._request(), ERR_HASH_1, ERR_HASH_2, api=True)
+        self.assertIsInstance(resp, dict)
+        self.assertIn('error', resp)
+
     def test_render_path_returns_http_response(self):
         StaticAnalyzerAndroid.objects.create(**_first_app_row())
         StaticAnalyzerAndroid.objects.create(**_second_app_row())

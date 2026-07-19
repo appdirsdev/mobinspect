@@ -62,12 +62,18 @@ class ManifestViewRunTests(TestCase):
         resp = self._get(checksum, 'apk')
         self.assertEqual(resp.status_code, 200)
 
-    def test_invalid_checksum_or_type_returns_none(self):
+    def test_invalid_checksum_or_type_returns_error_response(self):
         # Neither is_md5(checksum) nor typ-in-supported holds -> the `if`
-        # body never runs and the function implicitly returns None (no
-        # explicit else / early error response for this combination).
-        self.assertIsNone(self._get('not-an-md5', 'apk'))
-        self.assertIsNone(self._get('3' * 32, 'not-a-supported-type'))
+        # body never runs. Previously the function fell through and
+        # implicitly returned None, which Django's handler turns into an
+        # unhandled "didn't return an HttpResponse" 500 with a stack
+        # trace; it now renders the standard error page instead.
+        resp = self._get('not-an-md5', 'apk')
+        self.assertIsNotNone(resp)
+        self.assertEqual(resp.status_code, 500)
+        resp = self._get('3' * 32, 'not-a-supported-type')
+        self.assertIsNotNone(resp)
+        self.assertEqual(resp.status_code, 500)
 
     def test_missing_type_param_hits_exception_handler(self):
         req = self.factory.get('/manifest_view/x/')

@@ -140,8 +140,22 @@ def generic_compare(request,
     # We don't want to return this whole context back to the user
     # because its a lot of data we don't use
     # it should help the performance I guess
-    first_app = deepcopy(get_context_from_db_entry(db_entry))
-    second_app = deepcopy(get_context_from_db_entry(db_entry2))
+    first_ctx = get_context_from_db_entry(db_entry)
+    second_ctx = get_context_from_db_entry(db_entry2)
+    if first_ctx is None or second_ctx is None:
+        # get_context_from_db_entry() fails closed (returns None) when the
+        # stored analysis JSON for a row can't be parsed -- e.g. a
+        # corrupted/partial DB write. Without this guard the None flows
+        # into the dict subscripting below and raises an unhandled
+        # TypeError instead of a graceful, rendered error.
+        return print_n_send_error_response(
+            request,
+            'Failed to load the stored analysis data for one of the '
+            'apps being compared.',
+            api,
+        )
+    first_app = deepcopy(first_ctx)
+    second_app = deepcopy(second_ctx)
 
     # Second, fill the common static parts that
     # are missing in the classic analysis

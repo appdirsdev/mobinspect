@@ -14,6 +14,10 @@ $(function () {
           $firstRowCells.filter('[colspan]').length === $firstRowCells.length) {
         return;
       }
+      // A thrown init error (e.g. an unexpected table shape) would otherwise
+      // propagate out of this .each() callback and stop jQuery from
+      // continuing to the remaining tables on the page.
+      try {
       $table.DataTable({
       "paging": true,
       "lengthChange": false,
@@ -56,5 +60,8 @@ $(function () {
         },
       ],
       });
+      } catch (e) {
+        console.error('DataTable initialization failed for table', $table.attr('id') || $table, e);
+      }
     });
   });

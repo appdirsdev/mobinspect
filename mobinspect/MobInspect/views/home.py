@@ -660,7 +660,15 @@ def recent_scans(request, page_size=10, page_number=1):
 @permission_required(Permissions.SCAN)
 def download_apk(request):
     """Download and APK by package name."""
-    package = request.POST['package']
+    package = request.POST.get('package')
+    if not package:
+        return HttpResponse(
+            json.dumps({
+                'status': 'failed',
+                'description': 'No package name provided',
+            }),
+            content_type='application/json; charset=utf-8',
+            status=HTTP_BAD_REQUEST)
     # Package validated in apk_download()
     context = {
         'status': 'failed',
@@ -681,9 +689,9 @@ def download_apk(request):
 def search(request, api=False):
     """Search scan by checksum or text."""
     if request.method == 'POST':
-        query = request.POST['query']
+        query = request.POST.get('query', '')
     else:
-        query = request.GET['query']
+        query = request.GET.get('query', '')
 
     if not query:
         msg = 'No search query provided.'

@@ -262,6 +262,12 @@
 {% endblock %}
 
 {% block content %}
+{% comment %} api_key can resolve to Python None (e.g. secret file missing/unreadable
+   for a user who otherwise has permission to see it) — without this guard
+   every curl example and the copy-key box below would render the literal
+   text "None" instead of the same masked placeholder the view already uses
+   for the no-permission case. {% endcomment %}
+{% with api_key=api_key|default:"*******" %}
 
 {# ══════════════════ Ambient hero ══════════════════ #}
 <section class="mi-hero card relative overflow-hidden p-0 mb-6" data-reveal>
@@ -6734,4 +6740,5 @@
     });
   })();
 </script>
+{% endwith %}
 {% endblock %}

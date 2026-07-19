@@ -131,13 +131,17 @@
     <div class="mi-code-card card overflow-hidden" data-reveal>
       <div class="card-body p-0">
         <div class="overflow-x-auto">
-          <pre id="code_block">{{ data }}</pre>
+          <pre id="code_block">{{ data|default_if_none:"" }}</pre>
         </div>
       </div>
     </div>
     {% comment %} Raw copy of the source, kept off-DOM-visible so EnlighterJS's markup
-       rewrites of #code_block never affect the copy-to-clipboard text. {% endcomment %}
-    <textarea id="code_raw" class="sr-only" tabindex="-1" aria-hidden="true" readonly>{{ data }}</textarea>
+       rewrites of #code_block never affect the copy-to-clipboard text.
+       data|default_if_none guards the "sqlite dump failed/empty" fallback path
+       (DYNAMIC_DeviceData sqlite viewer), where `data` is explicitly None and
+       `sqlite` can be an empty dict — without it this would render the
+       literal text "None" instead of an empty source view. {% endcomment %}
+    <textarea id="code_raw" class="sr-only" tabindex="-1" aria-hidden="true" readonly>{{ data|default_if_none:"" }}</textarea>
   {% endif %}
 
 </div>
