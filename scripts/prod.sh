@@ -4,9 +4,9 @@
 # key fingerprint, not by address.
 #
 # Usage:
-#   ./prod.sh          find server, print URL + health
-#   ./prod.sh ssh      find server, then open an SSH session to it
-#   SUBNET=10.249.54 ./prod.sh   (override the /24 to scan)
+#   ./scripts/prod.sh          find server, print URL + health
+#   ./scripts/prod.sh ssh      find server, then open an SSH session to it
+#   SUBNET=10.249.54 ./scripts/prod.sh   (override the /24 to scan)
 set -u
 SUBNET="${SUBNET:-10.249.54}"
 HOSTKEY="AAAAC3NzaC1lZDI1NTE5AAAAIHldKXWj+kHYr/IbrNENUXaeMfy4uEIhOKkVC3Y5cy6/"

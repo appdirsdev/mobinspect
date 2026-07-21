@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # =============================================================================
-# Shared helpers for the MobInspect cross-platform launcher (start.sh).
+# Shared helpers for the MobInspect cross-platform launcher (start-all.sh).
 # Meant to be sourced, not executed. Callers must set, before sourcing:
 #   DJANGO_MANAGE  — array invoking "python manage.py" (e.g. ("$PY" manage.py))
 #   GUNICORN       — array invoking gunicorn           (e.g. ("$PY" -m gunicorn))

@@ -12,13 +12,13 @@
 # Idempotent: safe to re-run. Run as a NORMAL user that has sudo (NOT root).
 #
 #   git clone https://github.com/appdirsdev/mobinspect && cd mobinspect
-#   ./setup-ubuntu.sh
+#   ./scripts/setup-ubuntu.sh
 #
 # Override defaults via env, e.g.:
-#   POSTGRES_PASSWORD=secret MOBINSPECT_ADMIN_PASSWORD=Admin#12345 ./setup-ubuntu.sh
+#   POSTGRES_PASSWORD=secret MOBINSPECT_ADMIN_PASSWORD=Admin#12345 ./scripts/setup-ubuntu.sh
 # =============================================================================
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 REPO_DIR="$(pwd)"
 
 # ---- tunables ---------------------------------------------------------------
@@ -215,10 +215,10 @@ $(printf '\033[1;32m')==========================================================
 ============================================================$(printf '\033[0m')
 
   Start it (static + malware analysis, no emulator):
-      PY=$REPO_DIR/.venv/bin/python ./start.sh --no-emulator
+      PY=$REPO_DIR/.venv/bin/python ./scripts/start-all.sh --no-emulator
   or bind on all interfaces:
-      HOST=0.0.0.0 PORT=8000 PY=$REPO_DIR/.venv/bin/python ./start.sh --no-emulator
-  (start.sh's default interpreter path assumes ~/MobInspect; the PY= override
+      HOST=0.0.0.0 PORT=8000 PY=$REPO_DIR/.venv/bin/python ./scripts/start-all.sh --no-emulator
+  (start-all.sh's default interpreter path assumes ~/MobInspect; the PY= override
    points it at THIS clone's virtualenv.)
 
   Web UI:   http://${DETECTED_IP:-127.0.0.1}:8000/

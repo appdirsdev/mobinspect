@@ -1,11 +1,11 @@
 #!/bin/bash
 # Convenience launcher for the local MobInspect dev setup created during install.
 # Usage:
-#   ./run-mobinspect.sh emulator   # boot the Android AVD (for Dynamic Analysis)
-#   ./run-mobinspect.sh server     # start MobInspect web server (uses PostgreSQL)
-#   ./run-mobinspect.sh            # start the server (default)
+#   ./scripts/run-mobinspect.sh emulator   # boot the Android AVD (for Dynamic Analysis)
+#   ./scripts/run-mobinspect.sh server     # start MobInspect web server (uses PostgreSQL)
+#   ./scripts/run-mobinspect.sh            # start the server (default)
 set -e
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 PY="$HOME/.pyenv/versions/3.13.5/bin/python"
 export ANDROID_HOME="$HOME/Library/Android/sdk"

@@ -10,15 +10,15 @@
 #   3. django-q qcluster — background worker for scans/analysis.
 #   4. MobInspect web server (gunicorn, foreground → http://HOST:PORT).
 #
-# Usage:
-#   ./start.sh                 # everything (emulator on macOS)
-#   ./start.sh --no-emulator   # static analysis only
-#   HOST=0.0.0.0 PORT=8080 ./start.sh
-#   PY=/path/to/python ./start.sh          # override the interpreter
-#   USE_POETRY=0 ./start.sh                 # run $PY directly (no `poetry run`)
+# Usage (run from the repo root):
+#   ./scripts/start-all.sh                 # everything (emulator on macOS)
+#   ./scripts/start-all.sh --no-emulator   # static analysis only
+#   HOST=0.0.0.0 PORT=8080 ./scripts/start-all.sh
+#   PY=/path/to/python ./scripts/start-all.sh          # override the interpreter
+#   USE_POETRY=0 ./scripts/start-all.sh                 # run $PY directly (no `poetry run`)
 # =============================================================================
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 OS="$(uname -s)"
 START_EMULATOR=1
