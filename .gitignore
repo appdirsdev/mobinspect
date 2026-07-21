@@ -61,6 +61,14 @@ target/
 
 #Mac
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# local runtime artifacts (gunicorn control socket, pidfiles — git can't
+# track sockets anyway, but this documents intent + covers *.pid variants)
+*.ctl
+*.pid
+*.sock
 
 #D2J Error file
 classes-error.zip

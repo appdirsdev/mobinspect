@@ -37,6 +37,12 @@ Short, immutable records of consequential decisions. New ADRs go in `docs/adr/`.
 
 Mockups, design tokens (JSON), and reference imagery live under `docs/design/`.
 
+## Product state
+
+[`STATE.md`](STATE.md) is a point-in-time, honestly-scored snapshot of what's
+verified end-to-end vs. still a known gap — not a design doc, updated per
+verification pass rather than kept current line-by-line.
+
 ---
 
 ## Conventions used in these docs
