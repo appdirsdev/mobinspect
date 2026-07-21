@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MobInspect report_json response — iOS/Mach-O family (ipa/dylib/ios_src/ios_swift_src)",
+  "type": "object",
+  "required": [
+    "md5", "sha1", "sha256", "file_name", "size", "app_name",
+    "bundle_id", "permissions", "info_plist", "binary_analysis",
+    "macho_analysis", "ios_api", "code_analysis"
+  ],
+  "properties": {
+    "md5": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+    "sha1": {"type": "string"},
+    "sha256": {"type": "string"},
+    "file_name": {"type": "string"},
+    "size": {"type": ["string", "integer"]},
+    "app_name": {"type": "string"},
+    "bundle_id": {"type": "string"},
+    "permissions": {"type": ["object", "array"]},
+    "info_plist": {},
+    "binary_analysis": {},
+    "macho_analysis": {},
+    "ios_api": {"type": "object"},
+    "code_analysis": {"type": "object"}
+  }
+}

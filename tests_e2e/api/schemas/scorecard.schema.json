@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MobInspect scorecard response",
+  "type": "object",
+  "required": [
+    "hash", "app_name", "file_name", "version", "version_name",
+    "security_score", "high", "warning", "info", "secure",
+    "hotspot", "total_trackers", "trackers", "efr01", "dimensions", "title"
+  ],
+  "properties": {
+    "hash": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+    "app_name": {"type": "string"},
+    "file_name": {"type": "string"},
+    "version": {},
+    "version_name": {},
+    "security_score": {"type": ["number", "integer"]},
+    "high": {"type": ["integer", "array"]},
+    "warning": {"type": ["integer", "array"]},
+    "info": {"type": ["integer", "array"]},
+    "secure": {"type": ["integer", "array"]},
+    "hotspot": {"type": ["integer", "array"]},
+    "total_trackers": {"type": "integer"},
+    "trackers": {},
+    "efr01": {},
+    "dimensions": {},
+    "title": {"type": "string"}
+  }
+}

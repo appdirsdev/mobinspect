@@ -69,6 +69,12 @@ bcrypt = "4.0.1" # Pinned to avoid warnings with mitmproxy 12
 # Python 3.12+; bump together when raising the Django floor.
 pytest = ">=8.2,<9"
 pytest-django = ">=4.8,<5"
+# tests_e2e/ — Playwright UI automation + live-HTTP API contract suite
+# (see tests_e2e/README.md). Runs OUTSIDE testpaths (opt-in, explicit).
+pytest-playwright = ">=0.5"
+playwright = ">=1.45"
+jsonschema = ">=4.20"
+coverage = "^7.15.2"
 
 [tool.pytest.ini_options]
 # Pytest entrypoint configuration for the RBAC + Analytics test suite.
@@ -88,6 +94,18 @@ testpaths = ["mobinspect/RBAC/tests", "mobinspect/Analytics/tests"]
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
+]
+# Test-type taxonomy for tests_e2e/ (UI + API). Every spec tags its cases
+# with ONE OR MORE of these so a run can be sliced by intent, e.g.
+# `pytest tests_e2e -m "negative"` or `-m "regression and not preprod"`.
+# See tests_e2e/README.md "Test taxonomy" for the definition of each.
+markers = [
+    "positive: happy-path — valid input, expected success",
+    "negative: invalid input / unauthorized / malformed request — expects a clean rejection, not a crash",
+    "regression: pins a specific previously-fixed bug so it can't silently return",
+    "e2e_flow: a multi-step user journey across several pages/endpoints (e.g. upload -> scan -> report -> PDF)",
+    "preprod: safe to run against a shared pre-production/staging deployment (read-mostly, no destructive side effects on shared fixtures)",
+    "smoke: fast, minimal-coverage harness sanity check (server up, login works)",
 ]
 
 [build-system]

@@ -41,6 +41,7 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .coverage
+.coverage.*
 .cache
 nosetests.xml
 coverage.xml
@@ -90,3 +91,5 @@ emulator/
 
 # Local PostgreSQL credentials (copy .env.postgres.example → .env.postgres)
 .env.postgres
+test_files/.e2e_scratch/
+tests_e2e/api/.scratch/
