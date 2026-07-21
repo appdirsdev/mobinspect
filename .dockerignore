@@ -17,13 +17,41 @@ build
 docker-compose.yml
 *.md
 venv
-setup.bat
-run.bat
-setup.sh
-run.sh
+scripts/setup.bat
+scripts/setup.sh
+scripts/setup-ubuntu.sh
+scripts/run.bat
+scripts/run.sh
+scripts/run-mobinspect.sh
+scripts/prod.sh
+scripts/start-all.sh
+scripts/start_avd.sh
+scripts/start_avd.ps1
 mobinspect/downloads
 mobinspect/uploads
 mobinspect/debug.log
 mobinspect/secret
 mobinspect/StaticAnalyzer/test_files/
 TODO.md
+
+# Test suites and dev-session notes — never needed at runtime, only bloat
+# the image and lengthen the build. Docker's COPY . . (see Dockerfile)
+# means .dockerignore is the ONLY thing keeping these out of the final
+# image; the Dockerfile itself has no per-directory COPY exclusions.
+tests_e2e/
+test_files/
+**/tests/
+**/test_*.py
+**/tests.py
+claude-memory/
+project-memory/
+.claude/
+docs/
+
+# TRAP, do not remove this exception: despite the name, tests.py here is a
+# real, URL-wired production view (mobinspect/MobInspect/urls.py:41,504 ->
+# `re_path(r'^tests/$', tests.start_test)`), not a pytest file — excluding
+# it breaks the app at import time. The other two tests.py stubs
+# (DynamicAnalyzer/, MalwareAnalyzer/) are genuinely empty Django-scaffold
+# files and are NOT imported anywhere, so they stay excluded.
+!mobinspect/StaticAnalyzer/tests.py
