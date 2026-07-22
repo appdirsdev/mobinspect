@@ -82,6 +82,17 @@ RUN \
 WORKDIR /home/mobinspect/mobinspect
 COPY . .
 
+# Build the Tailwind CSS bundle. mobinspect/static/mobinspect/css/dist/ is
+# gitignored (generated output, never committed — see
+# mobinspect/static/mobinspect/.gitignore), so it does NOT exist in a fresh
+# checkout; without this step the image serves the app with no CSS at all
+# (a 404 on app.css that browsers reject as the wrong MIME type). The
+# Tailwind CLI itself (tools/tailwindcss, ~40MB) is a build-time-only tool —
+# remove it once the CSS is built so it doesn't bloat the runtime image.
+RUN ./scripts/install-tailwind.sh && \
+    ./scripts/tailwind-build.sh --minify && \
+    rm -rf tools/tailwindcss tools/tailwindcss-*
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl --fail http://localhost:8000/healthz/ || exit 1
 

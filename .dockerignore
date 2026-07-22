@@ -34,6 +34,12 @@ mobinspect/secret
 mobinspect/StaticAnalyzer/test_files/
 TODO.md
 
+# Tailwind CLI standalone binary (scripts/install-tailwind.sh downloads it
+# into tools/ for the build step) — a build-time tool, not needed at
+# runtime once mobinspect/static/mobinspect/css/dist/app.css is compiled.
+tools/tailwindcss
+tools/tailwindcss-*
+
 # Test suites and dev-session notes — never needed at runtime, only bloat
 # the image and lengthen the build. Docker's COPY . . (see Dockerfile)
 # means .dockerignore is the ONLY thing keeping these out of the final
