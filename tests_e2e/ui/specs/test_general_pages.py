@@ -14,23 +14,21 @@ against this environment's DB: both hashes have one), not that the artifact
 was literally an .apk. So the README-suggested default pair works as-is; no
 substitution needed.
 
-``/find/`` real-app finding (see report): the view
-(``mobinspect/StaticAnalyzer/views/android/views/find.py``) always calls
-``print_n_send_error_response(request, msg, True)`` on every error branch
-(invalid hash, missing source directory, or any other exception). With
-``api=True`` that helper returns a bare ``dict`` (not an ``HttpResponse`` /
-``JsonResponse``) -- Django's response-processing middleware chain then
-raises ``AttributeError: 'dict' object has no attribute 'headers'``, which
-surfaces as a real (branded, non-traceback) 500 for every single error path.
-Confirmed live: a request with an invalid MD5 500s, and this environment
-also doesn't have an on-disk ``java_source`` directory for any seeded fixture
-(JADX decompile artifacts aren't retained after scanning here), so even the
-"success" query with a real fixture hash still 500s via the "Invalid
-Directory Structure" branch -- there is currently NO way to get a 200 out of
-this endpoint in this environment. This is captured below as a strict xfail
-so a future fix is very visible (test starts failing-the-xfail, i.e. flips
-green) rather than being silently skipped.
+``/find/`` was previously broken on every error path: the view
+(``mobinspect/StaticAnalyzer/views/android/views/find.py``) called
+``print_n_send_error_response(request, msg, True)`` on every error branch,
+which with ``api=True`` returns a bare ``dict`` (not an ``HttpResponse``) ->
+Django's response middleware raised ``AttributeError: 'dict' object has no
+attribute 'headers'`` -> a 500 on every error path. FIXED: the view now
+returns a real ``JsonResponse`` (in the double-encoded shape the source-tree
+search client expects, ``JSON.parse(JSON.parse(text)).matches``) with an
+appropriate 4xx status and an ``error`` field. The test below asserts that
+fix (clean sub-500 JSON error for a bad hash). NOTE the double-encoded wire
+format: Playwright's ``resp.json()`` parses the OUTER layer and returns the
+inner JSON as a *string*, so the test does a second ``json.loads`` to reach
+the dict.
 """
+import json
 import re
 
 import pytest
@@ -76,30 +74,27 @@ def test_tasks_page_renders_scan_queue(admin_page):
     expect(page.locator('#tasks-table')).to_be_attached()
 
 
-# ─────────────────────────── /find/ (known-broken; see module docstring) ───────────────────────────
+# ─────────────────────────── /find/ (regression: was a 500 on every error path) ───────────────────────────
 
 @pytest.mark.negative
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Known app bug: find.run() (mobinspect/StaticAnalyzer/views/android/"
-        "views/find.py:37,49,76) always calls print_n_send_error_response(..., "
-        "True), which returns a plain dict on every error branch instead of a "
-        "JsonResponse -- Django's middleware then raises AttributeError and "
-        "5xx's. Confirmed live 2026-07-21: an invalid MD5 POST to /find/ "
-        "currently 500s instead of returning a clean JSON error. Remove this "
-        "xfail once find.py is fixed to always return a real HttpResponse."
-    ),
-)
+@pytest.mark.regression
 def test_find_files_invalid_md5_is_rejected_cleanly(admin_page):
+    """An invalid-hash POST to /find/ must return a clean JSON error, not a
+    5xx. Regression guard for the bare-dict-return bug (find.run previously
+    returned print_n_send_error_response(..., api=True) — a plain dict —
+    which Django can't render, 500ing every error path)."""
     page = admin_page
     # Need a CSRF token from a real page first (find.run has no GET form).
     page.goto('/tasks', wait_until='domcontentloaded')
     csrf = page.evaluate(
         "document.cookie.match(/csrftoken=([^;]+)/)?.[1]")
+    # `multipart=` (NOT `data=`) so Django parses these into request.POST —
+    # this mirrors the real client (source_tree.html posts a FormData object,
+    # i.e. multipart/form-data). Playwright's `data={...}` would send a JSON
+    # body, which Django's form parser ignores (request.POST stays empty).
     resp = page.request.post(
         '/find/',
-        data={
+        multipart={
             'md5': 'not-a-valid-md5',
             'q': 'x',
             'code': 'java',
@@ -107,11 +102,14 @@ def test_find_files_invalid_md5_is_rejected_cleanly(admin_page):
         },
         headers={'X-CSRFToken': csrf} if csrf else {},
     )
-    # Desired behavior once fixed: a clean 200 JSON error envelope, not a 5xx.
-    assert resp.status < 500, (
-        f'expected a clean JSON error, got HTTP {resp.status}')
-    body = resp.json()
-    assert 'error' in body
+    # A clean client error, never a 5xx.
+    assert 400 <= resp.status < 500, (
+        f'expected a clean 4xx JSON error, got HTTP {resp.status}')
+    # Double-encoded body (see module docstring): resp.json() yields the inner
+    # JSON as a string, so decode once more to reach the dict.
+    inner = json.loads(resp.json())
+    assert inner.get('error') == 'Invalid Hash'
+    assert inner.get('matches') == []
 
 
 # ─────────────────────────── /search ───────────────────────────

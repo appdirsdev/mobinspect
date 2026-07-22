@@ -53,8 +53,18 @@ NOT scan.export.pdf/scan.delete) is deliberately the role used here: it
 distinguishes the layer-2 permission-specific 403 (denied on download_pdf,
 which needs scan.export.pdf) from layer-2 grants (report_json/scorecard/
 compare/list_suppressions, all satisfied by scan.view/scan.export.json) and
-from the layer-3 legacy denial (delete_scan/suppress_by_rule — denied
-regardless, per the Django-Group note above).
+from the layer-3 legacy denial.
+
+Layer 3 (legacy ``@permission_required``) resolves through each RBAC role's
+WRAPPED Django Group, which is kept in lockstep with the RBAC catalog by the
+RoleAssignment→Group signal + create_roles' ``_mirror_rbac_role_groups`` (the
+top-level conftest runs ``create_roles`` so the suite matches production).
+So the legacy guard AGREES with the RBAC catalog: API User (holds
+``finding.suppress`` → wrapped Group gets ``can_suppress``) IS allowed to
+``suppress_by_rule``; API User (lacks ``scan.delete`` → no ``can_delete``) is
+denied ``delete_scan`` with the legacy ``{"status": "denied"}`` envelope.
+The genuine layer-3 DENIAL is therefore exercised via delete_scan, and the
+layer-3 ALLOW (bridge works) via suppress_by_rule.
 
 Mutating endpoints (suppress_by_rule / delete_scan) are exercised ONLY
 against a private SCRATCH scan this file uploads and deletes itself (a
@@ -328,25 +338,34 @@ def test_suppress_by_rule_denied_by_middleware(request, client_name, status, bod
     assert r.json() == body
 
 
-@pytest.mark.negative
+@pytest.mark.positive
 @pytest.mark.regression
-def test_suppress_by_rule_denied_for_api_user_legacy_shape(api_user_api_client):
-    """API User HOLDS the RBAC permission 'finding.suppress', but
+def test_suppress_by_rule_allowed_for_api_user_via_legacy_bridge(
+        api_user_api_client, scratch_scan):
+    """API User holds the RBAC permission 'finding.suppress', and
     suppress_by_rule_id() is guarded by the LEGACY
     @permission_required(Permissions.SUPPRESS) decorator (classic Django
-    Group membership), not the RBAC permission catalog -- and
-    conftest-provisioned test accounts are never added to a Django Group
-    (only the admin create_user UI flow mirrors that). So API User is
-    denied here despite holding the semantically-matching RBAC permission
-    -- a real, worth-flagging inconsistency between the RBAC catalog and
-    this one legacy-guarded endpoint (see also delete_scan's identical gap,
-    already pinned in test_scaffold_smoke.py)."""
-    r = api_user_api_client.post('/api/v1/suppress_by_rule', data={
-        'hash': PRIMARY_HASH, 'rule': 'irrelevant_rule', 'type': 'manifest'})
-    assert r.status_code == 403
-    body = r.json()
-    assert body.get('status') == 'denied'
-    assert 'error' not in body
+    Group membership). Those two are NOT independent: the RBAC↔legacy bridge
+    keeps them in lockstep -- RoleAssignment adds the user to the role's
+    wrapped Django Group (add_user_to_group_on_assignment signal), and
+    create_roles' _mirror_rbac_role_groups populates that Group's
+    'can_suppress' auth.Permission (the seed migration sets role.permissions
+    via historical models, so the m2m sync signal never fires for seeded
+    roles -> create_roles does it at startup; entrypoint.sh runs it, and the
+    top-level conftest runs it for the suite). So an API-User-role holder IS
+    correctly ALLOWED to suppress -- the legacy guard agrees with the RBAC
+    catalog. (An earlier assumption that they diverged was an artifact of a
+    test DB on which create_roles had never run; the genuine legacy DENIAL
+    path is still exercised by delete_scan, which API User legitimately lacks
+    'scan.delete' for -- see test_delete_scan_denied_for_api_user_legacy_shape.)
+
+    Mutating, so uses a private scratch scan (never a shared fixture); the
+    scratch_scan fixture's admin-driven teardown deletes the scan, which
+    cascade-deletes the suppression.
+    """
+    r = _suppress_by_rule(api_user_api_client, scratch_scan, 'api_user_bridge_rule')
+    assert r.status_code == 200
+    assert r.json() == {'status': 'ok'}
 
 
 @pytest.mark.positive

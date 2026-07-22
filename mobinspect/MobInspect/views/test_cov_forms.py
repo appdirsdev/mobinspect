@@ -112,3 +112,18 @@ class RegisterFormTests(TestCase):
         form.is_valid()
         # No email-uniqueness error (role may still be required/blank).
         self.assertNotIn('email', form.errors)
+
+    def test_clean_email_allows_blank_when_another_user_has_blank(self):
+        # Regression: the seeded admin account has a blank email, so a bare
+        # exists() check on '' matched it and rejected EVERY subsequent
+        # "create user without an email". A blank email must be allowed
+        # (Django does not treat blank emails as unique).
+        User.objects.create_user(
+            username='blank_email_user', password='x', email='')
+        form = RegisterForm({
+            'username': 'anotherblankuser', 'password1': 'Str0ngP@ssw0rd!',
+            'password2': 'Str0ngP@ssw0rd!', 'email': '',
+            'role': '',
+        })
+        form.is_valid()
+        self.assertNotIn('email', form.errors)

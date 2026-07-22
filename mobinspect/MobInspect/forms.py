@@ -59,7 +59,12 @@ class RegisterForm(UserCreationForm):
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if User.objects.filter(email__iexact=email).exists():
+        # Only enforce uniqueness for a NON-blank email. Django's User model
+        # allows blank emails and does not treat them as unique, and the
+        # seeded admin account has a blank email — so a bare exists() check
+        # matched that blank row and rejected EVERY "create user without an
+        # email" with a spurious "Email already exists".
+        if email and User.objects.filter(email__iexact=email).exists():
             raise forms.ValidationError('Email already exists')
         return email
 

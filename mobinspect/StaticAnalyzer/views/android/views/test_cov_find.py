@@ -7,21 +7,18 @@ RequestFactory + a real authenticated user (matching test_cov_view_source
 java/kotlin/smali source files written under an isolated (override_
 settings) UPLD_DIR.
 
-NOTE ON A SUSPECTED PRODUCTION BUG (reported, not fixed): find.run() is a
-plain Django view registered directly at /find/ (see urls.py), yet every
-one of its error branches calls print_n_send_error_response(request, msg,
-True) with `api` hardcoded to True. That makes those branches return a
-bare dict ({'error': msg}) instead of an HttpResponse. Going through the
-real URL via the Django test Client reproduces a real crash: Django's
-response-processing middleware (XFrameOptionsMiddleware) raises
-AttributeError: 'dict' object has no attribute 'headers' when it tries to
-finish processing that "response". Calling run() directly sidesteps that
-crash (as this file's convention already does for its sibling
-view_source.py) so we can still exercise -- and document -- every real
-line of find.py's own logic.
+find.run() now returns a real ``JsonResponse`` on EVERY path (it previously
+returned ``print_n_send_error_response(request, msg, True)`` — a bare dict —
+on its error branches, which Django's response middleware could not render,
+500ing every error path with ``AttributeError: 'dict' object has no
+attribute 'headers'``). The response body is double-encoded
+(``JsonResponse(json.dumps(context))``) for wire compatibility with the
+source-tree search client, so tests decode it with ``_body()`` below.
 """
+import json
 import tempfile
 from pathlib import Path
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase, override_settings
@@ -29,6 +26,11 @@ from django.test import RequestFactory, TestCase, override_settings
 from mobinspect.StaticAnalyzer.views.android.views.find import run
 
 TMP_UPLD = tempfile.mkdtemp(prefix='mobinspect_find_')
+
+
+def _body(resp):
+    """Decode find.run()'s DOUBLE-encoded JSON response body to a dict."""
+    return json.loads(json.loads(resp.content))
 
 
 @override_settings(UPLD_DIR=TMP_UPLD)
@@ -53,30 +55,65 @@ class FindViewTests(TestCase):
         d.mkdir(parents=True, exist_ok=True)
         return d
 
-    def test_invalid_md5_hits_exception_handler(self):
-        # Confirms the suspected bug above: the returned value is a bare
-        # dict (not an HttpResponse) because api=True is hardcoded.
-        out = self._post({
+    def test_invalid_md5_returns_clean_400(self):
+        resp = self._post({
             'md5': 'not-an-md5', 'q': 'x', 'code': 'java',
             'search_type': 'content'})
-        self.assertEqual(out, {'error': 'Searching Failed'})
+        self.assertEqual(resp.status_code, 400)
+        body = _body(resp)
+        self.assertEqual(body['error'], 'Invalid Hash')
+        self.assertEqual(body['matches'], [])
 
-    def test_unknown_search_type(self):
+    def test_missing_md5_param_returns_clean_400(self):
+        # request.POST has no 'md5' at all -> .get() default '' -> not an md5
+        # -> clean 400, not a KeyError-driven 500.
+        resp = self._post({'q': 'x', 'code': 'java', 'search_type': 'content'})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(_body(resp)['error'], 'Invalid Hash')
+
+    def test_unknown_search_type_returns_clean_400(self):
         checksum = '1' * 32
         self._base(checksum)
-        out = self._post({
+        resp = self._post({
             'md5': checksum, 'q': 'x', 'code': 'java',
             'search_type': 'bogus'})
-        self.assertEqual(out, {'error': 'Unknown search type'})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(_body(resp)['error'], 'Unknown search type')
 
-    def test_invalid_directory_structure_stopiteration(self):
+    def test_missing_search_type_returns_clean_400(self):
+        # No 'search_type' key -> .get() default '' -> not in the allowed set.
+        checksum = '1' * 32
+        self._base(checksum)
+        resp = self._post({'md5': checksum, 'q': 'x', 'code': 'java'})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(_body(resp)['error'], 'Unknown search type')
+
+    def test_invalid_directory_structure_returns_clean_404(self):
         # No java_source/app-src-main-java/kotlin/src folder exists at all.
         checksum = '2' * 32
         self._base(checksum)
-        out = self._post({
+        resp = self._post({
             'md5': checksum, 'q': 'x', 'code': 'java',
             'search_type': 'content'})
-        self.assertEqual(out, {'error': 'Invalid Directory Structure'})
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(_body(resp)['error'], 'Invalid Directory Structure')
+
+    def test_unexpected_exception_returns_clean_500(self):
+        # The outer except is a defensive catch-all no normal input reaches
+        # (all known failure modes return early with their own status). Induce
+        # a genuine unexpected error via a narrow patch so the safety-net
+        # branch is still exercised end to end (returns a real JsonResponse,
+        # NOT the old bare-dict crash).
+        checksum = '9' * 32
+        self._base(checksum)
+        target = ('mobinspect.StaticAnalyzer.views.android.views.find'
+                  '.find_java_source_folder')
+        with mock.patch(target, side_effect=RuntimeError('boom')):
+            resp = self._post({
+                'md5': checksum, 'q': 'x', 'code': 'java',
+                'search_type': 'content'})
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(_body(resp)['error'], 'Searching Failed')
 
     def test_smali_content_search_finds_match(self):
         checksum = '3' * 32
@@ -89,6 +126,7 @@ class FindViewTests(TestCase):
         resp = self._post({
             'md5': checksum, 'q': 'super-secret-string-token',
             'code': 'smali', 'search_type': 'content'})
+        self.assertEqual(resp.status_code, 200)
         self.assertIn(b'Main.smali', resp.content)
         self.assertIn(rb'\"found\": \"1\"', resp.content)
 
@@ -102,6 +140,7 @@ class FindViewTests(TestCase):
         resp = self._post({
             'md5': checksum, 'q': 'MainActivity', 'code': 'java',
             'search_type': 'filename'})
+        self.assertEqual(resp.status_code, 200)
         self.assertIn(b'MainActivity.java', resp.content)
 
     def test_no_matches_returns_zero_found(self):
@@ -113,6 +152,7 @@ class FindViewTests(TestCase):
         resp = self._post({
             'md5': checksum, 'q': 'nonexistent_token_xyz', 'code': 'java',
             'search_type': 'content'})
+        self.assertEqual(resp.status_code, 200)
         self.assertIn(rb'\"found\": \"0\"', resp.content)
 
     def test_kotlin_source_folder_content_search(self):
@@ -124,4 +164,5 @@ class FindViewTests(TestCase):
         resp = self._post({
             'md5': checksum, 'q': 'println', 'code': 'java',
             'search_type': 'content'})
+        self.assertEqual(resp.status_code, 200)
         self.assertIn(b'Main.kt', resp.content)
