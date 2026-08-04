@@ -75,8 +75,13 @@ class ManifestViewRunTests(TestCase):
         self.assertIsNotNone(resp)
         self.assertEqual(resp.status_code, 500)
 
-    def test_missing_type_param_hits_exception_handler(self):
+    def test_missing_type_param_defaults_to_apk_and_renders(self):
+        # A bare /manifest_view/<md5>/ with no ?type= used to raise
+        # MultiValueDictKeyError('type') -> generic 500 error page. It now
+        # defaults typ='apk', so with a valid md5 checksum the view renders
+        # normally (empty manifest here, since no apktool output exists for
+        # this synthetic checksum) with a 200 instead of failing.
         req = self.factory.get('/manifest_view/x/')
         req.user = self.user
         resp = run(req, '4' * 32)
-        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(resp.status_code, 200)
