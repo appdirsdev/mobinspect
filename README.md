@@ -121,7 +121,7 @@ Launcher environment variables:
 
 #### First-time admin
 
-There are no longer any default seeded credentials — the upstream `mobinspect / mobinspect` superuser is gone. Bootstrap your first admin instead:
+There are no longer any default seeded credentials — the historical `mobinspect / mobinspect` default superuser is gone. Bootstrap your first admin instead:
 
 ```bash
 # Idempotent: re-runs are a no-op once any superuser exists.

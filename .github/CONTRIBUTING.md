@@ -15,8 +15,7 @@ The issue tracker is the preferred channel for [bug reports](#bugs),
 [features requests](#features) and [submitting pull
 requests](#pull-requests), but please respect the following restrictions:
 
-* Please **do not** use the issue tracker for personal support requests (use [MobInspect Slack channel](https://join.slack.com/t/mobinspect/shared_invite/zt-3ephptj6c-OuDMatJ9z9MT0T_Vb~l2pg) or 
-  [Stack Overflow](https://stackoverflow.com/search?q=mobinspect)).
+* Please **do not** use the issue tracker for personal support requests (use [GitHub Discussions](https://github.com/appdirsdev/mobinspect/discussions)).
 
 * Please **do not** derail or troll issues. Keep the discussion on topic and
   respect the opinions of others.
@@ -69,7 +68,7 @@ Example:
 > causing the bug, and potential solutions (and your opinions on their
 > merits).
 
-[Open Bugs here](https://github.com/MobInspect/mobinspect/issues)
+[Open Bugs here](https://github.com/appdirsdev/mobinspect/issues)
 
 <a name="features"></a>
 ## Feature requests
@@ -103,11 +102,11 @@ project:
 
    ```bash
    # Clone your fork of the repo into the current directory
-   git clone https://github.com/MobInspect/mobinspect.git
+   git clone https://github.com/appdirsdev/mobinspect.git
    # Navigate to the newly cloned directory
    cd mobinspect
    # Assign the original repo to a remote called "upstream"
-   git remote add upstream https://github.com/MobInspect/mobinspect.git
+   git remote add upstream https://github.com/appdirsdev/mobinspect.git
    ```
 
 2. If you cloned a while ago, get the latest changes from upstream:

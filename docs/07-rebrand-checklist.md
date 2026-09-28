@@ -1,171 +1,63 @@
-# 07 — Rebrand Checklist (MobInspect → MobInspect)
+# 07 — Rebrand record
 
-> Phase 3 of the roadmap. Run only after the new UI and RBAC have stabilized.
-> The repository directory name (`mobinspect`) is **not** renamed — only the Python package, env vars, paths, and user-visible strings.
+This is the historical record of turning the upstream project (Mobile Security Framework, "MobSF")
+into MobInspect. It is the one document, together with `LICENSE.md` and `NOTICE`, that may name the
+upstream project; `scripts/rebrand-allowlist.txt` allows it for that reason.
 
-## Strategy
+The binding, checkable statement of "what is left" is `scripts/check-rebrand.sh`. If it exits 0,
+the rebrand is complete.
 
-A naive global find/replace will break licensing strings, third-party API URLs, and binary file references. The checklist below splits the work into **four passes**, each scoped, reviewable in a single commit.
+## What was renamed (pass 1–4, June–July 2026)
 
-## Pass 1 — Python package rename
+| Area | Before | After |
+|---|---|---|
+| Python package | `mobsf/`, `mobsf.MobSF` | `mobinspect/`, `mobinspect.MobInspect` |
+| Environment variables | `MOBSF_*` | `MOBINSPECT_*` (no compatibility shim; `init.env()` ignores legacy names) |
+| Runtime home | `~/.MobSF` | `~/.MobInspect` |
+| Default database | SQLite `mobsf` | PostgreSQL `mobinspect` (SQLite fallback removed) |
+| Docker user / image | `mobsf`, upstream image | `mobinspect`, `appdirsdev/mobinspect` |
+| API header / key prefix | `X-Mobsf-Api-Key` | `X-MobInspect-Api-Key`, per-user keys `mi_<prefix>_<secret>` |
+| UI, logo, strings | upstream branding | MobInspect brand, medallion-M mark |
 
-```
-mobinspect/                  →  mobinspect/
-mobinspect/MobInspect/            →  mobinspect/MobInspect/
-mobinspect.MobInspect             →  mobinspect.MobInspect
-mobinspect.StaticAnalyzer    →  mobinspect.StaticAnalyzer
-mobinspect.DynamicAnalyzer   →  mobinspect.DynamicAnalyzer
-mobinspect.MalwareAnalyzer   →  mobinspect.MalwareAnalyzer
-```
+## What that pass got wrong
 
-### Files affected
-- `pyproject.toml:2` — `name = "mobinspect"` → `"mobinspect"`
-- `pyproject.toml:11` — `packages = [{include = "mobinspect", ...}]` → `"mobinspect"`
-- `pyproject.toml:23` — `mobinspect = "mobinspect.__main__:main"` → `mobinspect = "mobinspect.__main__:main"`
-- `mobinspect/__main__.py:9` — `DJANGO_SETTINGS_MODULE` → `mobinspect.MobInspect.settings`
-- `mobinspect/__main__.py:52,66` — wsgi import path
-- `manage.py` — settings module reference
-- `tox.ini` — module references
-- All `from mobinspect.*` and `import mobinspect.*` lines (~600 occurrences across `mobinspect/`)
-- All Django app `apps.py` `name = 'mobinspect...'` declarations
-- Migration `dependencies` references — all migrations under `mobinspect/*/migrations/`
+The rename was a blind case-preserving find-and-replace applied to *every* occurrence of the
+upstream name, including places where the name was an identifier of an upstream feature, a URL, or
+prose about the upstream project. Workstream W1 of the agent contract reverses these:
 
-### Procedure
-1. `git mv mobinspect mobinspect`
-2. Within `mobinspect/`, `git mv MobInspect MobInspect`
-3. Run an automated rewrite script (committed to `scripts/rename-package.sh`) that does the AST-aware import rewrite — fall back to `sed` only for non-Python text
-4. Run all tests; fix any breakages
-5. Rebuild migrations: `python manage.py makemigrations --check` should report nothing
-6. Single commit: `chore(rebrand): rename python package mobinspect → mobinspect`
+- **Invented identifiers** — the upstream "prepare the device" feature became `mobinspecty` /
+  `is_mobinspectyied`; the emulator became `MobInspect_API30`. Now `prepare_device` and
+  `MobInspect_AVD`; the old API path `api/v1/android/mobinspecty` stays as a deprecated alias for one
+  release.
+- **Dead links** — 98 OWASP MSTG references in the rule files, the docs site, and contribution
+  links pointed at a `github.com/MobInspect/...` organisation that does not exist. They now point at
+  OWASP's repository or at this project.
+- **Foreign community files** — `.github/SECURITY.md` carried the upstream project's security
+  advisories relabelled as ours; the contributing/support/issue templates carried an upstream
+  chat-workspace invite. Rewritten for this project.
+- **Prose** — sentences such as "rename MobInspect to MobInspect" and "upstream MobInspect". Rewritten
+  to say "the upstream project".
 
-## Pass 2 — Environment variables and runtime paths
+## What intentionally remains
 
-| Old | New |
-|-----|-----|
-| `MOBINSPECT_HOME` | `MOBINSPECT_HOME` |
-| `MOBINSPECT_API_KEY` | `MOBINSPECT_API_KEY` |
-| `MOBINSPECT_API_KEY_FILE` | `MOBINSPECT_API_KEY_FILE` |
-| `MOBINSPECT_API_ONLY` | `MOBINSPECT_API_ONLY` |
-| `MOBINSPECT_DEBUG` | `MOBINSPECT_DEBUG` |
-| `MOBINSPECT_DISABLE_AUTHENTICATION` | `MOBINSPECT_DISABLE_AUTHENTICATION` |
-| `MOBINSPECT_PLATFORM` | `MOBINSPECT_PLATFORM` |
-| `MOBINSPECT_USER` | `MOBINSPECT_USER` |
-| ~~`MOBINSPECT_ASYNC_*`~~ → `MOBINSPECT_ASYNC_*` | done — no shim (new vars, nothing deployed depends on the old name yet) |
-| `MOBINSPECT_RATELIMIT` | `MOBINSPECT_RATELIMIT` |
-| `MOBINSPECT_IDP_*` | `MOBINSPECT_IDP_*` |
-| `MOBINSPECT_SP_*` | `MOBINSPECT_SP_*` |
-| `MOBINSPECT_VT_*` | `MOBINSPECT_VT_*` |
-| `MOBINSPECT_CORELLIUM_*` | `MOBINSPECT_CORELLIUM_*` |
-| `MOBINSPECT_PROXY_*` / `MOBINSPECT_UPSTREAM_PROXY_*` | `MOBINSPECT_*` |
-| `MOBINSPECT_FRIDA_TIMEOUT` | `MOBINSPECT_FRIDA_TIMEOUT` |
-| `MOBINSPECT_JADX_TIMEOUT` | `MOBINSPECT_JADX_TIMEOUT` |
-| `MOBINSPECT_SAST_TIMEOUT` | `MOBINSPECT_SAST_TIMEOUT` |
-| `MOBINSPECT_BINARY_ANALYSIS_TIMEOUT` | `MOBINSPECT_BINARY_ANALYSIS_TIMEOUT` |
-| `MOBINSPECT_*_BINARY` (paths to JADX, apktool, etc.) | `MOBINSPECT_*_BINARY` |
-| Default home dir `~/.MobInspect/` | `~/.MobInspect/` |
-| ~~Database default name `mobinspect` (Postgres)~~ → `mobinspect` | done — also dropped the SQLite fallback entirely; Postgres is now required |
-| `MOBINSPECT_DOMAIN_MALWARE_SCAN`, `MOBINSPECT_APKID_ENABLED`, etc. | `MOBINSPECT_*` |
+| Where | What | Why |
+|---|---|---|
+| `LICENSE.md`, `NOTICE` | upstream copyright and contributor roster | GPL-3.0 §4–5 require keeping notices (decision D1) |
+| `mobinspect/signatures/maltrail-malware-domains.txt` | a domain containing the author's org name | third-party threat-intel data |
+| `mobinspect/DynamicAnalyzer/views/android/environment.py` | package id `opensecurity.clipdump` | compiled into the bundled `ClipDump.apk`; changes only with a rebuilt, re-signed APK |
+| `mobinspect/StaticAnalyzer/tests.py` | a Java path inside a test APK fixture | fixture content |
+| `project-memory/`, `claude-memory/` | session notes | tracked, excluded from images (decision D2) |
+| `docs/agent-contract/`, `CHANGELOG.md`, `.claude/rules/` | describe the work | must name what was replaced |
 
-### Backwards compatibility shim
-Read both old and new env vars during a 1-release deprecation window:
+## Not renamed
 
-```python
-def env(new, old=None, default=''):
-    val = os.getenv(new)
-    if val is not None:
-        return val
-    if old is not None and os.getenv(old) is not None:
-        warnings.warn(
-            f'{old} is deprecated; use {new}', DeprecationWarning,
-        )
-        return os.getenv(old)
-    return default
-```
-
-After v1.0 of MobInspect ships, the shim is removed in v1.1.
-
-### Filesystem paths
-- `~/.MobInspect/` → migrate to `~/.MobInspect/` on first run if old dir exists
-- `~/.MobInspect/config.py` → loaded but written back to `~/.MobInspect/config.py` with a one-line warning
-
-## Pass 3 — User-visible strings, branding assets
-
-### Strings
-- All occurrences of "MobInspect" in templates → "MobInspect"
-- All occurrences in flash messages, error pages, page titles, breadcrumbs
-- "Mobile Security Framework" subtitle → "Mobile Application Security Inspector" (subtitle TBD)
-- README.md — top sentence, badges, screenshots
-- LICENSE file unchanged (GPL-3.0 verbatim)
-- LICENSES/ — unchanged (third-party notices stay)
-- Source file headers — **append** new copyright, do not replace original
-
-### Assets to replace
-| Path | Asset |
-|------|-------|
-| `mobinspect/static/img/favicon.ico` | new favicon |
-| `mobinspect/static/img/mobinspect_logo.png` | new wordmark — light variant |
-| `mobinspect/static/img/mobinspect_logo_dark.png` | new wordmark — dark variant |
-| `mobinspect/static/img/mobinspect-logo-square.png` | square logo (avatars, OG image) |
-| `mobinspect/templates/pdf/header.html` | PDF report header logo |
-| Open Graph image referenced in `base/app.html` | og-image-1200x630.png |
-
-Logo brief is owned by design; see `docs/design/logo-brief.md` (to be created).
-
-### Page titles / metadata
-- HTML `<title>` template: `{% block page_title %}{% endblock %} · MobInspect` (was `... · MobInspect`)
-- `<meta name="description">` updated to MobInspect tagline
-- Manifest / web app metadata if PWA-ish features added later
-
-## Pass 4 — Build & deployment
-
-### Dockerfile
-- `LABEL name="MobInspect"` → `name="MobInspect"`
-- `MOBINSPECT_USER` → `MOBINSPECT_USER`
-- `DJANGO_SUPERUSER_USERNAME=mobinspect` → `mobinspect`
-- `WORKDIR /home/mobinspect/mobinspect` → `/home/mobinspect/MobInspect`
-- All `mobinspect` user/group references
-- Image tag/name (project decision: keep repo name, change image name to `mobinspect/mobinspect`)
-
-### run.sh / run.bat
-- `gunicorn ... mobinspect.MobInspect.wsgi:application` → `mobinspect.MobInspect.wsgi:application`
-
-### scripts/
-- `dependencies.sh`, `entrypoint.sh` — any path/var references
-- `setup.sh`, `setup.bat`
-
-### CI
-- `.github/workflows/*.yml` — image names, env var names
-- Sonar config (`.sonarcloud.properties`) — project key
-
-### Documentation
-- README.md — full rewrite of the intro paragraph; keep MobInspect attribution paragraph at the bottom
-- All `docs/*.md` references that are still legacy
-- API docs — generated from URL conf; should auto-update when string constants change
-
-### External references (do not change)
-- The `mobinspect` strings inside **third-party API user agents or webhook payloads** stay if they're documented as part of the integration contract
-- `apkid.MobInspect` references in tooling that isn't ours
-- Public URLs of the upstream MobInspect project (in attribution links)
+The Django project module `mobinspect/MobInspect/` keeps its mixed case. It owns no database tables,
+but `mobinspect.MobInspect.settings/urls/wsgi` is referenced by `manage.py`, `mobinspect/__main__.py`,
+`wsgi.py`, `pyproject.toml`, the e2e suite, both Dockerfiles, every entrypoint and the systemd units.
+Renaming it is churn with deploy risk and no user-visible value.
 
 ## Verification
 
-After each pass, run:
-
-```bash
-# Pass 1
-poetry install --no-root && poetry run pytest
-
-# Pass 2
-MOBINSPECT_HOME=/tmp/mi-test poetry run mobinspect    # boots cleanly
-
-# Pass 3
-# Manual: open every page in light + dark, confirm brand strings
-
-# Pass 4
-docker build -t mobinspect:test . && docker run --rm -p 8000:8000 mobinspect:test
 ```
-
-Deferred-fail checks (not blocking):
-- `grep -rn 'MobInspect' mobinspect/` returns only intentional attribution lines
-- `grep -rn 'MOBINSPECT_' mobinspect/` returns only the deprecation shim
-- `find mobinspect -name '*MobInspect*'` returns empty
+scripts/check-rebrand.sh          # exit 0 = complete
+```

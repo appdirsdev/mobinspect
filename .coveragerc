@@ -33,7 +33,6 @@ omit =
     */tests_*.py
     */__pycache__/*
     */MobInspect/wsgi.py
-    */MobInspect/asgi.py
     */manage.py
     */DynamicAnalyzer/*
     */StaticAnalyzer/views/windows/*
@@ -54,7 +53,6 @@ omit =
     */tests_*.py
     */__pycache__/*
     */MobInspect/wsgi.py
-    */MobInspect/asgi.py
     */manage.py
     */DynamicAnalyzer/*
     */StaticAnalyzer/views/windows/*
