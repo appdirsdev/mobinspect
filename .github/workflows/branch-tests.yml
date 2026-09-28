@@ -14,9 +14,9 @@ name: Branch tests (pytest)
 
 on:
   push:
-    branches: [ release-2026.7, mobinspect, main ]
+    branches: [ "release-2026.*", mobinspect, main ]
   pull_request:
-    branches: [ release-2026.7, mobinspect, main ]
+    branches: [ "release-2026.*", mobinspect, main ]
 
 permissions:
   contents: read
@@ -71,13 +71,15 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install poetry==1.8.4
 
+      - name: Lockfile is current
+        run: poetry lock --check
+
       - name: Install dependencies (main + dev)
         run: poetry install --no-root --with dev --no-interaction --no-ansi
 
       - name: Apply migrations and seed RBAC roles
         run: |
-          poetry run python manage.py makemigrations --no-input
-          poetry run python manage.py makemigrations StaticAnalyzer --no-input
+          poetry run python manage.py makemigrations --check --dry-run
           poetry run python manage.py migrate --no-input
           poetry run python manage.py create_roles
 
@@ -86,3 +88,12 @@ jobs:
         # up" pre-check. The vars above put settings.py on the service's
         # Postgres; the script verifies it before running pytest.
         run: bash scripts/run-tests.sh
+
+  rebrand:
+    # Stays advisory until workstream W1 lands; W1 removes continue-on-error.
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rebrand gate
+        run: bash scripts/check-rebrand.sh --quiet
