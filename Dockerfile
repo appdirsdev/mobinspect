@@ -55,8 +55,9 @@ RUN apt update -y && \
 
 ARG TARGETPLATFORM
 
-# Install wkhtmltopdf, OpenJDK and jadx
-COPY scripts/dependencies.sh mobinspect/MobInspect/tools_download.py ./
+# Install wkhtmltopdf and OpenJDK (jadx is installed later, after COPY . .
+# makes the mobinspect package importable — see tools_download.py)
+COPY scripts/dependencies.sh ./
 RUN ./dependencies.sh
 
 # Install Python dependencies
@@ -92,6 +93,24 @@ COPY . .
 RUN ./scripts/install-tailwind.sh && \
     ./scripts/tailwind-build.sh --minify && \
     rm -rf tools/tailwindcss tools/tailwindcss-*
+
+# Install JADX now that the mobinspect package (COPY . . above) is
+# importable. install_jadx() catches its own exceptions (by design, so a
+# transient network blip never crashes the app's runtime fallback thread —
+# see mobinspect/MobInspect/init.py), so a failed download would otherwise
+# report success here too; the explicit `test -d` makes a build-time
+# failure loud instead of silently shipping an image with no JADX (the
+# app would then fall back to downloading it on first container start,
+# which defeats the point of an offline-capable image).
+RUN python3 -c "from mobinspect.MobInspect.tools_download import install_jadx; install_jadx('/home/mobinspect/.MobInspect')" && \
+    test -x /home/mobinspect/.MobInspect/tools/jadx/jadx-1.5.0/bin/jadx
+# NOTE: do NOT chown /home/mobinspect/.MobInspect here — the mobinspect
+# user/group are not created until the RUN below, so a chown at this point
+# fails the build with "invalid user". The recursive `chown -R ...
+# /home/mobinspect` in that RUN already covers .MobInspect. (The `test -x`
+# above asserts the actual jadx launcher, not just the dir, since
+# install_jadx() swallows its own exceptions and a corrupt download can
+# leave an empty jadx-1.5.0/ that a bare `test -d` would wrongly accept.)
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl --fail http://localhost:8000/healthz/ || exit 1

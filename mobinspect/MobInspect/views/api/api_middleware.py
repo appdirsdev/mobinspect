@@ -1,9 +1,11 @@
 # -*- coding: utf_8 -*-
 """REST API Middleware."""
+import json
 import logging
 from hmac import compare_digest
 
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, QueryDict
+from django.utils.datastructures import MultiValueDict
 from django.utils.deprecation import MiddlewareMixin
 from django.conf import settings
 from django_ratelimit import ALL as RATELIMIT_ALL_METHODS
@@ -174,6 +176,55 @@ def _has_api_use_permission(request):
         return True
 
 
+def _merge_json_body_into_post(request):
+    """Expose an ``application/json`` request body via ``request.POST``.
+
+    Every ``/api/v1/*`` view reads its parameters from ``request.POST``
+    (i.e. form-encoded or multipart bodies). Django never populates
+    ``request.POST`` from a raw JSON body, so a client that sends
+    ``Content-Type: application/json`` — a very common default — used to
+    get a confusing ``422 Missing Parameters`` even with the right keys.
+
+    This helper parses a flat JSON object and mirrors it into a
+    ``QueryDict`` on ``request.POST`` so JSON and form-encoded clients hit
+    the exact same view code. It is deliberately conservative:
+
+      * Only runs for ``application/json`` — multipart uploads (the
+        ``/api/v1/upload`` file endpoint) and form posts are left
+        untouched, so reading ``request.body`` here can never consume a
+        file-upload stream.
+      * Any parse failure, non-object body, or empty body is a silent
+        no-op — the view then falls back to its normal missing-parameter
+        handling, exactly as before.
+    """
+    if 'application/json' not in (request.content_type or ''):
+        return
+    try:
+        body = request.body
+    except Exception:  # noqa: BLE001 - stream already consumed, etc.
+        return
+    if not body:
+        return
+    try:
+        data = json.loads(body)
+    except (ValueError, TypeError):
+        return
+    if not isinstance(data, dict):
+        return
+    q = QueryDict('', mutable=True)
+    for key, value in data.items():
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                q.appendlist(key, '' if item is None else str(item))
+        else:
+            q[key] = '' if value is None else str(value)
+    q._mutable = False
+    request.POST = q
+    # Pin an empty FILES so a later request.FILES access can't trigger a
+    # re-parse that would overwrite the POST we just injected.
+    request._files = MultiValueDict()
+
+
 class RestApiAuthMiddleware(MiddlewareMixin):
     """Middleware for REST API auth.
 
@@ -238,3 +289,8 @@ class RestApiAuthMiddleware(MiddlewareMixin):
             return make_api_response(
                 {'error': 'API access not permitted for this user.'},
                 FORBIDDEN)
+
+        # Authenticated + permitted. Accept a JSON request body too (not
+        # just form-encoded) so clients that POST application/json reach
+        # the same request.POST[...] params every view already reads.
+        _merge_json_body_into_post(request)

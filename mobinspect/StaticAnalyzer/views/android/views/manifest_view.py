@@ -26,7 +26,13 @@ def run(request, checksum):
     """View the manifest."""
     try:
         supported = ['eclipse', 'studio', 'apk', 'aar']
-        typ = request.GET['type']  # APK or SOURCE
+        # Default to 'apk' when ?type= is omitted so a bare or bookmarked
+        # /manifest_view/<md5>/ URL renders the APK manifest instead of
+        # raising MultiValueDictKeyError (which the outer except turned into
+        # a generic "Error Viewing AndroidManifest.xml" 500 page). Every
+        # in-app link already appends ?type=apk, so this only changes the
+        # direct-URL case from a 500 into a working page.
+        typ = request.GET.get('type', 'apk')  # APK or SOURCE
         if is_md5(checksum) and (typ in supported):
             app_dir = Path(settings.UPLD_DIR) / checksum
             app_dic = {
