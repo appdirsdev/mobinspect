@@ -86,8 +86,6 @@ class MachOChecksec:
             severity = 'high'
             ext = Path(self.macho_name).suffix
             # PIE check not applicable for static and dynamic libraries
-            # https://github.com/MobInspect/mobinspect/
-            # issues/2290#issuecomment-1837272113
             if (ext == '.dylib'
                     or (not ext and '.framework' in self.macho_name)):
                 severity = 'info'

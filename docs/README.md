@@ -1,8 +1,8 @@
 # MobInspect Documentation
 
-This directory contains the design and engineering documentation for the **MobInspect** project — a fork and rebrand of [Mobile Security Framework (MobInspect)](https://github.com/MobInspect/mobinspect) with a modern UI, dynamic RBAC, and analytics.
+This directory contains the design and engineering documentation for the **MobInspect** project — a fork and rebrand of an open-source mobile security scanner (attribution in `NOTICE`) with a modern UI, dynamic RBAC, and analytics.
 
-> MobInspect is licensed under **GPL-3.0**, inheriting from upstream MobInspect.
+> MobInspect is licensed under **GPL-3.0**, inheriting from the upstream project.
 
 ---
 
@@ -12,7 +12,7 @@ For new contributors, read in this order:
 
 | # | Document | Purpose |
 |---|----------|---------|
-| 00 | [Overview & Vision](00-overview.md) | What MobInspect is, who it's for, what changes vs. upstream MobInspect |
+| 00 | [Overview & Vision](00-overview.md) | What MobInspect is, who it's for, what changes vs. the upstream project |
 | 01 | [Architecture](01-architecture.md) | High-level system architecture, Django apps, request lifecycle |
 | 02 | [Tech Stack](02-tech-stack.md) | Frameworks, libraries, and the rationale behind each |
 | 03 | [RBAC Design](03-rbac-design.md) | Dynamic roles, permission catalog, enforcement model |

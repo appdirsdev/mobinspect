@@ -4,7 +4,7 @@
 
 | Tool | Version | Why |
 |------|---------|-----|
-| Python | 3.12+ | Inherited from upstream MobInspect |
+| Python | 3.12+ | Inherited from the upstream project |
 | Poetry | ≥1.5 | Package manager |
 | Git | any | duh |
 | `make` | any | Convenience commands |
@@ -46,7 +46,7 @@ poetry run python manage.py runserver  # NOTE: blocked upstream, see below
 poetry run mobinspect                       # production-style server (gunicorn)
 ```
 
-> Upstream MobInspect blocks `manage.py runserver` (`manage.py:13`) for safety reasons. We unblock it under `MOBINSPECT_DEV=1`. Never set this in production.
+> The upstream project blocks `manage.py runserver` (`manage.py:13`) for safety reasons. We unblock it under `MOBINSPECT_DEV=1`. Never set this in production.
 
 ## Daily development loop
 

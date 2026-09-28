@@ -55,7 +55,7 @@ class Environment:
         self.tools_dir = settings.TOOLS_DIR
         # Suffix the marker with the on-device install path so that
         # relocating the frida-server binary invalidates markers written
-        # by older builds and is_mobinspectyied() triggers a re-provision.
+        # by older builds and is_device_prepared() triggers a re-provision.
         self.frida_str = (
             f'MobInspect-Frida-{frida_version}-{FRIDA_SERVER_REMOTE}'
             .encode('utf-8'))
@@ -632,7 +632,7 @@ class Environment:
             return False
         return True
 
-    def is_mobinspectyied(self, android_version):
+    def is_device_prepared(self, android_version):
         """Check is Device is instrumented."""
         logger.info('Environment Prepared Check')
         if android_version < 5:
@@ -654,7 +654,7 @@ class Environment:
             return False
         return True
 
-    def mobinspecty_init(self):
+    def prepare_device_init(self):
         """Init instrument."""
         version = self.get_android_version()
         logger.info('Android Version identified as %s', version)
@@ -807,7 +807,7 @@ class Environment:
             return
         # Devices instrumented by older builds carry frida-server at the
         # legacy /system location and nothing at FRIDA_SERVER_REMOTE,
-        # yet can still pass is_mobinspectyied(). The exec below discards its
+        # yet can still pass is_device_prepared(). The exec below discards its
         # output, so a missing binary would fail silently. Verify the
         # binary exists and re-provision it if it does not.
         out = self.adb_command(['ls', FRIDA_SERVER_REMOTE], True, True)

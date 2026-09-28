@@ -430,7 +430,7 @@
 {{ spark_values|json_script:"mi-spark-values" }}
 
 <script>
-  // Direct XHR upload — same endpoint and response shape as upstream MobInspect
+  // Direct XHR upload — same endpoint and response shape as the upstream project
   // (POST /, returns JSON {status, hash, analyzer, [description]}).
   function upload() {
     return {

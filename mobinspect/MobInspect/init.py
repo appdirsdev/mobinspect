@@ -26,7 +26,7 @@ def env(new_name, *args):
     """Read an environment variable, or return the default if unset.
 
     The LAST positional argument is the default. An earlier positional (a
-    legacy ``MOBINSPECT_*`` alias name emitted by an older generated user config)
+    legacy alias name emitted by an older generated user config)
     is accepted and ignored, so a pre-existing ``config.py`` keeps working
     after the rebrand.
     """

@@ -10,7 +10,7 @@ Replace the current 2-role / 3-permission model with a **dynamic, industry-stand
 - Enforcement is **uniform** across web views, REST API, and template-level UI hiding
 - Defaults ship out of the box so the product is usable on day one
 
-## Current state (upstream MobInspect)
+## Current state (upstream project)
 
 `mobinspect/MobInspect/views/authorization.py:38-50` defines:
 

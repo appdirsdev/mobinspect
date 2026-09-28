@@ -307,6 +307,72 @@ class ApiMiddlewareCoreTests(TestCase):
         self.assertIsNone(result)
         self.assertEqual(req.api_user, self.permitted)
 
+    # ---- JSON request body support (_merge_json_body_into_post) ---------
+
+    def test_json_body_is_exposed_via_request_post(self):
+        # A client that POSTs application/json (a common default) reaches
+        # the same request.POST[...] params the views read.
+        req = self.rf.post(
+            '/api/v1/scan',
+            data=json.dumps({'hash': 'a' * 32, 'rescan': '0'}),
+            content_type='application/json',
+            HTTP_X_MOBINSPECT_API_KEY=self.admin_key)
+        req.user = AnonymousUser()
+        result = self.mw_instance.process_request(req)
+        self.assertIsNone(result)  # auth + api.use ok; view would run
+        self.assertEqual(req.POST.get('hash'), 'a' * 32)
+        self.assertEqual(req.POST.get('rescan'), '0')
+
+    def test_json_list_values_become_multivalue(self):
+        req = self.rf.post(
+            '/api/v1/scan',
+            data=json.dumps({'ids': ['1', '2', '3']}),
+            content_type='application/json',
+            HTTP_X_MOBINSPECT_API_KEY=self.admin_key)
+        req.user = AnonymousUser()
+        self.mw_instance.process_request(req)
+        self.assertEqual(req.POST.getlist('ids'), ['1', '2', '3'])
+
+    def test_form_encoded_body_is_left_untouched(self):
+        # Regression guard: multipart/form-encoded posts must keep working
+        # exactly as before (the JSON path is skipped for them).
+        req = self.rf.post(
+            '/api/v1/scan', {'hash': 'b' * 32},
+            HTTP_X_MOBINSPECT_API_KEY=self.admin_key)
+        req.user = AnonymousUser()
+        self.mw_instance.process_request(req)
+        self.assertEqual(req.POST.get('hash'), 'b' * 32)
+
+    def test_invalid_json_body_is_a_silent_noop(self):
+        req = self.rf.post(
+            '/api/v1/scan',
+            data='{not valid json',
+            content_type='application/json',
+            HTTP_X_MOBINSPECT_API_KEY=self.admin_key)
+        req.user = AnonymousUser()
+        self.mw_instance.process_request(req)
+        self.assertEqual(list(req.POST.keys()), [])
+
+    def test_non_object_json_body_is_a_silent_noop(self):
+        req = self.rf.post(
+            '/api/v1/scan',
+            data=json.dumps(['a', 'b']),
+            content_type='application/json',
+            HTTP_X_MOBINSPECT_API_KEY=self.admin_key)
+        req.user = AnonymousUser()
+        self.mw_instance.process_request(req)
+        self.assertEqual(list(req.POST.keys()), [])
+
+    def test_merge_json_skips_non_json_content_type(self):
+        # Direct helper call: a non-JSON content type is a no-op even when
+        # the body happens to be valid JSON, so multipart uploads are safe.
+        req = self.rf.post(
+            '/api/v1/scan',
+            data=json.dumps({'hash': 'c' * 32}),
+            content_type='text/plain')
+        mw._merge_json_body_into_post(req)
+        self.assertEqual(list(req.POST.keys()), [])
+
 
 @override_settings(RATELIMIT_ENABLE=False, DISABLE_AUTHENTICATION=None)
 class ApiMiddlewareIntegrationTests(TestCase):

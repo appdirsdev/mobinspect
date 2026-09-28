@@ -8,10 +8,10 @@ DESCRIBE THE DETAILS OF PULL REQUEST HERE
 
 ### Checklist for PR
 
-- [ ] Run MobInspect unit tests and lint `tox -e lint,test`
+- [ ] Run MobInspect unit tests and lint `tox -e lint,test,rebrand`
 - [ ] Tested Working on Linux, Mac, Windows, and Docker
 - [ ] Add unit test for any new Web API (Refer: `StaticAnalyzer/tests.py`)
-- [ ] Make sure tests are passing on your PR [![MobInspect tests](https://github.com/MobInspect/mobinspect/workflows/MobInspect%20tests/badge.svg?branch=master)](https://github.com/MobInspect/mobinspect/actions)
+- [ ] Make sure tests are passing on your PR (see the Actions tab)
 
 ### Additional Comments (if any)
 

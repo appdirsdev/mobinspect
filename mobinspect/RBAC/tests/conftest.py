@@ -42,7 +42,7 @@ def _ensure_role(name, codenames):
     (`sync_legacy_group_permissions`) would otherwise re-run for no
     behavioral reason and can raise `MultipleObjectsReturned` on a
     legacy Permission row that has historically been seeded more than
-    once. That's an upstream-MobInspect data shape we tolerate at runtime
+    once. That's an upstream data shape we tolerate at runtime
     but mustn't trip on at test setup.
     """
     role = Role.objects.filter(name=name).first()

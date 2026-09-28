@@ -1,6 +1,8 @@
 # -*- coding: utf_8 -*-
 """MobInspect REST API V 1."""
 
+import logging
+
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -15,6 +17,8 @@ from mobinspect.DynamicAnalyzer.views.android import (
 )
 from mobinspect.DynamicAnalyzer.views.common import device
 from mobinspect.DynamicAnalyzer.views.common.frida import views as frida
+
+logger = logging.getLogger(__name__)
 
 
 def _passthrough(resp):
@@ -101,18 +105,35 @@ def api_logcat(request):
 # Android Operation APIs
 @request_method(['POST'])
 @csrf_exempt
-def api_mobinspecty(request):
-    """POST - MobInspecty API."""
+def api_prepare_device(request):
+    """POST - Prepare-device API."""
     if 'identifier' not in request.POST:
         return make_api_response(
             {'error': 'Missing Parameters'}, 422)
-    resp = operations.mobinspecty(request, True)
+    resp = operations.prepare_device(request, True)
     denied = _passthrough(resp)
     if denied is not None:
         return denied
     if resp['status'] == 'ok':
-        return make_api_response(resp, 200)  # pragma: no cover - needs a live Android device/emulator for operations.mobinspecty() to succeed
+        return make_api_response(resp, 200)  # pragma: no cover - needs a live Android device/emulator for operations.prepare_device() to succeed
     return make_api_response(resp, 500)
+
+
+_DEPRECATED_ALIAS_WARNED = False
+
+
+@request_method(['POST'])
+@csrf_exempt
+def api_prepare_device_deprecated(request):
+    """POST - deprecated alias of api_prepare_device, kept for one release."""
+    global _DEPRECATED_ALIAS_WARNED
+    if not _DEPRECATED_ALIAS_WARNED:
+        _DEPRECATED_ALIAS_WARNED = True
+        logger.warning(
+            'Deprecated API path used; switch to /api/v1/android/prepare_device')
+    response = api_prepare_device(request)
+    response['Deprecation'] = 'true'
+    return response
 
 
 @request_method(['POST'])

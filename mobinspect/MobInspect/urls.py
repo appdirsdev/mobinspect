@@ -134,7 +134,10 @@ urlpatterns = [
     re_path(r'^api/v1/dynamic/report_json$', api_dz.api_dynamic_report),
     # Android Specific
     re_path(r'^api/v1/android/logcat$', api_dz.api_logcat),
-    re_path(r'^api/v1/android/mobinspecty$', api_dz.api_mobinspecty),
+    re_path(r'^api/v1/android/prepare_device$', api_dz.api_prepare_device),
+    # Deprecated alias for the previous path; remove in the next release.
+    re_path(r'^api/v1/android/mobinspecty$',
+            api_dz.api_prepare_device_deprecated),
     re_path(r'^api/v1/android/adb_command$', api_dz.api_adb_execute),
     re_path(r'^api/v1/android/root_ca$', api_dz.api_root_ca),
     re_path(r'^api/v1/android/global_proxy$', api_dz.api_global_proxy),
@@ -333,7 +336,7 @@ if settings.API_ONLY == '0':
                 name='static_scan'),
         # Android Operations
         re_path(r'^run_apk/$', operations.run_apk),
-        re_path(r'^mobinspecty/$', operations.mobinspecty, name='mobinspecty'),
+        re_path(r'^prepare_device/$', operations.prepare_device, name='prepare_device'),
         re_path(r'^screenshot/$', operations.take_screenshot),
         re_path(r'^execute_adb/$', operations.execute_adb),
         re_path(r'^screen_cast/$',

@@ -86,13 +86,13 @@ def download_file(url, file_path):
         verify = True  # Default to verify for system proxies
         logger.info('Using system proxies (SSL verify: %s)', verify)
     else:
-        # Check if MobInspect upstream proxy is explicitly configured
+        # Check if the upstream proxy is explicitly configured
         upstream_proxy_enabled = bool(
             env('MOBINSPECT_UPSTREAM_PROXY_ENABLED', ''))
 
         if upstream_proxy_enabled:
             proxies, verify = standalone_upstream_proxy()
-            logger.info('Using MobInspect upstream proxies (SSL verify: %s)', verify)
+            logger.info('Using upstream proxies (SSL verify: %s)', verify)
         else:
             # No proxy configuration - use direct connection
             proxies = {}

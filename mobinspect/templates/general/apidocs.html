@@ -375,7 +375,7 @@
               <li><code>api/v1/dynamic/get_apps</code> - <a href="#get-apps-api">Get Apps for Dynamic Analysis</a></li>
               <li><code>api/v1/dynamic/start_analysis</code> - <a href="#start-analysis-api">Start Dynamic Analysis</a></li>
               <li><code>api/v1/android/logcat</code> - <a href="#logcat-api">View Logcat</a></li>
-              <li><code>api/v1/android/mobinspecty</code> - <a href="#mobinspecty-api">Prepare-runtime VM/Emulator/Device</a></li>
+              <li><code>api/v1/android/prepare_device</code> - <a href="#prepare-device-api">Prepare-runtime VM/Emulator/Device</a></li>
               <li><code>api/v1/android/adb_command</code> - <a href="#adb-command-api">Execute ADB Commands</a></li>
               <li><code>api/v1/android/root_ca</code> - <a href="#root-ca-api">Install or Remove MobInspect Root CA</a></li>
               <li><code>api/v1/android/global_proxy</code> - <a href="#global-proxy-api">Set or Unset MobInspect HTTP(S) Proxy</a></li>
@@ -2053,11 +2053,11 @@
             </ul>
 
              <hr />
-            <h2><a id="mobinspecty-api"></a><strong>Prepare-runtime API</strong></h2>
+            <h2><a id="prepare-device-api"></a><strong>Prepare-runtime API</strong></h2>
             <p>API to prepare the Android runtime environment.</p>
             <ul>
               <li>
-                <p><strong>URL:</strong> <code>/api/v1/android/mobinspecty</code></p>
+                <p><strong>URL:</strong> <code>/api/v1/android/prepare_device</code></p>
               </li>
               <li>
                 <p><strong>Method:</strong> <code>POST</code></p>
@@ -2122,7 +2122,7 @@
                 <p><strong>Sample Call:</strong></p>
                 <ul>
                   <li>
-                    <pre><code>curl -X POST --url http://localhost:8000/api/v1/android/mobinspecty --data "identifier=192.168.56.139:5555" -H "Authorization: {{ api_key}}"
+                    <pre><code>curl -X POST --url http://localhost:8000/api/v1/android/prepare_device --data "identifier=192.168.56.139:5555" -H "Authorization: {{ api_key}}"
                   </code></pre>
                   </li>
                 </ul>

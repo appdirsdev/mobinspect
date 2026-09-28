@@ -21,7 +21,7 @@
     cwe: cwe-312
     masvs: storage-14
     owasp-mobile: m9
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x05d-Testing-Data-Storage.md#checking-memory-for-sensitive-data-mstg-storage-10
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x05d-Testing-Data-Storage.md#checking-memory-for-sensitive-data-mstg-storage-10
 - id: ios_sqlite
   message: App uses SQLite Database. Sensitive Information should be encrypted.
   input_case: exact
@@ -35,7 +35,7 @@
     cwe: ''
     masvs: storage-14
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x05d-Testing-Data-Storage.md#sqlite-database-unencrypted
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x05d-Testing-Data-Storage.md#sqlite-database-unencrypted
 - id: ios_load_html_string
   message: User input in "loadHTMLString" will result in JavaScript Injection.
   input_case: exact
@@ -49,7 +49,7 @@
     cwe: cwe-95
     masvs: platform-5
     owasp-mobile: m7
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-webview-protocol-handlers-mstg-platform-6
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-webview-protocol-handlers-mstg-platform-6
 - id: ios_jailbreak_detect
   message: This App may have Jailbreak detection capabilities.
   input_case: exact
@@ -108,7 +108,7 @@
     cwe: ''
     masvs: resilience-1
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#jailbreak-detection-mstg-resilience-1
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#jailbreak-detection-mstg-resilience-1
 - id: ios_swift_log
   message: The App logs information. Sensitive information should never be logged.
   input_case: exact
@@ -120,7 +120,7 @@
     cwe: cwe-532
     masvs: storage-3
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06i-Testing-Code-Quality-and-Build-Settings.md#finding-debugging-code-and-verbose-error-logging-mstg-code-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06i-Testing-Code-Quality-and-Build-Settings.md#finding-debugging-code-and-verbose-error-logging-mstg-code-4
 - id: ios_swift_sha1_collision
   message: SHA1 is a weak hash known to have hash collisions.
   input_case: exact
@@ -134,7 +134,7 @@
     cwe: cwe-327
     masvs: crypto-4
     owasp-mobile: m5
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
 - id: ios_md2_collision
   message: MD2 is a weak hash known to have hash collisions.
   input_case: exact
@@ -147,7 +147,7 @@
     cwe: cwe-327
     masvs: crypto-4
     owasp-mobile: m5
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
 - id: ios_md4_collision
   message: MD4 is a weak hash known to have hash collisions.
   input_case: exact
@@ -160,7 +160,7 @@
     cwe: cwe-327
     masvs: crypto-4
     owasp-mobile: m5
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
 - id: ios_swift_md5_collision
   message: MD5 is a weak hash known to have hash collisions.
   input_case: exact
@@ -174,7 +174,7 @@
     cwe: cwe-327
     masvs: crypto-4
     owasp-mobile: m5
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
 - id: ios_md6_collision
   message: MD6 is a weak hash known to have hash collisions.
   input_case: exact
@@ -188,7 +188,7 @@
     cwe: cwe-327
     masvs: crypto-4
     owasp-mobile: m5
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
 - id: ios_custom_keyboard_disabled
   message: This App may have custom keyboards disabled.
   input_case: exact
@@ -200,7 +200,7 @@
     cwe: ''
     masvs: platform-11
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#app-extensions
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#app-extensions
 - id: ios_keyboard_cache
   message: Keyboard cache should be disabled for all sensitive data inputs.
   input_case: exact
@@ -212,7 +212,7 @@
     cwe: ''
     masvs: storage-5
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#finding-sensitive-data-in-the-keyboard-cache-mstg-storage-5
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#finding-sensitive-data-in-the-keyboard-cache-mstg-storage-5
 - id: ios_uiwebview_safari_view
   message: >-
     It is recommended to use WKWebView instead of SFSafariViewController or
@@ -226,7 +226,7 @@
     cwe: ''
     masvs: platform-5
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-ios-webviews-mstg-platform-5
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-ios-webviews-mstg-platform-5
 - id: ios_detect_reversing
   message: This App may have Reverse engineering detection capabilities.
   input_case: exact
@@ -242,7 +242,7 @@
     cwe: ''
     masvs: resilience-4
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#ios-anti-reversing-defenses
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#ios-anti-reversing-defenses
 - id: ios_detect_simulator
   message: This App may have Simulator detection capabilities.
   input_case: exact
@@ -267,7 +267,7 @@
     cwe: ''
     masvs: auth-8
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06f-Testing-Local-Authentication.md#local-authentication-framework
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06f-Testing-Local-Authentication.md#local-authentication-framework
 - id: ios_biometric_bool
   message: 'Biometric authentication should be hardware and keychain backed, local authentication returns a boolean that can be bypassed by runtime instrumentation tools like Frida. This is not applicable if authentication data in keychain is protected with a biometric only access control.'
   input_case: exact
@@ -282,7 +282,7 @@
     cwe: cwe-303
     masvs: auth-8
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06f-Testing-Local-Authentication.md#local-authentication-framework
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06f-Testing-Local-Authentication.md#local-authentication-framework
 - id: ios_biometric_acl
   message: Weak biometric ACL flag is associated with a key stored in Keychain. With `.biometryAny/.userPresence/.touchIDAny` flag, an attacker with the ability to add a biometry to the device can authenticate as the user. Use `.biometryCurrentSet/.touchIDCurrentSet` instead.
   input_case: exact
@@ -296,7 +296,7 @@
     cwe: cwe-305
     masvs: auth-8
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06f-Testing-Local-Authentication.md#local-authentication-framework
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06f-Testing-Local-Authentication.md#local-authentication-framework
 - id: ios_keychain_weak_acl_device_passcode
   message: A key stored in the Keychain is not making use of stronger biometric backed ACL. Use `.biometryCurrentSet` instead.
   input_case: exact
@@ -310,7 +310,7 @@
     cwe: cwe-305
     masvs: auth-8
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06f-Testing-Local-Authentication.md
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06f-Testing-Local-Authentication.md
 - id: ios_keychain_weak_accessibility_value
   message: A key stored in the Keychain is using a weak accessibility value. Use stronger ACLs like `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly/kSecAttrAccessibleWhenUnlocked/kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.
   input_case: exact
@@ -322,7 +322,7 @@
     cwe: cwe-305
     masvs: auth-8
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06f-Testing-Local-Authentication.md
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06f-Testing-Local-Authentication.md
 - id: ios_insecure_random_no_generator
   message: The App uses an insecure Random Number Generator.
   input_case: exact
@@ -335,7 +335,7 @@
     cwe: cwe-330
     owasp-mobile: m5
     masvs: crypto-6
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#weak-random-number-generators
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04g-Testing-Cryptography.md#weak-random-number-generators
 - id: ios_file_no_special
   message: The file has no special protections associated with it.
   input_case: exact
@@ -347,7 +347,7 @@
     cwe: cwe-311
     masvs: storage-1
     owasp-mobile: m2
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
 - id: ios_uipaste_sec
   message: >-
     This application uses UIPasteboard, improper use of this class can lead to
@@ -361,7 +361,7 @@
     cwe: ''
     masvs: platform-4
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#uipasteboard
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#uipasteboard
 - id: ios_general_paste
   message: Usage of generalPasteboard should be avoided.
   input_case: exact
@@ -373,7 +373,7 @@
     cwe: ''
     masvs: platform-4
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#uipasteboard
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#uipasteboard
 - id: ios_custom_url
   message: >-
     The app should not export sensitive functionality via custom URL schemes,
@@ -387,7 +387,7 @@
     cwe: ''
     masvs: platform-3
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-custom-url-schemes-registration
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-custom-url-schemes-registration
 - id: ios_secure_text
   message: Some UI controls have secure text entry configured.
   input_case: exact
@@ -399,7 +399,7 @@
     cwe: ''
     masvs: storage-5
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#finding-sensitive-data-in-the-keyboard-cache-mstg-storage-5
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#finding-sensitive-data-in-the-keyboard-cache-mstg-storage-5
 - id: ios_cert_pinning
   message: This App may have Certificate Pinning mechanism.
   input_case: exact
@@ -413,7 +413,7 @@
     cwe: cwe-295
     masvs: network-4
     owasp-mobile: m3
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x05g-Testing-Network-Communication.md#testing-custom-certificate-stores-and-certificate-pinning-mstg-network-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x05g-Testing-Network-Communication.md#testing-custom-certificate-stores-and-certificate-pinning-mstg-network-4
 - id: ios_realm_enable_enc
   message: App uses Realm Database. Sensitive Information should be encrypted.
   input_case: exact
@@ -425,7 +425,7 @@
     cwe: cwe-311
     masvs: storage-14
     owasp-mobile: m2
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#realm-databases
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#realm-databases
 - id: ios_core_data
   message: App uses CoreData Database. Sensitive Information should be encrypted.
   input_case: exact
@@ -439,7 +439,7 @@
     cwe: cwe-311
     masvs: storage-14
     owasp-mobile: m2
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#coredata
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#coredata
 - id: ios_realm_db_enc_enabled
   message: Used Realm database has configured encryption.
   input_case: exact
@@ -453,7 +453,7 @@
     cwe: cwe-311
     masvs: storage-14
     owasp-mobile: m2
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#realm-databases
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#realm-databases
 - id: ios_ui_controls_disabled
   message: Copy feature may be disabled in some UI controls.
   input_case: exact
@@ -491,7 +491,7 @@
     cwe: ''
     masvs: storage-8
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#the-keychain
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#the-keychain
 - id: ios_webview_disable_js
   message: JavaScript should be disabled in WebViews unless explicitly required.
   input_case: exact
@@ -505,7 +505,7 @@
     cwe: ''
     masvs: platform-5
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-javascript-configuration
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-javascript-configuration
 - id: ios_tls3_not_used
   message: TLS 1.3 should be used. Detected old version
   input_case: exact
@@ -520,7 +520,7 @@
     cwe: cwe-757
     masvs: network-2
     owasp-mobile: m3
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04f-Testing-Network-Communication.md#verifying-data-encryption-on-the-network-mstg-network-1-and-mstg-network-2
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04f-Testing-Network-Communication.md#verifying-data-encryption-on-the-network-mstg-network-1-and-mstg-network-2
 - id: ios_tls12_used
   message: TLS 1.3 should be used. Detected old version - TLS 1.2.
   input_case: exact
@@ -534,7 +534,7 @@
     cwe: ''
     masvs: network-2
     owasp-mobile: m3
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04f-Testing-Network-Communication.md#verifying-data-encryption-on-the-network-mstg-network-1-and-mstg-network-2
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04f-Testing-Network-Communication.md#verifying-data-encryption-on-the-network-mstg-network-1-and-mstg-network-2
 - id: ios_dtls1_used
   message: DTLS 1.2 should be used. Detected old version - DTLS 1.0.
   input_case: exact
@@ -548,7 +548,7 @@
     cwe: ''
     masvs: network-2
     owasp-mobile: m3
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04f-Testing-Network-Communication.md#verifying-data-encryption-on-the-network-mstg-network-1-and-mstg-network-2
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04f-Testing-Network-Communication.md#verifying-data-encryption-on-the-network-mstg-network-1-and-mstg-network-2
 - id: ios_depr_tls_min
   message: >-
     Use of deprecated property tlsMinimumSupportedProtocol. To avoid potential
@@ -562,4 +562,4 @@
     cwe: ''
     masvs: network-2
     owasp-mobile: m3
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04f-Testing-Network-Communication.md#verifying-data-encryption-on-the-network-mstg-network-1-and-mstg-network-2
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04f-Testing-Network-Communication.md#verifying-data-encryption-on-the-network-mstg-network-1-and-mstg-network-2

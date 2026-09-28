@@ -65,7 +65,7 @@ This is read into `settings.WKHTMLTOPDF_BINARY` and passed to
 
 ### 1. StaticAnalyzer migrations (was the #1 deploy gotcha)
 
-Upstream MobInspect gitignores `mobinspect/StaticAnalyzer/migrations`. We **un-gitignore** it in this fork and ship `0001_initial.py` in the repo. If you ever see:
+The upstream project gitignores `mobinspect/StaticAnalyzer/migrations`. We **un-gitignore** it here and ship `0001_initial.py` in the repo. If you ever see:
 
 ```
 sqlite3.OperationalError: no such table: StaticAnalyzer_recentscansdb
@@ -451,7 +451,7 @@ repo file without copying it to `/etc/systemd/system/`.
 ## Dynamic analysis: writable /system + host requirements (2026-06-12)
 
 Android dynamic analysis needs the emulator's `/system` partition writable so
-`mobinspecty_init` can push the Frida server + CA. On API 30 that requires disabling
+`prepare_device_init` can push the Frida server + CA. On API 30 that requires disabling
 dm-verity, which **only takes effect after a guest reboot**.
 
 **Provisioning (capable host):** `deploy/scripts/avd-provision.sh` + the

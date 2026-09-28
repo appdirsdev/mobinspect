@@ -12,7 +12,7 @@ if __name__ == '__main__':
     from django.core.management import execute_from_command_line
     if 'runserver' in sys.argv and os.environ.get('MOBINSPECT_DEV') != '1':
         print('We do not allow debug server anymore. '
-              'Please follow official docs: '
-              'https://mobinspect.github.io/docs/')
+              'Set MOBINSPECT_DEV=1 for development, or run gunicorn '
+              '(see docs/09-development-setup.md).')
         sys.exit(0)
     execute_from_command_line(sys.argv)

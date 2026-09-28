@@ -45,7 +45,7 @@ Environment=ANDROID_AVD_HOME=/home/ubuntu/.android/avd
 Environment=PATH=/home/ubuntu/android-sdk/cmdline-tools/latest/bin:/home/ubuntu/android-sdk/platform-tools:/home/ubuntu/android-sdk/emulator:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Headless, software GPU, no audio, no snapshot (clean boot each restart).
 #
-# -writable-system is REQUIRED for MobInspect's dynamic analysis: mobinspecty_init
+# -writable-system is REQUIRED for MobInspect's dynamic analysis: prepare_device_init
 # does `adb remount` to push the Frida server + Burp CA into /system. Without
 # this flag the vbmeta partition is read-only and `adb disable-verity` fails
 # with "Error writing to partition 'vbmeta'".

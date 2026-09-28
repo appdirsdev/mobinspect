@@ -229,12 +229,12 @@ def dynamic_analyzer(request, checksum, api=False):
         version = env.get_android_version()
         logger.info('Android Version identified as %s', version)
         xposed_first_run = False
-        if not env.is_mobinspectyied(version):
+        if not env.is_device_prepared(version):
             msg = ('This Android instance is not instrumented/Outdated.\n'
                    'instrumenting the android runtime environment')
             logger.warning(msg)
-            if not env.mobinspecty_init():
-                # mobinspecty_init() returns False when the device drops out
+            if not env.prepare_device_init():
+                # prepare_device_init() returns False when the device drops out
                 # mid-preparation (adb calls return None / raise inside).
                 # Treat this as device unavailability (HTTP 200) rather
                 # than a hard 500.

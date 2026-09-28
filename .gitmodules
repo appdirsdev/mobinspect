@@ -1,3 +1,0 @@
-[submodule "mobinspect/StaticAnalyzer/test_files"]
-	path = mobinspect/StaticAnalyzer/test_files
-	url = https://github.com/MobInspect/test_files.git

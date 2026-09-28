@@ -85,7 +85,7 @@ load_postgres_env
 
 # ---- Dynamic Analysis target (macOS local emulator) ------------------------
 EMU_PID=""
-AVD="${AVD:-MobInspect_API30}"
+AVD="${AVD:-MobInspect_AVD}"
 # A local emulator's `emulator-5554` id is NOT usable with `adb connect`
 # (MobInspect connects that way), so target the emulator's TCP adb port.
 EMU_TCP="127.0.0.1:5555"
