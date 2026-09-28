@@ -24,7 +24,7 @@ def static_analysis_test():
         uploaded = []
         logger.info('Running Upload Test')
         http_client = Client()
-        apk_dir = os.path.join(settings.BASE_DIR, 'StaticAnalyzer/test_files/')
+        apk_dir = os.path.join(settings.BASE_DIR, '..', 'test_files')
         for filename in os.listdir(apk_dir):
             if not filename.endswith(EXTS):
                 continue
@@ -180,7 +180,7 @@ def api_test():
         uploaded = []
         logger.info('Running Test on Upload API')
         http_client = Client()
-        apk_dir = os.path.join(settings.BASE_DIR, 'StaticAnalyzer/test_files/')
+        apk_dir = os.path.join(settings.BASE_DIR, '..', 'test_files')
         for filename in os.listdir(apk_dir):
             if not filename.endswith(EXTS):
                 continue

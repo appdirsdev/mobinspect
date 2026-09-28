@@ -21,7 +21,7 @@
     cwe: cwe-312
     masvs: storage-14
     owasp-mobile: m9
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x05d-Testing-Data-Storage.md#checking-memory-for-sensitive-data-mstg-storage-10
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x05d-Testing-Data-Storage.md#checking-memory-for-sensitive-data-mstg-storage-10
 - id: ios_sqlite
   message: App uses SQLite Database. Sensitive Information should be encrypted.
   input_case: exact
@@ -35,7 +35,7 @@
     cwe: ''
     masvs: storage-14
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x05d-Testing-Data-Storage.md#sqlite-database-unencrypted
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x05d-Testing-Data-Storage.md#sqlite-database-unencrypted
 - id: ios_load_html_string
   message: User input in "loadHTMLString" will result in JavaScript Injection.
   input_case: exact
@@ -49,7 +49,7 @@
     cwe: cwe-95
     masvs: platform-5
     owasp-mobile: m7
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-webview-protocol-handlers-mstg-platform-6
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06h-Testing-Platform-Interaction.md#testing-webview-protocol-handlers-mstg-platform-6
 - id: ios_jailbreak_detect
   message: This App may have Jailbreak detection capabilities.
   input_case: exact
@@ -108,7 +108,7 @@
     cwe: ''
     masvs: resilience-1
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#jailbreak-detection-mstg-resilience-1
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#jailbreak-detection-mstg-resilience-1
 - id: ios_banned_api
   message: >-
     The App may contain banned API(s). These API(s) are insecure and must not be
@@ -137,7 +137,7 @@
     cwe: cwe-295
     masvs: network-3
     owasp-mobile: m3
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06g-Testing-Network-Communication.md#testing-custom-certificate-stores-and-certificate-pinning-mstg-network-3-and-mstg-network-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06g-Testing-Network-Communication.md#testing-custom-certificate-stores-and-certificate-pinning-mstg-network-3-and-mstg-network-4
 - id: ios_webview_ignore_ssl
   message: >-
     UIWebView in App ignore SSL errors and accept any SSL Certificate. App is
@@ -152,7 +152,7 @@
     cwe: cwe-295
     masvs: network-3
     owasp-mobile: m3
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x05g-Testing-Network-Communication.md#webview-server-certificate-verification
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x05g-Testing-Network-Communication.md#webview-server-certificate-verification
 - id: ios_app_logging
   message: The App logs information. Sensitive information should never be logged.
   input_case: exact
@@ -164,7 +164,7 @@
     cwe: cwe-532
     masvs: storage-3
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06i-Testing-Code-Quality-and-Build-Settings.md#finding-debugging-code-and-verbose-error-logging-mstg-code-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06i-Testing-Code-Quality-and-Build-Settings.md#finding-debugging-code-and-verbose-error-logging-mstg-code-4
 - id: ios_clipboard_listen
   message: >-
     This app listens to Clipboard changes. Some malware also listen to
@@ -178,7 +178,7 @@
     cwe: ''
     masvs: platform-4
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04b-Mobile-App-Security-Testing.md#clipboard
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04b-Mobile-App-Security-Testing.md#clipboard
 - id: ios_temp_dir
   message: >-
     Untrusted user input to "NSTemporaryDirectory()" will result in path
@@ -205,7 +205,7 @@
     cwe: ''
     masvs: storage-14
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
 - id: ios_file_enc_closed
   message: File is stored in an encrypted format on disk after it is closed.
   input_case: exact
@@ -217,7 +217,7 @@
     cwe: ''
     masvs: storage-14
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
 - id: ios_file_enc_boot
   message: >-
     File is stored in an encrypted format on disk and cannot be accessed until
@@ -231,7 +231,7 @@
     cwe: ''
     masvs: storage-14
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
 - id: ios_file_perm
   message: The file has no special protections associated with it.
   input_case: exact
@@ -243,7 +243,7 @@
     cwe: cwe-311
     masvs: storage-2
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#ios-data-storage
 - id: ios_jailbreak_check
   message: SFAntiPiracy Jailbreak checks found
   input_case: exact
@@ -258,7 +258,7 @@
     cwe: ''
     masvs: resilience-1
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#jailbreak-detection-mstg-resilience-1
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#jailbreak-detection-mstg-resilience-1
 - id: ios_piracy_check
   message: SFAntiPiracy Piracy checks found
   input_case: exact
@@ -273,7 +273,7 @@
     cwe: ''
     masvs: resilience-3
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#bypassing-jailbreak-detection
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#bypassing-jailbreak-detection
 - id: ios_md5_collision
   message: MD5 is a weak hash known to have hash collisions.
   input_case: exact
@@ -287,7 +287,7 @@
     cwe: cwe-327
     masvs: crypto-4
     owasp-mobile: m5
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
 - id: ios_sha1_collision
   message: SHA1 is a weak hash known to have hash collisions.
   input_case: exact
@@ -301,7 +301,7 @@
     cwe: cwe-327
     masvs: crypto-4
     owasp-mobile: m5
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04g-Testing-Cryptography.md#identifying-insecure-andor-deprecated-cryptographic-algorithms-mstg-crypto-4
 - id: ios_aes_ecb
   message: >-
     The App uses ECB mode in Cryptographic encryption algorithm. ECB mode is
@@ -318,7 +318,7 @@
     cwe: cwe-327
     masvs: crypto-3
     owasp-mobile: m5
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04g-Testing-Cryptography.md#weak-block-cipher-mode
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04g-Testing-Cryptography.md#weak-block-cipher-mode
 - id: ios_ptrace
   message: 'The App has anti-debugger code using ptrace() '
   input_case: exact
@@ -332,7 +332,7 @@
     cwe: ''
     masvs: resilience-2
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#using-ptrace
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06j-Testing-Resiliency-Against-Reverse-Engineering.md#using-ptrace
 - id: ios_mach_ports
   message: This App has anti-debugger code using Mach Exception Ports.
   input_case: exact
@@ -347,7 +347,7 @@
     cwe: ''
     masvs: resilience-2
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#mach-ports
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#mach-ports
 - id: ios_clipboard_copy
   message: >-
     This App copies data to clipboard. Sensitive data should not be copied to
@@ -364,7 +364,7 @@
     cwe: ''
     masvs: storage-10
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x04b-Mobile-App-Security-Testing.md#clipboard
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x04b-Mobile-App-Security-Testing.md#clipboard
 - id: ios_realm_db
   message: App uses Realm Database. Sensitive Information should be encrypted.
   input_case: exact
@@ -376,7 +376,7 @@
     cwe: ''
     masvs: storage-14
     owasp-mobile: ''
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06d-Testing-Data-Storage.md#realm-databases
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06d-Testing-Data-Storage.md#realm-databases
 - id: ios_biometric_bool
   message: Biometric authentication should be hardware and keychain backed, local authentication returns a boolean that can be bypassed by runtime instrumentation tools like Frida. This is not applicable if authentication data in keychain is protected with a biometric only access control.
   input_case: exact
@@ -392,4 +392,4 @@
     cwe: cwe-303
     masvs: auth-8
     owasp-mobile: m1
-    ref: https://github.com/MobInspect/owasp-mstg/blob/master/Document/0x06f-Testing-Local-Authentication.md#local-authentication-framework
+    ref: https://github.com/OWASP/mastg/blob/master/Document/0x06f-Testing-Local-Authentication.md#local-authentication-framework
