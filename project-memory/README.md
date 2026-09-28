@@ -4,11 +4,12 @@ This folder is a **verbatim copy of the Claude Code project memory** for MobInsp
 placed inside the repo so it travels with the project to another machine. It is the
 notes Claude uses to recall how this project is built, deployed, and operated.
 
-Last synced from the live memory: **2026-07-23**.
+Last synced from the live memory: **2026-09-28** (adds `agent-contract.md` — read that
+first; it points at the binding contract under `docs/agent-contract/`).
 
 On this Mac the live copy lives at:
 
-    ~/.claude/projects/-Users-vipin-Appdirs-projects-mac-mini-projects-MobInspect/memory/
+    ~/.claude/projects/-Users-vipin-Appdirs-projects-MobInspect/memory/
 
 ## Index
 
@@ -32,8 +33,8 @@ where `<encoded-path>` is the project's absolute path with every `/` replaced by
    creates the `~/.claude/projects/<encoded-path>/` directory).
 2. Copy these files into place. For the current absolute path it is:
 
-       mkdir -p ~/.claude/projects/-Users-vipin-Appdirs-projects-mac-mini-projects-MobInspect/memory
-       cp project-memory/*.md ~/.claude/projects/-Users-vipin-Appdirs-projects-mac-mini-projects-MobInspect/memory/
+       mkdir -p ~/.claude/projects/-Users-vipin-Appdirs-projects-MobInspect/memory
+       cp project-memory/*.md ~/.claude/projects/-Users-vipin-Appdirs-projects-MobInspect/memory/
 
    If the path differs, compute the encoded name from the new absolute path
    (replace `/` with `-`) and copy into `~/.claude/projects/<that>/memory/`.
@@ -42,4 +43,4 @@ where `<encoded-path>` is the project's absolute path with every `/` replaced by
 
 Keep this copy in sync by re-copying whenever the live memory changes:
 
-    cp ~/.claude/projects/-Users-vipin-Appdirs-projects-mac-mini-projects-MobInspect/memory/*.md project-memory/
+    cp ~/.claude/projects/-Users-vipin-Appdirs-projects-MobInspect/memory/*.md project-memory/ claude-memory/

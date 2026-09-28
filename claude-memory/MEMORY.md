@@ -1,5 +1,6 @@
 # MobInspect — memory index
 
+- [agent-contract](agent-contract.md) — READ FIRST: binding contract at docs/agent-contract/ (2026-09-28); 4 workstreams, execution order, decisions D1–D15, rebrand gate script, what the blind-sed rebrand broke, fix/docker-allinone-bugs holds the all-in-one image
 - [release-2026-7](release-2026-7.md) — active work branch: review fixes, admin/admin cred convention, creds-in-history security debt, local dev env
 - [coverage-campaign](coverage-campaign.md) — how to run the full real-execution coverage suite; reached 66.9%, ceiling is device/Windows/network-locked
 - [local-ai-enhancement](local-ai-enhancement.md) — local CPU AI to enhance scans (defence/air-gap): Granite 4.x + nomic-embed shortlist, live-tested on M1 (works, ~7.5 tok/s), honest limits, 9 product features, llama.cpp runtime gotcha, 8B server sizing for 5 users

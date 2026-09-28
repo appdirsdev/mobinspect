@@ -1,0 +1,28 @@
+# Allowlist for scripts/check-rebrand.sh (the G-rebrand gate).
+# One rule per line:  <path regex>:<line regex>
+# Both are POSIX ERE, matched case-insensitively; the path regex is anchored (^...$).
+# Only legitimately-retained upstream references belong here — every rule needs a reason,
+# and DECISIONS.md must back any rule that keeps the old brand name in a shipped file.
+
+# D1 — the single GPL-3 attribution (upstream copyright line + contributor roster).
+LICENSE\.md:.*
+NOTICE:.*
+
+# Third-party threat-intel feed: a domain name that merely contains the string; unrelated to the upstream author.
+mobinspect/signatures/maltrail-malware-domains\.txt:opensecurity
+
+# Android package id compiled into the bundled ClipDump.apk; changing it means rebuilding + re-signing the APK.
+mobinspect/DynamicAnalyzer/views/android/environment\.py:opensecurity\.clipdump
+
+# Java source path inside the bundled test APK fixture used by the self-test suite.
+mobinspect/StaticAnalyzer/tests\.py:opensecurity/webviewignoressl
+
+# The rebrand record, the agent contract, the changelog and the rules file necessarily name what was replaced.
+docs/07-rebrand-checklist\.md:.*
+docs/agent-contract/.*:.*
+CHANGELOG\.md:.*
+\.claude/rules/.*:.*
+
+# D2 — session-note copies synced from the auto-memory; kept tracked, excluded from the image by .dockerignore.
+project-memory/.*:.*
+claude-memory/.*:.*
