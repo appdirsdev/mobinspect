@@ -13,7 +13,7 @@ export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export JAVA_HOME="/opt/homebrew/opt/openjdk@17"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
-AVD="${AVD:-MobInspect_API30}"
+AVD="${AVD:-MobInspect_AVD}"
 
 case "$1" in
   emulator)

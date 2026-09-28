@@ -172,8 +172,13 @@ class AndroidDynamicApiTests(TestCase):
     def test_logcat_missing_package(self):
         self._assert_missing_params(self._post('/api/v1/android/logcat'))
 
-    def test_mobinspecty_missing_identifier(self):
-        self._assert_missing_params(self._post('/api/v1/android/mobinspecty'))
+    def test_prepare_device_missing_identifier(self):
+        self._assert_missing_params(self._post('/api/v1/android/prepare_device'))
+
+    def test_deprecated_alias_still_answers_with_deprecation_header(self):
+        resp = self._post('/api/v1/android/mobinspecty')
+        self._assert_missing_params(resp)
+        self.assertEqual(resp['Deprecation'], 'true')
 
     def test_screenshot_missing_hash(self):
         # api_screenshot has no URL route; call the real view directly.
@@ -260,10 +265,10 @@ class AndroidDynamicApiTests(TestCase):
         self.assertEqual(resp.status_code, 500)
         self.assertEqual(self._json(resp).get('status'), 'failed')
 
-    def test_mobinspecty_command_injection_500(self):
+    def test_prepare_device_command_injection_500(self):
         """Injection markers in identifier -> analyzer 'failed', 500."""
         resp = self._post(
-            '/api/v1/android/mobinspecty', {'identifier': 'device;rm -rf /'})
+            '/api/v1/android/prepare_device', {'identifier': 'device;rm -rf /'})
         self.assertEqual(resp.status_code, 500)
         self.assertEqual(self._json(resp).get('status'), 'failed')
 
@@ -431,7 +436,7 @@ class AndroidDynamicApiTests(TestCase):
         cases = [
             ('/api/v1/dynamic/start_analysis', {'hash': 'x'}),
             ('/api/v1/android/logcat', {'package': 'com.example'}),
-            ('/api/v1/android/mobinspecty', {'identifier': 'dev'}),
+            ('/api/v1/android/prepare_device', {'identifier': 'dev'}),
             ('/api/v1/android/adb_command', {'cmd': 'shell pm list packages'}),
             ('/api/v1/android/root_ca', {'action': 'install'}),
             ('/api/v1/android/global_proxy', {'action': 'set'}),

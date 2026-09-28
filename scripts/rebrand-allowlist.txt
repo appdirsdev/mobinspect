@@ -26,3 +26,7 @@ CHANGELOG\.md:.*
 # D2 — session-note copies synced from the auto-memory; kept tracked, excluded from the image by .dockerignore.
 project-memory/.*:.*
 claude-memory/.*:.*
+
+# D8 — deprecated API alias kept for one release (route, deprecation test); remove both rules with the alias.
+mobinspect/MobInspect/urls\.py:api/v1/android/mobinspecty
+mobinspect/MobInspect/views/api/test_cov_api_android_dynamic_analysis\.py:api/v1/android/mobinspecty

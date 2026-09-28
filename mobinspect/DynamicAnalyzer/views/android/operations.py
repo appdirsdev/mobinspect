@@ -66,7 +66,7 @@ def get_package_name(checksum):
 @login_required
 @permission_required(Permissions.SCAN)
 @require_http_methods(['POST'])
-def mobinspecty(request, api=False):
+def prepare_device(request, api=False):
     """Configure Instance for Dynamic Analysis."""
     logger.info('Preparing Android instance')
     data = {}
@@ -85,7 +85,7 @@ def mobinspecty(request, api=False):
         if not create_env.connect_n_mount():
             data = {'status': 'failed', 'message': msg}
             return send_response(data, api)
-        version = create_env.mobinspecty_init()
+        version = create_env.prepare_device_init()
         if not version:
             data = {'status': 'failed', 'message': msg}
             return send_response(data, api)

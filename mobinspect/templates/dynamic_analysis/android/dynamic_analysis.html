@@ -76,8 +76,8 @@
   .mi-console-dot { width: 9px; height: 9px; border-radius: 9999px; }
 
   /* ── Spinner takes over the Prepare-runtime button while it's working ── */
-  #mi-mobinspecty-btn:disabled { position: relative; color: transparent !important; }
-  #mi-mobinspecty-btn:disabled::after {
+  #mi-prepare-device-btn:disabled { position: relative; color: transparent !important; }
+  #mi-prepare-device-btn:disabled::after {
     content: ''; position: absolute; inset: 0; margin: auto; width: 16px; height: 16px;
     border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 9999px;
     animation: mi-spin .7s linear infinite;
@@ -86,7 +86,7 @@
   @media (prefers-reduced-motion: reduce) {
     .mi-hero-glow::before, .mi-hero-glow::after { animation: none; }
     .mi-stat, .mi-row, .mi-copy-flash { transition: none; }
-    #mi-mobinspecty-btn:disabled::after { animation: none; }
+    #mi-prepare-device-btn:disabled::after { animation: none; }
   }
   @keyframes mi-float {
     0%, 100% { transform: translate3d(0,0,0); }
@@ -126,7 +126,7 @@
         <button
           type="button"
           class="mi-pillbtn btn btn-md {% if not identifier %}opacity-50 pointer-events-none{% endif %}"
-          onclick="document.getElementById('mi-mobinspecty').showModal()"
+          onclick="document.getElementById('mi-prepare-device').showModal()"
           {% if not identifier %}disabled{% endif %}
         >
           {% icon "zap" size=14 %} Prepare runtime
@@ -331,7 +331,7 @@
       <button
         type="button"
         class="mi-pillbtn btn btn-md w-full {% if not identifier %}opacity-50 pointer-events-none{% endif %}"
-        onclick="document.getElementById('mi-mobinspecty').showModal()"
+        onclick="document.getElementById('mi-prepare-device').showModal()"
         {% if not identifier %}disabled{% endif %}
       >
         {% icon "zap" size=14 %} Prepare runtime
@@ -524,7 +524,7 @@
 </section>
 
 {# ─────────────────── Prepare-runtime modal ─────────────────── #}
-<dialog id="mi-mobinspecty"
+<dialog id="mi-prepare-device"
         class="rounded-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm max-w-2xl w-full p-0 bg-surface-1 text-text-primary border border-border-subtle shadow-elevation-4">
   <form method="dialog" class="flex flex-col">
     <div class="flex items-center justify-between gap-4 px-5 py-4 border-b border-border-subtle bg-gradient-to-r from-chart-amber/5 to-transparent">
@@ -566,7 +566,7 @@
     <form method="dialog" class="contents">
       <button type="submit" class="btn btn-ghost btn-md">Close</button>
     </form>
-    <button id="mi-mobinspecty-btn" type="button" class="mi-pillbtn btn btn-md">
+    <button id="mi-prepare-device-btn" type="button" class="mi-pillbtn btn btn-md">
       {% icon "zap" size=14 %} Prepare runtime
     </button>
   </div>
@@ -590,7 +590,7 @@
   // Prepare-runtime AJAX — uses fetch() instead of jQuery; same endpoint + payload
   // shape as upstream so the legacy view continues to work.
   (function () {
-    var btn = document.getElementById('mi-mobinspecty-btn');
+    var btn = document.getElementById('mi-prepare-device-btn');
     if (!btn) return;
     var stat = document.getElementById('mi-stat');
     var idInput = document.getElementById('mi-identifier');
@@ -612,7 +612,7 @@
       fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
       fd.append('identifier', idInput.value);
 
-      fetch('{% url "mobinspecty" %}', { method: 'POST', body: fd, credentials: 'same-origin' })
+      fetch('{% url "prepare_device" %}', { method: 'POST', body: fd, credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
         .then(function (json) {
           if (json.status === 'ok') {
